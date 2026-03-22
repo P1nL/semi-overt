@@ -30,7 +30,7 @@ export function isBusinessSuccess(code: number): boolean {
     return code === 200
 }
 
-async function runBusinessSideEffects(code: number, message: string): Promise<void> {
+export async function runApiSideEffects(code: number, message: string): Promise<void> {
     if (code === 401) {
         await sideEffectHandlers.onUnauthorized?.()
         return
@@ -55,7 +55,7 @@ export async function unwrapApiResponse<T>(payload: unknown): Promise<T> {
     }
 
     if (!isBusinessSuccess(payload.code)) {
-        await runBusinessSideEffects(payload.code, payload.message)
+        await runApiSideEffects(payload.code, payload.message)
 
         throw new ApiBusinessError(payload.message || '请求失败', {
             code: payload.code,

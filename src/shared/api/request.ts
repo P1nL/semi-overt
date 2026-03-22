@@ -5,7 +5,7 @@ import type { ApiResponse, RequestConfig } from '../types/api'
 
 type RequestParams = object
 type RequestData = unknown
-const SKIP_AUTH_HEADER = 'X-Skip-Auth'
+const SKIP_AUTH_CONFIG_KEY = '__skipAuth'
 
 function mergeConfig(config?: RequestConfig): AxiosRequestConfig {
     const axiosConfig: AxiosRequestConfig = {
@@ -16,9 +16,9 @@ function mergeConfig(config?: RequestConfig): AxiosRequestConfig {
         },
     }
 
-    if (config?.withAuth === false && axiosConfig.headers) {
+    if (config?.withAuth === false) {
         delete (axiosConfig.headers as Record<string, unknown>).Authorization
-        ;(axiosConfig.headers as Record<string, unknown>)[SKIP_AUTH_HEADER] = '1'
+        ;(axiosConfig as AxiosRequestConfig & { [SKIP_AUTH_CONFIG_KEY]?: boolean })[SKIP_AUTH_CONFIG_KEY] = true
     }
 
     return axiosConfig
@@ -94,10 +94,6 @@ export async function upload<T>(
     return requestAndUnwrap<T>(
         http.post<ApiResponse<T>>(url, formData, {
             ...mergeConfig(config),
-            headers: {
-                ...(config?.headers ?? {}),
-                'Content-Type': 'multipart/form-data',
-            },
         }),
     )
 }

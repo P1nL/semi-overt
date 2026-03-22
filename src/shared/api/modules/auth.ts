@@ -11,11 +11,15 @@ import type {
 const AUTH_BASE = '/auth'
 
 export function register(payload: RegisterReqDto): Promise<AuthRespDto> {
-    return request.post<any>(`${AUTH_BASE}/register`, payload).then(normalizeAuthResp)
+    return request.post<any>(`${AUTH_BASE}/register`, payload, {
+        withAuth: false,
+    }).then(normalizeAuthResp)
 }
 
 export function login(payload: LoginReqDto): Promise<AuthRespDto> {
-    return request.post<any>(`${AUTH_BASE}/login`, payload).then(normalizeAuthResp)
+    return request.post<any>(`${AUTH_BASE}/login`, payload, {
+        withAuth: false,
+    }).then(normalizeAuthResp)
 }
 
 export function logout(): Promise<null> {

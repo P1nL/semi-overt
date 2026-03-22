@@ -1,29 +1,27 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import { ApiBusinessError } from '../types/api'
 import { ENV } from '@/shared/config/env'
+import { readStoredToken, writeStoredToken } from '@/shared/utils/authStorage'
+import { runApiSideEffects } from './response'
 
 const DEFAULT_TIMEOUT = 15000
 const REFRESH_TOKEN_HEADER_KEYS = ['new-token', 'x-new-token', 'x-access-token', 'authorization']
-const SKIP_AUTH_HEADER = 'X-Skip-Auth'
+const SKIP_AUTH_CONFIG_KEY = '__skipAuth'
+
+type AuthAwareRequestConfig = InternalAxiosRequestConfig & {
+    __skipAuth?: boolean
+}
 
 function getApiBaseURL(): string {
     return ENV.apiBaseUrl || '/api/v1'
 }
 
 function getStoredToken(): string | null {
-    try {
-        return localStorage.getItem(ENV.tokenStorageKey)
-    } catch {
-        return null
-    }
+    return readStoredToken()
 }
 
 function setStoredToken(token: string): void {
-    try {
-        localStorage.setItem(ENV.tokenStorageKey, token)
-    } catch {
-        // ignore storage errors
-    }
+    writeStoredToken(token)
 }
 
 function normalizeAuthHeaderToken(rawValue: string | null | undefined): string | null {
@@ -38,10 +36,9 @@ function normalizeAuthHeaderToken(rawValue: string | null | undefined): string |
     return rawValue.trim()
 }
 
-function attachAuthToken(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
-    const skipAuth = config.headers?.[SKIP_AUTH_HEADER]
+function attachAuthToken(config: AuthAwareRequestConfig): AuthAwareRequestConfig {
+    const skipAuth = config[SKIP_AUTH_CONFIG_KEY]
     if (skipAuth) {
-        delete config.headers[SKIP_AUTH_HEADER]
         return config
     }
 
@@ -136,9 +133,23 @@ http.interceptors.response.use(
         tryPersistRefreshedToken(response)
         return response
     },
-    (error: AxiosError) => {
+    async (error: AxiosError) => {
+        const skipAuth = Boolean((error.config as AuthAwareRequestConfig | undefined)?.[SKIP_AUTH_CONFIG_KEY])
+
         if (error.response) {
             tryPersistRefreshedToken(error.response)
+
+            if (!skipAuth) {
+                await runApiSideEffects(
+                    error.response.status,
+                    typeof error.response.data === 'object' &&
+                        error.response.data &&
+                        'message' in error.response.data &&
+                        typeof (error.response.data as { message?: unknown }).message === 'string'
+                        ? (error.response.data as { message: string }).message
+                        : error.message || '请求失败',
+                )
+            }
         }
 
         return Promise.reject(createHttpError(error))

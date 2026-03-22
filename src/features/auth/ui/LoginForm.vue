@@ -86,7 +86,9 @@ async function handleSubmit() {
 
   try {
     const result = await authApi.login(mapLoginFormToDto(form))
-    authStore.setAuth(mapAuthRespToSession(result))
+    authStore.setAuth(mapAuthRespToSession(result), {
+      persistence: form.rememberMe ? 'local' : 'session',
+    })
 
     toast.success('登录成功')
 

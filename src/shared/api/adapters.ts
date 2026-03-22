@@ -239,7 +239,7 @@ export function normalizeArticleDetailDto(raw: BackendArticleDetailResp): Articl
         title: raw.title ?? null,
         content: raw.content,
         summary: raw.summary ?? null,
-        coverUrl: raw.coverUrl ?? null,
+        coverUrl: resolveAssetUrl(raw.coverUrl),
         coverColor: raw.coverColor ?? null,
         wordCount: raw.wordCount ?? 0,
         readMinutes: toNumber(raw.readMinutes),
