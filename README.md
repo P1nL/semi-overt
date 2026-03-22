@@ -25,6 +25,10 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
+## Notes
+
+This repository is configured to push to GitHub over SSH.
+
 ### Compile and Hot-Reload for Development
 
 ```sh
