@@ -65,21 +65,3 @@ export async function unwrapApiResponse<T>(payload: unknown): Promise<T> {
 
     return payload.data
 }
-
-export function toApiBusinessError(error: unknown): ApiBusinessError {
-    if (error instanceof ApiBusinessError) {
-        return error
-    }
-
-    if (error instanceof Error) {
-        return new ApiBusinessError(error.message, {
-            code: -1,
-            details: error,
-        })
-    }
-
-    return new ApiBusinessError('未知错误', {
-        code: -1,
-        details: error,
-    })
-}

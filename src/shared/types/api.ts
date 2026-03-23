@@ -52,10 +52,6 @@ export interface ArticleCardDto {
     rejectReason?: string | null
 }
 
-export interface ApiListResult<T> {
-    list: T[]
-}
-
 export class ApiBusinessError extends Error {
     code: number
     details?: unknown
@@ -69,8 +65,6 @@ export class ApiBusinessError extends Error {
         this.status = options?.status
     }
 }
-
-export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface RequestConfig {
     headers?: Record<string, string>

@@ -4,29 +4,10 @@ import { reviewApi } from '@/shared/api/modules/review'
 import { requiresReviewReason } from '@/shared/utils/review'
 import type {
     ReviewActionFormValues,
-    ReviewActionOption,
     ReviewActionResult,
     ReviewActionValue,
     ReviewActionValidationResult,
 } from './review-action.types'
-
-export const REVIEW_ACTION_OPTIONS: ReviewActionOption[] = [
-    {
-        value: REVIEW_ACTION.APPROVE,
-        label: '通过',
-        variant: 'success',
-    },
-    {
-        value: REVIEW_ACTION.RETURN,
-        label: '退回修改',
-        variant: 'warning',
-    },
-    {
-        value: REVIEW_ACTION.REJECT,
-        label: '拒绝',
-        variant: 'danger',
-    },
-]
 
 export function canReviewArticle(status?: string | null): boolean {
     return status?.toUpperCase() === ARTICLE_STATUS.PENDING
@@ -67,9 +48,7 @@ export async function submitReviewActionByArticleId(
 export type {
     ReviewActionFieldErrors,
     ReviewActionFormValues,
-    ReviewActionOption,
     ReviewActionResult,
     ReviewActionValue,
     ReviewActionValidationResult,
 } from './review-action.types'
-

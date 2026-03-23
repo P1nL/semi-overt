@@ -858,7 +858,7 @@ defineExpose({
                 <line x1="3" y1="8" x2="13" y2="8" />
               </svg>
             </span>
-            <span class="editor-insert-label">鏍囬</span>
+            <span class="editor-insert-label">标题</span>
           </button>
 
           <button

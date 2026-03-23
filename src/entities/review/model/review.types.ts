@@ -1,13 +1,11 @@
 // src/entities/review/model/review.types.ts
-import type { PendingReviewItemDto, ReviewActionRespDto, ReviewLogRespDto } from '@/shared/types/api'
+import type { PendingReviewItemDto, ReviewLogRespDto } from '@/shared/types/api'
 import type { ReviewAction } from './review.constants'
 import type { ArticleAuthorVm, ArticleStatusVm } from '@/entities/article/model/article.types'
 
 export interface PendingReviewItemEntityDto extends PendingReviewItemDto {}
 
 export interface ReviewLogEntityDto extends ReviewLogRespDto {}
-
-export interface ReviewActionResultEntityDto extends ReviewActionRespDto {}
 
 export interface PendingReviewItemVm {
     id: number

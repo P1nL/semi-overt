@@ -3,9 +3,6 @@ import type {
     ArticleCardDto,
     ArticleDetailRespDto,
     DraftItemRespDto,
-    SaveDraftRespDto,
-    SubmitArticleRespDto,
-    CancelReviewRespDto,
 } from '@/shared/types/api'
 import type { ArticleDurationCategory, ArticleStatus } from './article.constants'
 
@@ -26,18 +23,6 @@ export interface ArticleDetailEntityDto extends ArticleDetailRespDto {
 
 export interface ArticleDraftEntityDto extends DraftItemRespDto {
     status: Extract<ArticleStatus, 'DRAFT' | 'RETURNED'> | string
-}
-
-export interface SaveDraftEntityDto extends SaveDraftRespDto {
-    status: Extract<ArticleStatus, 'DRAFT' | 'RETURNED'> | string
-}
-
-export interface SubmitArticleEntityDto extends SubmitArticleRespDto {
-    status: Extract<ArticleStatus, 'PENDING'> | string
-}
-
-export interface CancelReviewEntityDto extends CancelReviewRespDto {
-    status: Extract<ArticleStatus, 'DRAFT'> | string
 }
 
 export interface ArticleAuthorVm {

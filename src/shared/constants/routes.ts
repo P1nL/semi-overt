@@ -20,8 +20,6 @@ export const ROUTE_NAME = {
     NOT_FOUND: 'not-found',
 } as const
 
-export type RouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME]
-
 export const ROUTE_PATH = {
     HOME: '/',
     LOGIN: '/login',
@@ -43,30 +41,3 @@ export const ROUTE_PATH = {
     FORBIDDEN: '/403',
     NOT_FOUND: '/:pathMatch(.*)*',
 } as const
-
-export const ROUTE_META_KEY = {
-    REQUIRES_AUTH: 'requiresAuth',
-    REQUIRES_GUEST: 'requiresGuest',
-    REQUIRES_ADMIN: 'requiresAdmin',
-    TITLE: 'title',
-} as const
-
-export const PUBLIC_ROUTE_NAMES: readonly RouteName[] = [
-    ROUTE_NAME.HOME,
-    ROUTE_NAME.LOGIN,
-    ROUTE_NAME.REGISTER,
-    ROUTE_NAME.FORGOT_PASSWORD,
-    ROUTE_NAME.RESET_PASSWORD,
-    ROUTE_NAME.CATEGORY,
-    ROUTE_NAME.SEARCH,
-    ROUTE_NAME.ARTICLE_READ,
-    ROUTE_NAME.PROFILE,
-    ROUTE_NAME.NOT_FOUND,
-]
-
-export const AUTH_ROUTE_NAMES: readonly RouteName[] = [
-    ROUTE_NAME.LOGIN,
-    ROUTE_NAME.REGISTER,
-    ROUTE_NAME.FORGOT_PASSWORD,
-    ROUTE_NAME.RESET_PASSWORD,
-]

@@ -24,5 +24,3 @@ export const REVIEW_ACTION_BADGE_VARIANT_MAP: Record<
     REJECT: 'danger',
     CANCEL: 'info',
 }
-
-export const REVIEW_ACTION_REASON_REQUIRED: ReviewAction[] = ['RETURN', 'REJECT']

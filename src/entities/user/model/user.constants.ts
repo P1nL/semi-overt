@@ -20,11 +20,3 @@ export const USER_ROLE_BADGE_VARIANT_MAP: Record<
 }
 
 export const USER_DEFAULT_SIGNATURE = '这个人很低调，还没有留下签名。'
-export const USER_ARTICLE_TAB = {
-    ALL: 'all',
-    APPROVED: 'approved',
-    PENDING: 'pending',
-    RETURNED: 'returned',
-    REJECTED: 'rejected',
-    DRAFT: 'draft',
-} as const

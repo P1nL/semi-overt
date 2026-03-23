@@ -45,7 +45,6 @@ export const ARTICLE_STATUS_BADGE_VARIANT_MAP: Record<
 
 export const ARTICLE_DEFAULT_COVER_COLOR = '#F3F4F6'
 export const ARTICLE_DEFAULT_TITLE = '未命名文章'
-export const ARTICLE_DEFAULT_SUMMARY = '暂无摘要'
 export const ARTICLE_DEFAULT_AUTHOR_NAME = '未知作者'
 
 export const ARTICLE_WORDS_PER_MINUTE = 300

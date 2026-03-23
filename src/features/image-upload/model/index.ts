@@ -14,14 +14,6 @@ import type {
 
 const DEFAULT_MAX_SIZE_BYTES = ARTICLE_IMAGE_MAX_SIZE_MB * 1024 * 1024
 
-export function formatImageSize(sizeBytes: number): string {
-    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return '0 B'
-
-    if (sizeBytes < 1024) return `${sizeBytes} B`
-    if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`
-    return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`
-}
-
 export function validateImageFile(
     file: File,
     options: ImageValidationOptions = {},

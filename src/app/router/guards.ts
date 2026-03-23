@@ -143,36 +143,3 @@ export function setupRouterGuards(router: Router) {
         }
     })
 }
-
-export type RouterGuardRule = {
-    name: string
-    description: string
-}
-
-export const ROUTER_GUARD_RULES: RouterGuardRule[] = [
-    {
-        name: 'drawer-navigation',
-        description:
-            '抽屉打开时，优先暂存目标路由并关闭抽屉；真正跳转由抽屉 transitionend 后续流程完成。',
-    },
-    {
-        name: 'auth-required',
-        description:
-            'meta.requiresAuth=true 时，未登录用户统一跳转到登录页，并携带 redirect 参数。',
-    },
-    {
-        name: 'public-only',
-        description:
-            'meta.publicOnly=true 时，已登录用户不再进入登录/注册/找回密码页面，直接重定向到目标页或首页。',
-    },
-    {
-        name: 'role-based-access',
-        description:
-            'meta.roles 存在时按角色校验；无权限进入 /403。',
-    },
-    {
-        name: 'backend-authority-first',
-        description:
-            '前端守卫只做 UI 层控制；资源是否存在、是否能访问，仍以后端返回 code/状态为准。',
-    },
-]

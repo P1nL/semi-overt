@@ -6,7 +6,3 @@ export const STORAGE_KEY = {
     AUTH_REDIRECT: 'now.authRedirect',
     ARTICLE_PUBLISH_COOLDOWN_PREFIX: 'now.articlePublishCooldown.',
 } as const
-
-export const SESSION_STORAGE_KEY = {
-    EDITOR_DRAFT_PREFIX: 'now.editorDraft.',
-} as const

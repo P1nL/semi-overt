@@ -1,27 +1,9 @@
 import {
-    ARTICLE_DEFAULT_TITLE,
     ARTICLE_DURATION_CATEGORY,
-    ARTICLE_DURATION_LABEL_MAP,
     ARTICLE_STATUS,
-    ARTICLE_STATUS_LABEL_MAP,
     ARTICLE_WORDS_PER_MINUTE,
     type ArticleDurationCategory,
-    type ArticleStatus,
 } from '@/shared/constants/article'
-
-export function getArticleStatusLabel(status?: string | null): string {
-    if (!status) return '未知状态'
-    return ARTICLE_STATUS_LABEL_MAP[status as ArticleStatus] ?? status
-}
-
-export function getArticleDurationLabel(category?: string | null): string {
-    if (!category) return '未分类'
-    return ARTICLE_DURATION_LABEL_MAP[category as ArticleDurationCategory] ?? category
-}
-
-export function getArticleDisplayTitle(title?: string | null): string {
-    return title?.trim() || ARTICLE_DEFAULT_TITLE
-}
 
 export function calcWordCount(content?: string | null): number {
     if (!content) return 0

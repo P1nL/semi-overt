@@ -14,11 +14,4 @@ export interface ReviewActionValidationResult {
     errors: ReviewActionFieldErrors
 }
 
-export interface ReviewActionOption {
-    value: ReviewActionValue
-    label: string
-    variant: 'success' | 'warning' | 'danger'
-}
-
 export interface ReviewActionResult extends ReviewActionRespDto {}
-
