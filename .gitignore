@@ -37,3 +37,9 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Local startup helpers
+scripts/start-now-demo.cmd
+scripts/start-now-demo.ps1
+scripts/start-redis.cmd
+scripts/start-redis.ps1

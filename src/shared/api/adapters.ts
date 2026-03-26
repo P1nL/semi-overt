@@ -80,6 +80,7 @@ interface BackendUserProfileResp {
         id: number
         username: string
         nickname?: string | null
+        role?: string | null
         avatarUrl?: string | null
         coverUrl?: string | null
         signature?: string | null
@@ -265,7 +266,7 @@ export function normalizeUserProfileResp(raw: BackendUserProfileResp): UserProfi
             avatarUrl: resolveAssetUrl(raw.profile.avatarUrl),
             coverUrl: resolveAssetUrl(raw.profile.coverUrl),
             signature: raw.profile.signature ?? null,
-            role: 'USER',
+            role: raw.profile.role ?? 'USER',
         },
         stats: {
             approved: raw.stats?.approved ?? 0,
