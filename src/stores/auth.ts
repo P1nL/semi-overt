@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
+import { queryClient } from '@/app/providers/query'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { userApi } from '@/shared/api/modules/user'
 import { AUTH_BIZ_CODE } from '@/shared/constants/auth'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -26,6 +28,20 @@ export interface AuthUser {
 export interface AuthErrorState {
     code: number | null
     message: string
+}
+
+function clearAuthScopedQueries() {
+    queryClient.removeQueries({
+        predicate: (query) => {
+            const [rootKey] = query.queryKey as readonly unknown[]
+
+            return (
+                rootKey === queryKeys.userProfile('', '', 0, 0)[0] ||
+                rootKey === queryKeys.reviewPendingRoot[0] ||
+                rootKey === queryKeys.reviewLogs('')[0]
+            )
+        },
+    })
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -60,6 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
         payload: { token: string; user: AuthUser },
         options: { persistence?: AuthPersistence } = {},
     ) {
+        clearAuthScopedQueries()
         const persistence = options.persistence ?? 'local'
         setToken(payload.token, persistence)
         setUser(payload.user, persistence)
@@ -75,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function clearAuth(options: { keepError?: boolean } = {}) {
+        clearAuthScopedQueries()
         token.value = null
         user.value = null
         authPersistence.value = 'local'

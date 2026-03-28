@@ -9,6 +9,7 @@ import { AppHeader } from '@/widgets/app-header'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
 const pendingReviewsQuery = usePendingReviewsQuery(1, 10)
+const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
 const pageError = computed(() =>
   pendingReviewsQuery.error.value
     ? getErrorMessage(pendingReviewsQuery.error.value, 'Failed to load the review queue.')
@@ -36,12 +37,12 @@ function refreshPending() {
       </section>
 
       <ReviewQueueStrip
-        :items="pendingReviewsQuery.data?.list ?? []"
+        :items="pendingItems"
         :loading="pendingReviewsQuery.isFetching.value"
       />
 
       <div
-        v-if="!pendingReviewsQuery.isFetching.value && !(pendingReviewsQuery.data?.list?.length ?? 0) && pageError"
+        v-if="!pendingReviewsQuery.isFetching.value && !pendingItems.length && pageError"
         class="surface-1 rounded-[var(--radius-xl)] p-8"
       >
         <EmptyState

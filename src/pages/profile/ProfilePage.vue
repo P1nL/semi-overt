@@ -76,8 +76,9 @@ const tabCounts = computed(() => {
   return result
 })
 
+const hasResolvedProfile = computed(() => profile.value !== null)
 const contentState = computed(() => {
-  if (profileQuery.isFetching.value) return 'loading'
+  if (!hasResolvedProfile.value && profileQuery.isFetching.value) return 'loading'
   if (articles.value.length) return 'content'
   return 'empty'
 })
@@ -91,6 +92,7 @@ const showAdminReviewQueue = computed(
 )
 
 const pendingReviewsQuery = usePendingReviewsQuery(1, 10, showAdminReviewQueue)
+const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
 const reviewQueueError = computed(() =>
   pendingReviewsQuery.error.value
     ? getErrorMessage(pendingReviewsQuery.error.value, '待审核列表加载失败，请稍后重试。')
@@ -127,7 +129,7 @@ async function onTabChange(tab: ProfileArticleTab) {
 
         <div class="mt-4">
           <ReviewQueueStrip
-            :items="pendingReviewsQuery.data?.list ?? []"
+            :items="pendingItems"
             :loading="pendingReviewsQuery.isFetching.value"
           />
         </div>

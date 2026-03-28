@@ -36,30 +36,24 @@ const emit = defineEmits<{
 const slots = useSlots()
 
 const variantClassMap: Record<ButtonVariant, string> = {
-  primary:
-      'border border-transparent bg-[var(--color-primary)] text-white shadow-[var(--shadow-button)] hover:bg-[var(--color-primary-strong)] focus-visible:outline-none focus-visible:ring-0',
-  secondary:
-      'control-surface text-[var(--color-text)] hover:border-[var(--color-border-strong)] hover:bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)] focus-visible:outline-none focus-visible:ring-0',
-  ghost:
-      'text-[var(--color-text-muted)] hover:bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)] hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-0',
-  danger:
-      'border border-transparent bg-[var(--color-danger)] text-white shadow-[var(--shadow-xs)] hover:brightness-[1.03] focus-visible:outline-none',
-  success:
-      'border border-transparent bg-[var(--color-success)] text-white shadow-[var(--shadow-xs)] hover:brightness-[1.03] focus-visible:outline-none',
-  warning:
-      'border border-transparent bg-[var(--color-warning)] text-white shadow-[var(--shadow-xs)] hover:brightness-[1.03] focus-visible:outline-none',
+  primary: 'button--primary',
+  secondary: 'button--secondary',
+  ghost: 'button--ghost',
+  danger: 'button--danger',
+  success: 'button--success',
+  warning: 'button--warning',
 }
 
 const sizeClassMap: Record<ButtonSize, string> = {
-  sm: 'h-9 gap-2 px-3.5 text-sm',
-  md: 'h-11 gap-2 px-5 text-sm',
-  lg: 'h-12 gap-2.5 px-6 text-base',
+  sm: 'button--sm',
+  md: 'button--md',
+  lg: 'button--lg',
 }
 
 const iconOnlySizeClassMap: Record<ButtonSize, string> = {
-  sm: 'size-9 p-0',
-  md: 'size-11 p-0',
-  lg: 'size-12 p-0',
+  sm: 'button--icon-sm',
+  md: 'button--icon-md',
+  lg: 'button--icon-lg',
 }
 
 const isDisabled = computed(() => props.disabled || props.loading)
@@ -100,3 +94,105 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
     <slot v-if="!loading && hasRightIcon" name="trailing" />
   </button>
 </template>
+
+<style scoped>
+.button--primary {
+  border: 1px solid transparent;
+  background: var(--color-primary);
+  color: white;
+  box-shadow: var(--shadow-button);
+}
+
+.button--primary:hover {
+  background: var(--color-primary-strong);
+}
+
+.button--secondary {
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 16%, transparent);
+  color: var(--color-text);
+  box-shadow:
+    0 4px 14px rgb(15 23 42 / 0.018),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+  backdrop-filter: blur(calc(var(--backdrop-blur) * 0.7)) saturate(160%);
+}
+
+.button--secondary:hover {
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+}
+
+.button--ghost {
+  color: var(--color-text-muted);
+}
+
+.button--ghost:hover {
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 72%, transparent);
+  color: var(--color-text);
+}
+
+.button--danger,
+.button--success,
+.button--warning {
+  border: 1px solid transparent;
+  color: white;
+  box-shadow: var(--shadow-xs);
+}
+
+.button--danger {
+  background: var(--color-danger);
+}
+
+.button--success {
+  background: var(--color-success);
+}
+
+.button--warning {
+  background: var(--color-warning);
+}
+
+.button--danger:hover,
+.button--success:hover,
+.button--warning:hover {
+  filter: brightness(1.03);
+}
+
+.button--sm {
+  height: 2.25rem;
+  gap: 0.5rem;
+  padding-inline: 0.875rem;
+  font-size: 0.875rem;
+}
+
+.button--md {
+  height: 2.75rem;
+  gap: 0.5rem;
+  padding-inline: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.button--lg {
+  height: 3rem;
+  gap: 0.625rem;
+  padding-inline: 1.5rem;
+  font-size: 1rem;
+}
+
+.button--icon-sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+
+.button--icon-md {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+}
+
+.button--icon-lg {
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+}
+</style>

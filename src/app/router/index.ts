@@ -49,7 +49,7 @@ export function createAppRouter() {
                     behavior: 'smooth',
                 }
             }
-            if (to.fullPath !== from.fullPath) {
+            if (to.path !== from.path) {
                 return { top: 0 }
             }
             return undefined

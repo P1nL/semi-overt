@@ -191,14 +191,14 @@ function drawInteractiveGrid(
       Math.sin(time * 0.2 + pointX * 0.0022 + pointY * 0.0015) +
       Math.cos(time * 0.14 + pointX * 0.0012 - pointY * 0.001) * 0.6
     ) * 0.08
-  const wakeRadius = GRID_RADIUS + Math.min(125, pointer.wakeEnergy * 16)
-  const wakeStrength = Math.min(9.4, 2.8 + pointer.wakeEnergy * 0.34)
+  const wakeRadius = GRID_RADIUS + Math.min(82, pointer.wakeEnergy * 9)
+  const wakeStrength = Math.min(5.2, 1.2 + pointer.wakeEnergy * 0.16)
 
   ctx.save()
   ctx.lineWidth = 1
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(64, 97, 143, 0.12)'
+  ctx.strokeStyle = 'rgba(64, 97, 143, 0.08)'
 
   for (let x = 0; x <= width + GRID_SIZE; x += GRID_SIZE) {
     const points: GridVertex[] = []
@@ -215,7 +215,7 @@ function drawInteractiveGrid(
     drawSmoothGridPath(ctx, points)
   }
 
-  ctx.strokeStyle = 'rgba(92, 126, 168, 0.08)'
+  ctx.strokeStyle = 'rgba(92, 126, 168, 0.055)'
 
   for (let y = 0; y <= height + GRID_SIZE; y += GRID_SIZE) {
     const points: GridVertex[] = []
@@ -240,8 +240,8 @@ function drawInteractiveGrid(
     height * 0.2,
     Math.max(width, height) * 0.8,
   )
-  ambientGlow.addColorStop(0, 'rgba(255,255,255,0.62)')
-  ambientGlow.addColorStop(0.38, 'rgba(255,255,255,0.24)')
+  ambientGlow.addColorStop(0, 'rgba(255,255,255,0.34)')
+  ambientGlow.addColorStop(0.38, 'rgba(255,255,255,0.12)')
   ambientGlow.addColorStop(1, 'rgba(255,255,255,0)')
 
   ctx.globalCompositeOperation = 'screen'
@@ -553,15 +553,19 @@ function render(now: number) {
   pointer.vy += (pointer.y - prevY - pointer.vy) * 0.24
 
   const speed = Math.hypot(pointer.vx, pointer.vy)
-  pointer.wakeEnergy += (speed - pointer.wakeEnergy) * 0.055
+  pointer.wakeEnergy += (speed - pointer.wakeEnergy) * (currentTheme === 'light' ? 0.035 : 0.055)
   const directionX = speed > 0.001 ? pointer.vx / speed : 0
   const directionY = speed > 0.001 ? pointer.vy / speed : 0
-  const wakeDistance = Math.min(138, pointer.wakeEnergy * 14)
+  const wakeDistance =
+    currentTheme === 'light'
+      ? Math.min(84, pointer.wakeEnergy * 7.5)
+      : Math.min(138, pointer.wakeEnergy * 14)
   const wakeTargetX = pointer.x - directionX * wakeDistance
   const wakeTargetY = pointer.y - directionY * wakeDistance
 
-  pointer.wakeX += (wakeTargetX - pointer.wakeX) * 0.05
-  pointer.wakeY += (wakeTargetY - pointer.wakeY) * 0.05
+  const wakeLerp = currentTheme === 'light' ? 0.035 : 0.05
+  pointer.wakeX += (wakeTargetX - pointer.wakeX) * wakeLerp
+  pointer.wakeY += (wakeTargetY - pointer.wakeY) * wakeLerp
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)

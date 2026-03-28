@@ -39,15 +39,13 @@ const emit = defineEmits<{
       <div
         v-for="index in 3"
         :key="index"
-        class="surface-2 h-24 animate-pulse rounded-[var(--radius-lg)]"
+        class="surface-2 min-h-[5.75rem] animate-pulse rounded-[var(--radius-lg)]"
       />
     </div>
 
     <div v-else class="space-y-3">
-      <TransitionGroup
+      <div
         v-if="items.length"
-        name="draft-list"
-        tag="div"
         class="draft-list"
       >
         <div
@@ -62,13 +60,13 @@ const emit = defineEmits<{
             @delete="emit('delete', $event)"
           />
         </div>
-      </TransitionGroup>
+      </div>
 
       <Button
         type="button"
         variant="ghost"
         block
-        class="draft-create-card h-18 items-center gap-3 border-2 border-dashed px-5 text-left active:!scale-100"
+        class="draft-create-card min-h-[4rem] items-center gap-3 border-2 border-dashed px-5 py-3.5 text-left active:!scale-100"
         @click="emit('create')"
       >
         <span class="draft-create-card__icon inline-flex size-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-muted)]">
@@ -91,36 +89,6 @@ const emit = defineEmits<{
 
 .draft-list__item {
   position: relative;
-}
-
-.draft-list-enter-active,
-.draft-list-leave-active {
-  overflow: hidden;
-  transition:
-    opacity 220ms ease,
-    transform 260ms ease,
-    max-height 260ms ease,
-    filter 220ms ease;
-}
-
-.draft-list-enter-from,
-.draft-list-leave-to {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.985);
-  max-height: 0;
-  filter: blur(4px);
-}
-
-.draft-list-enter-to,
-.draft-list-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  max-height: 12rem;
-  filter: blur(0);
-}
-
-.draft-list-move {
-  transition: transform 260ms ease;
 }
 
 .draft-create-card,

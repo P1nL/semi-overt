@@ -34,6 +34,8 @@ const errorMessage = ref('')
 const pendingWarning = ref('')
 const deletingId = ref<number | string | null>(null)
 const draftCountText = computed(() => `${items.value.length} 篇`)
+const panelLoading = computed(() => draftStore.loading && !draftStore.initialized)
+const panelClass = computed(() => (panelLoading.value ? 'min-h-[13rem]' : 'min-h-0'))
 
 function closeMenu() {
   emit('update:modelValue', false)
@@ -44,25 +46,33 @@ async function goCreateArticle() {
   await router.push({ name: ROUTE_NAME.ARTICLE_EDITOR_NEW })
 }
 
-async function loadDrafts() {
-  draftStore.loading = true
+async function loadDrafts(options: { background?: boolean } = {}) {
+  if (draftStore.loading) return
+
   errorMessage.value = ''
   pendingWarning.value = ''
 
   const username = authStore.user?.username
   if (!username) {
-    errorMessage.value = '写作箱加载失败'
+    items.value = []
     draftStore.loading = false
+    draftStore.initialized = false
+    errorMessage.value = '加载写作箱失败'
     return
   }
+
+  draftStore.loading = true
 
   try {
     const result = await loadDraftBoxItems(username)
     items.value = result.items
     pendingWarning.value = result.pendingWarning
     syncDraftStore(draftStore, result.items)
+    draftStore.initialized = true
   } catch (error) {
-    errorMessage.value = getErrorMessage(error, '写作箱加载失败')
+    if (!options.background || !draftStore.initialized) {
+      errorMessage.value = getErrorMessage(error, '加载写作箱失败')
+    }
   } finally {
     draftStore.loading = false
   }
@@ -97,9 +107,28 @@ watch(
   () => props.modelValue,
   (open) => {
     if (open) {
-      void loadDrafts()
+      void loadDrafts({ background: draftStore.initialized })
     }
   },
+)
+
+watch(
+  () => authStore.user?.username,
+  (username) => {
+    if (!username) {
+      items.value = []
+      errorMessage.value = ''
+      pendingWarning.value = ''
+      draftStore.loading = false
+      draftStore.initialized = false
+      return
+    }
+
+    if (!draftStore.initialized) {
+      void loadDrafts({ background: true })
+    }
+  },
+  { immediate: true },
 )
 </script>
 
@@ -115,6 +144,7 @@ watch(
     <div
       v-if="modelValue"
       class="draft-box-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)]"
+      :class="panelClass"
     >
       <div class="mb-3 px-1">
         <h3 class="text-base font-semibold tracking-[-0.02em] text-[var(--color-text)]">
@@ -124,7 +154,7 @@ watch(
 
       <DraftList
         :items="items"
-        :loading="draftStore.loading"
+        :loading="panelLoading"
         :error="errorMessage"
         :warning="pendingWarning"
         :deleting-id="deletingId"

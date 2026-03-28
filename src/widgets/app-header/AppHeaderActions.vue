@@ -229,6 +229,7 @@ async function handleLogout() {
   justify-content: center;
   border-radius: 999px;
   color: var(--color-text-muted);
+  -webkit-tap-highlight-color: transparent;
   transition:
     color 220ms ease,
     background-color 220ms ease;
@@ -236,7 +237,19 @@ async function handleLogout() {
 
 .tool-icon-button-active,
 .user-trigger[aria-expanded='true'] {
-  background: color-mix(in srgb, var(--color-surface-glass-strong) 76%, transparent);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.tool-icon-button:hover,
+.user-trigger:hover {
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 24%, transparent);
+  color: var(--color-text);
+}
+
+.tool-icon-button:active,
+.user-trigger:active {
+  background: transparent;
   color: var(--color-text);
 }
 

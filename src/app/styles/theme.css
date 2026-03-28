@@ -56,10 +56,11 @@
             inset 0 1px 0 rgb(255 255 255 / 0.16);
 
     --scrollbar-size: 0.8rem;
-    --radius-sm: 0.875rem;
-    --radius-md: 1.25rem;
-    --radius-lg: 1.75rem;
-    --radius-xl: 2.25rem;
+    --radius-base: 1rem;
+    --radius-sm: calc(var(--radius-base) - 0.25rem);
+    --radius-md: var(--radius-base);
+    --radius-lg: calc(var(--radius-base) + 0.375rem);
+    --radius-xl: calc(var(--radius-base) + 0.75rem);
     --radius-pill: 999px;
     --backdrop-blur: 22px;
 }

@@ -60,7 +60,7 @@ function getRouteViewKey(targetRoute: RouteLocationNormalizedLoaded): string {
     return 'article-editor-sheet'
   }
 
-  return targetRoute.fullPath
+  return targetRoute.path
 }
 
 function isSheetRoute(

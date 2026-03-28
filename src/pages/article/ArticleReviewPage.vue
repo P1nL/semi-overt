@@ -30,6 +30,7 @@ const article = ref<ArticleDetailVm | null>(null)
 const tocSyncKey = ref(`${articleId.value}-0`)
 
 const reviewLogsQuery = useReviewLogsQuery(articleId)
+const reviewLogs = computed(() => reviewLogsQuery.data.value ?? [])
 const pageError = computed(() =>
   reviewLogsQuery.error.value
     ? getErrorMessage(reviewLogsQuery.error.value, '审核记录加载失败，请稍后重试。')
@@ -93,9 +94,9 @@ async function handleAdminDeleted() {
 
             <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
               <SectionHeader title="审核记录" compact />
-              <ReviewLogList :logs="reviewLogsQuery.data ?? []" />
+              <ReviewLogList :logs="reviewLogs" />
               <EmptyState
-                v-if="!reviewLogsQuery.isFetching.value && !(reviewLogsQuery.data?.length ?? 0) && pageError"
+                v-if="!reviewLogsQuery.isFetching.value && !reviewLogs.length && pageError"
                 title="审核记录加载失败"
                 :description="pageError"
                 emoji="!"
