@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { ArticleCard } from '@/entities/article/ui'
-import { categoryApi } from '@/shared/api/modules/category'
+import { useSearchArticlesQuery } from '@/shared/api/queries'
 import { Button, EmptyState, Input, Pagination } from '@/shared/components/base'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -16,14 +16,30 @@ const router = useRouter()
 const uiStore = useUiStore()
 
 const keyword = ref('')
-const loading = ref(false)
-const errorMessage = ref('')
-const page = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const list = ref<ReturnType<typeof mapArticleCardDtoToVm>[]>([])
+const pageSize = 10
 
 const routeKeyword = computed(() => String(route.query.keyword || route.query.q || '').trim())
+const page = computed(() => Number(route.query.page || 1) || 1)
+const searchQuery = useSearchArticlesQuery(routeKeyword, page, pageSize)
+
+watch(
+  routeKeyword,
+  (value) => {
+    keyword.value = value || uiStore.searchQuery
+  },
+  { immediate: true },
+)
+
+const loading = computed(() => searchQuery.isFetching.value)
+const errorMessage = computed(() =>
+  searchQuery.error.value
+    ? getErrorMessage(searchQuery.error.value, '搜索失败，请稍后重试。')
+    : '',
+)
+const total = computed(() => Number(searchQuery.data.value?.total ?? searchQuery.data.value?.list.length ?? 0))
+const list = computed(() =>
+  (searchQuery.data.value?.list ?? []).map((item) => mapArticleCardDtoToVm(item)),
+)
 const contentState = computed(() => {
   if (loading.value) return 'loading'
   if (list.value.length) return 'content'
@@ -45,67 +61,31 @@ function resolveSearchLocation(keywordValue: string, nextPage = 1) {
   }
 }
 
-async function search() {
-  const normalized = keyword.value.trim()
-  if (!normalized) {
-    list.value = []
-    total.value = 0
-    errorMessage.value = ''
-    return
-  }
-
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    const response = await categoryApi.searchArticles({
-      keyword: normalized,
-      page: page.value,
-      pageSize: pageSize.value,
-    })
-
-    list.value = response.list.map((item) => mapArticleCardDtoToVm(item))
-    total.value = Number(response.total ?? response.list.length)
-    uiStore.setSearchQuery(normalized)
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, '搜索失败，请稍后重试。')
-    list.value = []
-    total.value = 0
-  } finally {
-    loading.value = false
-  }
-}
-
 async function submitSearch() {
-  page.value = 1
+  const normalized = keyword.value.trim()
+  uiStore.setSearchQuery(normalized)
 
-  const target = resolveSearchLocation(keyword.value.trim(), page.value)
+  const target = resolveSearchLocation(normalized, 1)
   if (router.resolve(target).fullPath !== route.fullPath) {
     await router.replace(target)
     return
   }
 
-  await search()
+  if (normalized) {
+    await searchQuery.refetch()
+  }
 }
 
 async function onPageChange(nextPage: number) {
-  page.value = nextPage
-
-  const target = resolveSearchLocation(keyword.value.trim(), page.value)
+  const target = resolveSearchLocation(keyword.value.trim(), nextPage)
   if (router.resolve(target).fullPath !== route.fullPath) {
     await router.replace(target)
     return
   }
 
-  await search()
-}
-
-const nextKeyword = routeKeyword.value || uiStore.searchQuery
-keyword.value = nextKeyword
-page.value = Number(route.query.page || 1) || 1
-
-if (nextKeyword) {
-  void search()
+  if (keyword.value.trim()) {
+    await searchQuery.refetch()
+  }
 }
 </script>
 

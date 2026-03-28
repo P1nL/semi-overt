@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import {
   ARTICLE_STATUS_BADGE_VARIANT_MAP,
@@ -10,35 +11,30 @@ import type { ArticleDetailVm } from '@/entities/article/model/article.types'
 import { ReviewLogList } from '@/entities/review/ui'
 import { AdminDeleteArticleButton } from '@/features/admin-article-delete'
 import { ReviewActionBar, type ReviewActionResult } from '@/features/review-action'
+import { useReviewLogsQuery } from '@/shared/api/queries'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
-import { useReviewStore } from '@/stores/review'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
 
 const route = useRoute()
 const router = useRouter()
-const reviewStore = useReviewStore()
+const queryClient = useQueryClient()
 
 const articleId = computed(() => String(route.params.id || ''))
 const readerKey = ref(0)
 const article = ref<ArticleDetailVm | null>(null)
-const pageError = ref('')
 const tocSyncKey = ref(`${articleId.value}-0`)
 
-async function loadReviewLogs() {
-  if (!articleId.value) return
-
-  pageError.value = ''
-
-  try {
-    await reviewStore.loadReviewLogs(articleId.value)
-  } catch (error) {
-    pageError.value = getErrorMessage(error, '审核记录加载失败，请稍后重试。')
-  }
-}
+const reviewLogsQuery = useReviewLogsQuery(articleId)
+const pageError = computed(() =>
+  reviewLogsQuery.error.value
+    ? getErrorMessage(reviewLogsQuery.error.value, '审核记录加载失败，请稍后重试。')
+    : '',
+)
 
 async function onActed(result: ReviewActionResult) {
   if (article.value) {
@@ -58,7 +54,7 @@ async function onActed(result: ReviewActionResult) {
     }
   }
 
-  await loadReviewLogs()
+  await reviewLogsQuery.refetch()
 }
 
 function onLoaded(value: ArticleDetailVm) {
@@ -66,15 +62,12 @@ function onLoaded(value: ArticleDetailVm) {
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
 }
 
-function handleAdminDeleted() {
-  reviewStore.removePendingByArticleId(articleId.value)
-  void reviewStore.refreshPendingListIfInitialized()
-  void router.push({ name: ROUTE_NAME.REVIEW_DASHBOARD })
+async function handleAdminDeleted() {
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.reviewPendingRoot,
+  })
+  await router.push({ name: ROUTE_NAME.REVIEW_DASHBOARD })
 }
-
-onMounted(() => {
-  void loadReviewLogs()
-})
 </script>
 
 <template>
@@ -100,9 +93,9 @@ onMounted(() => {
 
             <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
               <SectionHeader title="审核记录" compact />
-              <ReviewLogList :logs="reviewStore.reviewLogs" />
+              <ReviewLogList :logs="reviewLogsQuery.data ?? []" />
               <EmptyState
-                v-if="!reviewStore.logsLoading && !reviewStore.reviewLogs.length && pageError"
+                v-if="!reviewLogsQuery.isFetching.value && !(reviewLogsQuery.data?.length ?? 0) && pageError"
                 title="审核记录加载失败"
                 :description="pageError"
                 emoji="!"

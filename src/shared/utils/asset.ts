@@ -1,7 +1,7 @@
 import { ENV, isHttpUrl } from '@/shared/config/env'
 
-function getApiOrigin(): string | null {
-    const base = ENV.apiBaseUrl?.trim()
+function getAssetOrigin(): string | null {
+    const base = ENV.assetBaseUrl?.trim()
     if (!base || !isHttpUrl(base)) {
         return null
     }
@@ -24,13 +24,13 @@ export function resolveAssetUrl(value?: string | null): string | null {
     }
 
     const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`
-    const apiOrigin = getApiOrigin()
+    const assetOrigin = getAssetOrigin()
 
-    if (apiOrigin) {
+    if (assetOrigin) {
         try {
-            return new URL(normalizedPath, apiOrigin).toString()
+            return new URL(normalizedPath, assetOrigin).toString()
         } catch {
-            return `${apiOrigin}${normalizedPath}`
+            return `${assetOrigin}${normalizedPath}`
         }
     }
 

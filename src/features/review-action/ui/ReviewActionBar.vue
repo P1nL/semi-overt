@@ -2,6 +2,7 @@
 import { onClickOutside } from '@vueuse/core'
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import {
   canReviewArticle,
@@ -9,11 +10,11 @@ import {
   validateReviewActionForm,
 } from '@/features/review-action/model'
 import type { ReviewActionResult, ReviewActionValue } from '@/features/review-action/model'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { Button, Textarea } from '@/shared/components/base'
 import { REVIEW_ACTION, REVIEW_REASON_MAX_LENGTH } from '@/shared/constants/review'
 import { useToast } from '@/shared/composables/useToast'
 import { getErrorMessage } from '@/shared/utils/error'
-import { useReviewStore } from '@/stores/review'
 
 type ReasonAction = Extract<ReviewActionValue, 'RETURN' | 'REJECT'>
 type PopoverPlacement = 'top' | 'bottom'
@@ -58,12 +59,13 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
-const reviewStore = useReviewStore()
+const queryClient = useQueryClient()
 
 const barRef = ref<HTMLElement | null>(null)
 const activeReasonAction = ref<ReasonAction | null>(null)
 const approvePending = ref(false)
 const loadingAction = ref<ReviewActionValue | null>(null)
+const acting = ref(false)
 const popoverPlacement = ref<PopoverPlacement>('top')
 const actionErrorMessage = ref('')
 
@@ -82,7 +84,7 @@ const reasonErrors = reactive<Record<ReasonAction, string>>({
   REJECT: '',
 })
 
-const canAct = computed(() => !props.disabled && !reviewStore.acting && canReviewArticle(props.status))
+const canAct = computed(() => !props.disabled && !acting.value && canReviewArticle(props.status))
 const showProcessedState = computed(() => !canReviewArticle(props.status) && Boolean(props.status))
 
 function setTriggerRef(
@@ -230,7 +232,7 @@ async function submitAction(action: ReviewActionValue) {
   if (!validation.valid) return
 
   loadingAction.value = action
-  reviewStore.acting = true
+  acting.value = true
 
   try {
     const result = await submitReviewActionByArticleId(props.articleId, {
@@ -238,8 +240,15 @@ async function submitAction(action: ReviewActionValue) {
       reason,
     })
 
-    reviewStore.removePendingByArticleId(props.articleId)
-    void reviewStore.refreshPendingListIfInitialized()
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.reviewPendingRoot,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.reviewLogs(props.articleId),
+      }),
+    ])
+
     emit('acted', result)
     toast.success(`审核${action === REVIEW_ACTION.APPROVE ? '通过' : action === REVIEW_ACTION.RETURN ? '退回' : '拒绝'}成功`)
     resetInteractionState()
@@ -249,7 +258,7 @@ async function submitAction(action: ReviewActionValue) {
     toast.error(message)
   } finally {
     loadingAction.value = null
-    reviewStore.acting = false
+    acting.value = false
   }
 }
 

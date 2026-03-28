@@ -1,29 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed } from 'vue'
 
 import { Button, EmptyState } from '@/shared/components/base'
+import { usePendingReviewsQuery } from '@/shared/api/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
-import { useReviewStore } from '@/stores/review'
 import { AppHeader } from '@/widgets/app-header'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
-const reviewStore = useReviewStore()
-const pageError = ref('')
+const pendingReviewsQuery = usePendingReviewsQuery(1, 10)
+const pageError = computed(() =>
+  pendingReviewsQuery.error.value
+    ? getErrorMessage(pendingReviewsQuery.error.value, 'Failed to load the review queue.')
+    : '',
+)
 
-async function loadPending() {
-  pageError.value = ''
-
-  try {
-    await reviewStore.loadPendingList()
-  } catch (error) {
-    pageError.value = getErrorMessage(error, 'Failed to load the review queue.')
-  }
+function refreshPending() {
+  void pendingReviewsQuery.refetch()
 }
-
-onMounted(() => {
-  void loadPending()
-})
 </script>
 
 <template>
@@ -34,20 +28,26 @@ onMounted(() => {
       <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
         <SectionHeader title="Review queue" description="Process pending articles and keep the editorial flow moving.">
           <template #actions>
-            <Button type="button" variant="secondary" pill :loading="reviewStore.loading" @click="loadPending">
+            <Button type="button" variant="secondary" pill :loading="pendingReviewsQuery.isFetching.value" @click="refreshPending">
               Refresh queue
             </Button>
           </template>
         </SectionHeader>
       </section>
 
-      <ReviewQueueStrip :items="reviewStore.pendingList" :loading="reviewStore.loading" />
+      <ReviewQueueStrip
+        :items="pendingReviewsQuery.data?.list ?? []"
+        :loading="pendingReviewsQuery.isFetching.value"
+      />
 
-      <div v-if="!reviewStore.loading && !reviewStore.pendingList.length && pageError" class="surface-1 rounded-[var(--radius-xl)] p-8">
+      <div
+        v-if="!pendingReviewsQuery.isFetching.value && !(pendingReviewsQuery.data?.list?.length ?? 0) && pageError"
+        class="surface-1 rounded-[var(--radius-xl)] p-8"
+      >
         <EmptyState
-            title="Unable to load reviews"
-            :description="pageError"
-            emoji="!"
+          title="Unable to load reviews"
+          :description="pageError"
+          emoji="!"
         />
       </div>
     </main>

@@ -5,7 +5,8 @@ import type {
     AuthRespDto,
     CategoryRespDto,
     HomeRespDto,
-    PendingReviewListRespDto,
+    PageRespDto,
+    PendingReviewItemDto,
     ProfileDto,
     ReviewLogRespDto,
     SearchArticleRespDto,
@@ -97,6 +98,7 @@ interface BackendUserProfileResp {
     total?: number
     page?: number
     pageSize?: number
+    pages?: number
 }
 
 interface BackendHomeResp {
@@ -280,6 +282,7 @@ export function normalizeUserProfileResp(raw: BackendUserProfileResp): UserProfi
         total: raw.total ?? raw.list.length,
         page: raw.page ?? 1,
         pageSize: raw.pageSize ?? 10,
+        pages: raw.pages ?? 1,
     }
 }
 
@@ -320,7 +323,7 @@ export function normalizeSearchResp(raw: BackendSearchResp): SearchArticleRespDt
 
 export function normalizePendingReviewListResp(
     raw: BackendReviewPendingPageResp,
-): PendingReviewListRespDto {
+): PageRespDto<PendingReviewItemDto> {
     return {
         list: (raw.records ?? []).map((item) => ({
             id: item.id,
@@ -335,6 +338,10 @@ export function normalizePendingReviewListResp(
                 avatarUrl: null,
             },
         })),
+        total: (raw.records ?? []).length,
+        page: 1,
+        pageSize: (raw.records ?? []).length,
+        pages: 1,
     }
 }
 

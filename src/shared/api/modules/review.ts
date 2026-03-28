@@ -1,11 +1,11 @@
 import request from '../request'
 import {
-    normalizePendingReviewListResp,
     normalizeReviewLogListResp,
 } from '../adapters'
 import type {
+    PageRespDto,
     PaginationParams,
-    PendingReviewListRespDto,
+    PendingReviewItemDto,
     ReviewActionReqDto,
     ReviewActionRespDto,
     ReviewLogRespDto,
@@ -13,8 +13,8 @@ import type {
 
 const REVIEW_BASE = '/reviews'
 
-export function getPendingReviews(params?: PaginationParams): Promise<PendingReviewListRespDto> {
-    return request.get<any>(`${REVIEW_BASE}/pending`, params).then(normalizePendingReviewListResp)
+export function getPendingReviews(params?: PaginationParams): Promise<PageRespDto<PendingReviewItemDto>> {
+    return request.get<PageRespDto<PendingReviewItemDto>>(`${REVIEW_BASE}/pending`, params)
 }
 
 export function submitReviewAction(

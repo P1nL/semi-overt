@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { ArticleCard } from '@/entities/article/ui'
 import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
-import { categoryApi } from '@/shared/api/modules/category'
+import { useHomeQuery } from '@/shared/api/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { useUiStore } from '@/stores/ui'
@@ -14,39 +14,31 @@ import { HeroSection } from '@/widgets/hero-section'
 
 const router = useRouter()
 const uiStore = useUiStore()
+const homeQuery = useHomeQuery()
 
-const loading = ref(false)
-const contentReady = ref(false)
 const hiddenHomeSectionKeys = new Set(['QUICK', 'SHORT', 'DEEP'])
-const home = ref<{
-  heroPrimary: ReturnType<typeof mapArticleCardDtoToVm> | null
-  heroSecondary: ReturnType<typeof mapArticleCardDtoToVm>[]
-  sections: Array<{
-    key: string
-    title: string
-    description: string
-    list: ReturnType<typeof mapArticleCardDtoToVm>[]
-  }>
-}>({
-  heroPrimary: null,
-  heroSecondary: [],
-  sections: [],
-})
-
 const keyword = computed({
   get: () => uiStore.searchQuery,
   set: (value: string) => uiStore.setSearchQuery(value),
 })
 
-async function loadHome() {
-  loading.value = true
+const loading = computed(() => homeQuery.isFetching.value)
+const contentReady = computed(() => homeQuery.isSuccess.value)
+const home = computed(() => {
+  const response = homeQuery.data.value
 
-  try {
-    const response = await categoryApi.getHomeContent()
+  if (!response) {
+    return {
+      heroPrimary: null,
+      heroSecondary: [],
+      sections: [],
+    }
+  }
 
-    home.value.heroPrimary = response.hero.primary ? mapArticleCardDtoToVm(response.hero.primary) : null
-    home.value.heroSecondary = response.hero.secondary.map((item) => mapArticleCardDtoToVm(item))
-    home.value.sections = response.sections
+  return {
+    heroPrimary: response.hero.primary ? mapArticleCardDtoToVm(response.hero.primary) : null,
+    heroSecondary: response.hero.secondary.map((item) => mapArticleCardDtoToVm(item)),
+    sections: response.sections
       .filter((section) => !hiddenHomeSectionKeys.has(section.category.toUpperCase()))
       .map((section) => {
         const category = mapCategoryValueToVm(section.category, null)
@@ -57,13 +49,9 @@ async function loadHome() {
           description: category.description,
           list: section.list.map((item) => mapArticleCardDtoToVm(item)),
         }
-      })
-
-    contentReady.value = true
-  } finally {
-    loading.value = false
+      }),
   }
-}
+})
 
 async function onSearch(query: string) {
   const normalized = query.trim()
@@ -75,8 +63,6 @@ async function onSearch(query: string) {
     query: { keyword: normalized },
   })
 }
-
-void loadHome()
 </script>
 
 <template>

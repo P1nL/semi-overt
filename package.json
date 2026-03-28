@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:api": "node ./scripts/generate-api-types.mjs"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
@@ -36,6 +37,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^25.5.0",
     "@vitejs/plugin-vue": "^6.0.4",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

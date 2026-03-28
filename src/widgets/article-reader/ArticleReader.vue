@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import type { ArticleDetailVm } from '@/entities/article/model/article.types'
-import { articleApi } from '@/shared/api/modules/article'
+import { useArticleDetailQuery } from '@/shared/api/queries'
 import { Skeleton } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -20,34 +19,34 @@ const emit = defineEmits<{
   error: [string]
 }>()
 
-const article = ref<ArticleDetailVm | null>(null)
-const loading = ref(false)
-const errorMessage = ref('')
-
-async function loadArticle() {
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    const response = await articleApi.getArticleDetail(props.articleId)
-    article.value = mapArticleDetailDtoToVm(response)
-    await nextTick()
-    emit('loaded', article.value)
-  } catch (error) {
-    const message = getErrorMessage(error, '文章加载失败，请稍后重试。')
-    errorMessage.value = message
-    emit('error', message)
-  } finally {
-    loading.value = false
+const articleQuery = useArticleDetailQuery(computed(() => props.articleId))
+const article = computed(() => articleQuery.data.value ?? null)
+const loading = computed(() => articleQuery.isFetching.value)
+const errorMessage = computed(() => {
+  if (!articleQuery.error.value) {
+    return ''
   }
-}
+
+  return getErrorMessage(articleQuery.error.value, '文章加载失败，请稍后重试。')
+})
 
 watch(
-    () => props.articleId,
-    () => {
-      void loadArticle()
-    },
-    { immediate: true },
+  article,
+  async (value) => {
+    if (!value) return
+    await nextTick()
+    emit('loaded', value)
+  },
+  { immediate: true },
+)
+
+watch(
+  errorMessage,
+  (value) => {
+    if (!value) return
+    emit('error', value)
+  },
+  { immediate: true },
 )
 </script>
 

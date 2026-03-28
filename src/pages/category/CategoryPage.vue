@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { ArticleCard } from '@/entities/article/ui'
 import { CATEGORY_TAB } from '@/entities/category/model/category.constants'
 import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
-import { categoryApi } from '@/shared/api/modules/category'
+import { useCategoryArticlesQuery } from '@/shared/api/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
 import { AppHeader } from '@/widgets/app-header'
 
 const route = useRoute()
-const loading = ref(false)
-const errorMessage = ref('')
-const list = ref<ReturnType<typeof mapCategoryDtoToSectionVm>['list']>([])
 
 const activeCategory = computed(() => {
   const value = String(route.params.tab || CATEGORY_TAB.SHORT).toUpperCase()
@@ -22,30 +19,26 @@ const activeCategory = computed(() => {
   return CATEGORY_TAB.SHORT
 })
 
+const categoryQuery = useCategoryArticlesQuery(activeCategory, 1, 10)
 const sectionMeta = computed(() => mapCategoryValueToVm(activeCategory.value, activeCategory.value))
+const loading = computed(() => categoryQuery.isFetching.value)
+const errorMessage = computed(() =>
+  categoryQuery.error.value
+    ? getErrorMessage(categoryQuery.error.value, '栏目文章加载失败，请稍后重试。')
+    : '',
+)
+const list = computed(() => {
+  if (!categoryQuery.data.value) {
+    return []
+  }
+
+  return mapCategoryDtoToSectionVm(categoryQuery.data.value, activeCategory.value).list
+})
 const contentState = computed(() => {
   if (loading.value) return 'loading'
   if (list.value.length) return 'content'
   return 'empty'
 })
-
-async function loadCategory() {
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    const response = await categoryApi.getCategoryArticles(activeCategory.value)
-    const section = mapCategoryDtoToSectionVm(response, activeCategory.value)
-    list.value = section.list
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, '栏目文章加载失败，请稍后重试。')
-    list.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-void loadCategory()
 </script>
 
 <template>
