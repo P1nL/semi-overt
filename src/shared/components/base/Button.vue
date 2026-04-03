@@ -79,7 +79,7 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
       :aria-busy="loading || undefined"
       :class="
       cn(
-        'inline-flex shrink-0 items-center justify-center rounded-[var(--radius-md)] font-medium tracking-[-0.01em] transition-all duration-300 ease-out focus:outline-none focus-visible:outline-none focus-visible:ring-0 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-55',
+        'inline-flex shrink-0 items-center justify-center rounded-[var(--radius-md)] font-medium tracking-[-0.01em] transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-220 ease-out focus:outline-none focus-visible:outline-none focus-visible:ring-0 active:scale-[0.985] disabled:pointer-events-none disabled:shadow-none disabled:opacity-50',
         variantClassMap[variant],
         iconOnly ? iconOnlySizeClassMap[size] : sizeClassMap[size],
         block && 'w-full',
@@ -105,6 +105,14 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
 
 .button--primary:hover {
   background: var(--color-primary-strong);
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 30px rgb(0 113 227 / 0.26),
+    inset 0 1px 0 rgb(255 255 255 / 0.16);
+}
+
+.button--primary:active {
+  transform: translateY(0);
 }
 
 .button--secondary {
@@ -120,14 +128,24 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
 .button--secondary:hover {
   border-color: var(--color-border-strong);
   background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 22px rgb(15 23 42 / 0.04),
+    inset 0 1px 0 rgb(255 255 255 / 0.32);
+}
+
+.button--secondary:active {
+  transform: translateY(0);
 }
 
 .button--ghost {
   color: var(--color-text-muted);
+  border: 1px solid transparent;
 }
 
 .button--ghost:hover {
   background: color-mix(in srgb, var(--color-surface-glass-strong) 72%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 68%, transparent);
   color: var(--color-text);
 }
 
@@ -155,6 +173,13 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
 .button--success:hover,
 .button--warning:hover {
   filter: brightness(1.03);
+  transform: translateY(-1px);
+}
+
+.button--danger:active,
+.button--success:active,
+.button--warning:active {
+  transform: translateY(0);
 }
 
 .button--sm {

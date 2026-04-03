@@ -6,6 +6,7 @@ import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { ArticleCard } from '@/entities/article/ui'
 import { useSearchArticlesQuery } from '@/shared/api/queries'
 import { Button, EmptyState, Input, Pagination } from '@/shared/components/base'
+import Icon from '@/shared/components/base/Icon.vue'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useUiStore } from '@/stores/ui'
@@ -21,6 +22,8 @@ const pageSize = 10
 const routeKeyword = computed(() => String(route.query.keyword || route.query.q || '').trim())
 const page = computed(() => Number(route.query.page || 1) || 1)
 const searchQuery = useSearchArticlesQuery(routeKeyword, page, pageSize)
+const normalizedKeyword = computed(() => keyword.value.trim())
+const hasKeyword = computed(() => Boolean(normalizedKeyword.value))
 
 watch(
   routeKeyword,
@@ -45,9 +48,19 @@ const contentState = computed(() => {
   if (list.value.length) return 'content'
   return 'empty'
 })
+const activeKeyword = computed(() => routeKeyword.value || normalizedKeyword.value)
+const resultSummary = computed(() => {
+  if (!activeKeyword.value || !list.value.length) return ''
+  return `共找到 ${Math.max(total.value, list.value.length)} 篇与“${activeKeyword.value}”相关的文章`
+})
+const emptyStateTitle = computed(() => {
+  if (errorMessage.value) return '搜索失败'
+  if (activeKeyword.value) return '暂无搜索结果'
+  return '开始搜索文章'
+})
 const emptyStateDescription = computed(() => {
   if (errorMessage.value) return errorMessage.value
-  if (keyword.value) return `没有找到和“${keyword.value}”相关的文章。`
+  if (activeKeyword.value) return `没有找到和“${activeKeyword.value}”相关的文章。`
   return '先输入一个关键词，开始搜索文章。'
 })
 
@@ -62,7 +75,7 @@ function resolveSearchLocation(keywordValue: string, nextPage = 1) {
 }
 
 async function submitSearch() {
-  const normalized = keyword.value.trim()
+  const normalized = normalizedKeyword.value
   uiStore.setSearchQuery(normalized)
 
   const target = resolveSearchLocation(normalized, 1)
@@ -76,14 +89,18 @@ async function submitSearch() {
   }
 }
 
+function clearSearchInput() {
+  uiStore.clearSearchQuery()
+}
+
 async function onPageChange(nextPage: number) {
-  const target = resolveSearchLocation(keyword.value.trim(), nextPage)
+  const target = resolveSearchLocation(normalizedKeyword.value, nextPage)
   if (router.resolve(target).fullPath !== route.fullPath) {
     await router.replace(target)
     return
   }
 
-  if (keyword.value.trim()) {
+  if (normalizedKeyword.value) {
     await searchQuery.refetch()
   }
 }
@@ -94,24 +111,33 @@ async function onPageChange(nextPage: number) {
     <AppHeader />
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
+      <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
         <div class="mb-5">
           <h1 class="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-text)]">搜索文章</h1>
           <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">按关键词查找文章，快速定位你想看的内容。</p>
         </div>
 
-        <div class="surface-2 flex items-center gap-2 rounded-[var(--radius-xl)] p-2">
+        <form class="surface-2 flex flex-col items-stretch gap-2 rounded-[var(--radius-xl)] p-2 sm:flex-row sm:items-center" @submit.prevent="submitSearch">
           <Input
             v-model="keyword"
-            class="border-none bg-transparent shadow-none"
+            class="search-page-input border-none bg-transparent shadow-none"
             placeholder="输入关键词搜索"
             clearable
+            @clear="clearSearchInput"
             @enter="submitSearch"
-          />
-          <Button type="button" pill :loading="loading" @click="submitSearch">
+          >
+            <template #leading>
+              <Icon name="search" :size="16" />
+            </template>
+          </Input>
+          <Button type="submit" pill size="lg" class="w-full sm:w-auto" :loading="loading" :disabled="!hasKeyword">
             搜索
           </Button>
-        </div>
+        </form>
+
+        <p v-if="resultSummary" class="mt-4 text-sm text-[var(--color-text-muted)]">
+          {{ resultSummary }}
+        </p>
       </section>
 
       <section class="space-y-5">
@@ -156,7 +182,7 @@ async function onPageChange(nextPage: number) {
 
           <div v-else key="search-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
             <EmptyState
-              title="暂无搜索结果"
+              :title="emptyStateTitle"
               :description="emptyStateDescription"
               emoji="S"
             />
@@ -166,3 +192,10 @@ async function onPageChange(nextPage: number) {
     </main>
   </div>
 </template>
+
+<style scoped>
+.search-page-input :deep(input:focus-visible) {
+  outline: none !important;
+  outline-offset: 0;
+}
+</style>

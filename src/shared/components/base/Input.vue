@@ -86,8 +86,8 @@ function onClear() {
             'control-surface w-full rounded-[var(--radius-md)] px-4 py-3 text-sm text-[var(--color-text)] outline-none shadow-none transition-[border-color,box-shadow,background-color] duration-300',
             'placeholder:text-[var(--color-text-muted)]',
             invalid
-              ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-0 focus:shadow-none'
-              : 'focus:border-[color-mix(in_srgb,var(--color-border-strong)_72%,white)] focus:ring-0 focus:shadow-none',
+              ? 'border-[var(--color-danger)] focus:ring-0 focus:shadow-none'
+              : 'focus:ring-0 focus:shadow-none',
             disabled && 'cursor-not-allowed opacity-55',
             $slots.leading && 'pl-11',
             (clearable && model) || $slots.trailing ? 'pr-11' : '',

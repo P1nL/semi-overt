@@ -187,8 +187,7 @@ onBeforeUnmount(() => {
 }
 
 .article-reader-body :deep(img[data-previewable='true']:focus-visible) {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 72%, white);
-  outline-offset: 0.2rem;
+  outline: none;
 }
 
 .article-image-preview__close {

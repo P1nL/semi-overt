@@ -148,4 +148,40 @@ function getLineWidth(level: number) {
   opacity: 1;
   transform: scaleX(1.4);
 }
+
+@media (max-width: 1023px) {
+  .toc-anchor-list {
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .toc-anchor {
+    justify-content: space-between;
+    gap: 0.85rem;
+    padding: 0.35rem 0;
+  }
+
+  .toc-anchor__label,
+  .toc-anchor--expanded .toc-anchor__label {
+    max-width: none;
+    opacity: 1;
+    transform: none;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .toc-anchor__line {
+    order: -1;
+    width: 0.8rem;
+    transform-origin: left center;
+  }
+
+  .toc-anchor--active {
+    transform: none;
+  }
+
+  .toc-anchor--active .toc-anchor__label {
+    transform: none;
+  }
+}
 </style>

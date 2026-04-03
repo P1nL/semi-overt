@@ -39,6 +39,8 @@ const backgroundStyle = computed(() => ({
           v-if="url"
           :src="url"
           :alt="alt"
+          loading="eager"
+          decoding="async"
           class="h-40 w-full object-cover"
       />
       <div
@@ -60,4 +62,3 @@ const backgroundStyle = computed(() => ({
     </Button>
   </div>
 </template>
-

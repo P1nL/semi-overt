@@ -67,8 +67,8 @@ watch(() => props.modelValue, resizeIfNeeded, { immediate: true })
       cn(
         'control-surface w-full rounded-[var(--radius-lg)] px-4 py-3 text-sm text-[var(--color-text)] outline-none shadow-none transition-[border-color,box-shadow,background-color] duration-300 placeholder:text-[var(--color-text-muted)]',
         invalid
-          ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-0 focus:shadow-none'
-          : 'focus:border-[color-mix(in_srgb,var(--color-border-strong)_72%,white)] focus:ring-0 focus:shadow-none',
+          ? 'border-[var(--color-danger)] focus:ring-0 focus:shadow-none'
+          : 'focus:ring-0 focus:shadow-none',
         disabled && 'cursor-not-allowed opacity-55',
         resize === 'none' && 'resize-none',
         resize === 'vertical' && 'resize-y',

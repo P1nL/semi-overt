@@ -35,7 +35,7 @@ const rootRef = ref<HTMLElement | null>(null)
 const confirming = ref(false)
 const loading = ref(false)
 
-const effectiveVariant = computed(() => 'warning')
+const effectiveVariant = computed((): 'warning' => 'warning')
 
 let confirmTimer: ReturnType<typeof setTimeout> | null = null
 

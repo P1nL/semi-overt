@@ -44,21 +44,24 @@ const coverStyle = computed(() => {
     <div class="absolute inset-0">
       <div
         v-if="profile.coverUrl"
-        class="absolute inset-x-6 top-6 h-64 scale-[1.02] rounded-[calc(var(--radius-xl)+0.5rem)] bg-cover bg-center opacity-16 blur-lg md:inset-x-8 md:top-8 md:h-72"
+        class="absolute inset-x-4 top-4 h-48 scale-[1.02] rounded-[calc(var(--radius-xl)+0.5rem)] bg-cover bg-center opacity-16 blur-lg sm:inset-x-6 sm:top-6 sm:h-64 md:inset-x-8 md:top-8 md:h-72"
         :style="coverStyle"
       />
       <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06)_42%,transparent)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03)_42%,transparent)]" />
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,113,227,0.16),transparent_46%)]" />
     </div>
 
-    <div class="relative px-6 pb-6 pt-6 md:px-8 md:pb-8 md:pt-8">
+    <div class="relative px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 md:px-8 md:pb-8 md:pt-8">
       <div
         v-if="profile.coverUrl"
-        class="relative mt-4 h-[22rem] overflow-hidden rounded-[calc(var(--radius-xl)+0.25rem)] border border-white/35 bg-[var(--color-surface-elevated)] shadow-[0_24px_60px_rgb(15_23_42_/_0.12)] md:h-[26rem]"
+        class="relative mt-3 h-[18rem] overflow-hidden rounded-[calc(var(--radius-xl)+0.25rem)] border border-white/35 bg-[var(--color-surface-elevated)] shadow-[0_24px_60px_rgb(15_23_42_/_0.12)] sm:mt-4 sm:h-[22rem] md:h-[26rem]"
       >
         <img
           :src="profile.coverUrl"
           :alt="`${profile.displayName} cover`"
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
           class="absolute inset-0 size-full object-cover"
         />
         <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,15,34,0.18),rgba(8,15,34,0.1)_34%,rgba(8,15,34,0.62))]" />
@@ -72,7 +75,7 @@ const coverStyle = computed(() => {
           />
         </div>
 
-        <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-6 pb-5 pt-10 text-center md:px-8 md:pb-6">
+        <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-4 pt-8 text-center sm:px-6 sm:pb-5 sm:pt-10 md:px-8 md:pb-6">
           <Avatar
             :src="profile.avatarUrl ?? undefined"
             :alt="profile.displayName"
@@ -80,12 +83,15 @@ const coverStyle = computed(() => {
             :fallback="profile.displayName.slice(0, 1)"
             size="xl"
             rounded
-            class="size-20 border-white/70 bg-white/15 text-2xl text-white shadow-[0_18px_40px_rgb(15_23_42_/_0.3)] ring-4 ring-white/35 backdrop-blur-sm md:size-24 md:text-3xl"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+            class="size-[4.5rem] border-white/70 bg-white/15 text-xl text-white shadow-[0_18px_40px_rgb(15_23_42_/_0.3)] ring-4 ring-white/35 backdrop-blur-sm sm:size-20 sm:text-2xl md:size-24 md:text-3xl"
           />
 
           <div class="mt-3 space-y-2">
             <div>
-              <h1 class="text-2xl font-semibold tracking-[-0.04em] text-white drop-shadow-[0_4px_20px_rgb(8_15_34_/_0.35)] md:text-3xl">
+              <h1 class="text-[1.55rem] font-semibold tracking-[-0.04em] text-white drop-shadow-[0_4px_20px_rgb(8_15_34_/_0.35)] sm:text-2xl md:text-3xl">
                 {{ profile.displayName }}
               </h1>
               <p class="mt-1 text-sm text-white/78 md:text-base">
@@ -124,12 +130,15 @@ const coverStyle = computed(() => {
             :fallback="profile.displayName.slice(0, 1)"
             size="xl"
             rounded
-            class="size-28 border-white/50 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-3xl text-[var(--color-text)] shadow-[0_18px_40px_rgb(15_23_42_/_0.16)] ring-4 ring-white/40 md:size-36 md:text-4xl"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+            class="size-24 border-white/50 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-2xl text-[var(--color-text)] shadow-[0_18px_40px_rgb(15_23_42_/_0.16)] ring-4 ring-white/40 sm:size-28 sm:text-3xl md:size-36 md:text-4xl"
           />
 
-          <div class="mt-5 space-y-3">
+          <div class="mt-4 space-y-3 sm:mt-5">
             <div>
-              <h1 class="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-text)] md:text-4xl">
+              <h1 class="text-[1.9rem] font-semibold tracking-[-0.04em] text-[var(--color-text)] sm:text-3xl md:text-4xl">
                 {{ profile.displayName }}
               </h1>
               <p class="mt-2 text-sm text-[var(--color-text-muted)] md:text-base">
@@ -151,7 +160,7 @@ const coverStyle = computed(() => {
         </div>
       </div>
 
-      <div class="mt-7 flex justify-center">
+      <div class="mt-6 flex justify-center sm:mt-7">
         <ProfileHeaderStats :stats="visibleStats" />
       </div>
     </div>

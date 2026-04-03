@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useAttrs, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -15,6 +15,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useDraftStore } from '@/stores/draft'
 import DraftList from './DraftList.vue'
 
+defineOptions({
+  inheritAttrs: false,
+})
+
 const props = defineProps<{
   modelValue: boolean
 }>()
@@ -28,6 +32,7 @@ const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 const draftStore = useDraftStore()
+const attrs = useAttrs()
 
 const items = ref<DraftBoxItem[]>([])
 const errorMessage = ref('')
@@ -143,8 +148,13 @@ watch(
   >
     <div
       v-if="modelValue"
+      v-bind="attrs"
       class="draft-box-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)]"
       :class="panelClass"
+      role="dialog"
+      aria-modal="false"
+      aria-label="写作箱"
+      tabindex="-1"
     >
       <div class="mb-3 px-1">
         <h3 class="text-base font-semibold tracking-[-0.02em] text-[var(--color-text)]">
@@ -170,9 +180,9 @@ watch(
 
 <style scoped>
 .draft-box-panel {
-  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
-  border-color: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
-  -webkit-backdrop-filter: blur(26px) saturate(180%);
-  backdrop-filter: blur(26px) saturate(180%);
+  background: var(--color-surface-panel);
+  border-color: var(--color-border-panel);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+  backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
 }
 </style>

@@ -1,20 +1,27 @@
 <!-- src/entities/article/ui/ArticleCover.vue -->
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ArticleCoverVm } from '../model/article.types'
 
-withDefaults(
+const props = withDefaults(
     defineProps<{
       cover: ArticleCoverVm
       title?: string
       compact?: boolean
       fillHeight?: boolean
+      eager?: boolean
     }>(),
     {
       title: '',
       compact: false,
       fillHeight: false,
+      eager: false,
     },
 )
+
+const imageLoading = computed<'eager' | 'lazy'>(() => (props.eager ? 'eager' : 'lazy'))
+const imageDecoding = computed<'sync' | 'async'>(() => (props.eager ? 'sync' : 'async'))
+const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high' : 'auto'))
 </script>
 
 <template>
@@ -33,6 +40,9 @@ withDefaults(
         v-if="cover.hasImage && cover.src"
         :src="cover.src"
         :alt="cover.alt || title"
+        :loading="imageLoading"
+        :decoding="imageDecoding"
+        :fetchpriority="imageFetchPriority"
         class="h-full w-full object-cover"
     />
     <div

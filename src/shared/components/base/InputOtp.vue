@@ -131,7 +131,7 @@ async function onPaste(event: ClipboardEvent) {
           'size-11 rounded-[var(--radius-sm)] border bg-[var(--color-surface)] text-center text-lg font-semibold outline-none shadow-none transition-[border-color,box-shadow] duration-300',
           invalid
             ? 'border-[var(--color-danger)]'
-            : 'border-[var(--color-border)] focus:border-[color-mix(in_srgb,var(--color-border-strong)_72%,white)] focus:ring-0 focus:shadow-none',
+            : 'border-[var(--color-border)] focus:ring-0 focus:shadow-none',
           disabled && 'cursor-not-allowed opacity-60',
         )
       "

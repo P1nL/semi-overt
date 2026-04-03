@@ -1360,17 +1360,77 @@ onBeforeUnmount(() => {
   .editor-topbar {
     flex-direction: column;
     align-items: stretch;
-    padding: 0.65rem 1rem;
+    padding: 0.75rem 0.9rem;
     gap: 0.65rem;
   }
 
+  .editor-topbar__left {
+    gap: 0.6rem;
+  }
+
+  .editor-topbar__logo,
+  .editor-topbar__divider {
+    display: none;
+  }
+
+  .editor-topbar__title {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
   .editor-topbar__right {
+    width: 100%;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: stretch;
+    gap: 0.5rem;
   }
 
   .editor-save-pill {
     display: none;
+  }
+
+  .editor-save-action-slot,
+  .editor-main-action-slot,
+  .editor-secondary-action,
+  .editor-primary-action {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .editor-btn,
+  .editor-icon-btn {
+    width: 100%;
+  }
+
+  .editor-icon-btn {
+    height: 2.5rem;
+    border-radius: 0.75rem;
+  }
+
+  .editor-btn {
+    min-width: 0;
+    min-height: 2.5rem;
+    padding-inline: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  .editor-btn--cooldown-fixed {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-page {
+    --editor-topbar-height: auto;
+  }
+
+  .editor-topbar {
+    padding-inline: 0.75rem;
+  }
+
+  .editor-page__body {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 </style>

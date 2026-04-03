@@ -32,6 +32,14 @@ type GridVertex = {
 }
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const THEME_TRANSITION_DURATION = 420
+const LIGHT_POINTER_STRENGTH = GRID_STRENGTH * 0.78
+const LIGHT_WAKE_RADIUS = GRID_RADIUS * 0.92
+const LIGHT_WAKE_MAX_DISTANCE = 74
+const DARK_TRAVEL_SCALE = 0.72
+const DARK_PULSE_SCALE = 0.78
+const LIGHT_GRID_DRIFT_SCALE = 0.8
+const DARK_GLOBAL_DRIFT_SCALE = 0.82
 
 const GRID_SIZE = 42
 const GRID_SEGMENT = 8
@@ -48,6 +56,7 @@ const pointer = {
   wakeX: -1000,
   wakeY: -1000,
   wakeEnergy: 0,
+  active: false,
 }
 
 const lightPoints: MeshPoint[] = [
@@ -69,9 +78,54 @@ const darkPoints: MeshPoint[] = [
 let frameId = 0
 let dpr = 1
 let currentTheme: MeshTheme = 'light'
+let targetTheme: MeshTheme = 'light'
+let transitionFromTheme: MeshTheme | null = null
+let themeTransitionStart = 0
 let themeObserver: MutationObserver | null = null
+let reducedMotionQuery: MediaQueryList | null = null
+let prefersReducedMotion = false
+
+function easeOutQuart(value: number) {
+  return 1 - (1 - value) ** 4
+}
+
+function queueFrame() {
+  if (frameId !== 0 || prefersReducedMotion || document.hidden) {
+    return
+  }
+
+  frameId = requestAnimationFrame(render)
+}
+
+function stopAnimation() {
+  if (frameId === 0) {
+    return
+  }
+
+  cancelAnimationFrame(frameId)
+  frameId = 0
+}
+
+function syncAnimationLoop(forceRender = false) {
+  if (prefersReducedMotion || document.hidden) {
+    stopAnimation()
+
+    if (forceRender) {
+      renderFrame(performance.now())
+    }
+    return
+  }
+
+  if (forceRender) {
+    renderFrame(performance.now())
+  }
+
+  queueFrame()
+}
 
 function handlePointerMove(event: MouseEvent) {
+  pointer.active = true
+
   if (pointer.x < -500 || pointer.y < -500) {
     pointer.x = event.clientX
     pointer.y = event.clientY
@@ -84,12 +138,33 @@ function handlePointerMove(event: MouseEvent) {
 }
 
 function handlePointerLeave() {
-  pointer.targetX = -1000
-  pointer.targetY = -1000
+  pointer.active = false
+  pointer.targetX = pointer.x
+  pointer.targetY = pointer.y
 }
 
 function resolveTheme(): MeshTheme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+}
+
+function beginThemeTransition(nextTheme: MeshTheme, now = performance.now()) {
+  if (nextTheme === targetTheme) {
+    return
+  }
+
+  if (prefersReducedMotion) {
+    transitionFromTheme = null
+    currentTheme = nextTheme
+    targetTheme = nextTheme
+    renderFrame(now)
+    return
+  }
+
+  transitionFromTheme = targetTheme
+  currentTheme = nextTheme
+  targetTheme = nextTheme
+  themeTransitionStart = now
+  queueFrame()
 }
 
 function resizeCanvas() {
@@ -186,19 +261,21 @@ function drawInteractiveGrid(
   height: number,
   time: number,
 ) {
+  const pointerRadius = pointer.active ? GRID_RADIUS : 0
+  const pointerStrength = pointer.active ? LIGHT_POINTER_STRENGTH : 0
   const drift = (pointX: number, pointY: number) =>
     (
       Math.sin(time * 0.2 + pointX * 0.0022 + pointY * 0.0015) +
       Math.cos(time * 0.14 + pointX * 0.0012 - pointY * 0.001) * 0.6
-    ) * 0.08
-  const wakeRadius = GRID_RADIUS + Math.min(82, pointer.wakeEnergy * 9)
-  const wakeStrength = Math.min(5.2, 1.2 + pointer.wakeEnergy * 0.16)
+    ) * 0.08 * LIGHT_GRID_DRIFT_SCALE
+  const wakeRadius = LIGHT_WAKE_RADIUS + Math.min(64, pointer.wakeEnergy * 6.4)
+  const wakeStrength = Math.min(4.3, 0.9 + pointer.wakeEnergy * 0.12)
 
   ctx.save()
   ctx.lineWidth = 1
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(64, 97, 143, 0.08)'
+  ctx.strokeStyle = 'rgba(64, 97, 143, 0.062)'
 
   for (let x = 0; x <= width + GRID_SIZE; x += GRID_SIZE) {
     const points: GridVertex[] = []
@@ -206,7 +283,7 @@ function drawInteractiveGrid(
     for (let y = 0; y <= height + GRID_SEGMENT; y += GRID_SEGMENT) {
       const offsetX =
         drift(x, y) +
-        resolveGridOffset(pointer.x, pointer.y, x, y, 'x', GRID_RADIUS, GRID_STRENGTH) +
+        resolveGridOffset(pointer.x, pointer.y, x, y, 'x', pointerRadius, pointerStrength) +
         resolveGridOffset(pointer.wakeX, pointer.wakeY, x, y, 'x', wakeRadius, wakeStrength)
 
       points.push({ x: x + offsetX, y })
@@ -215,7 +292,7 @@ function drawInteractiveGrid(
     drawSmoothGridPath(ctx, points)
   }
 
-  ctx.strokeStyle = 'rgba(92, 126, 168, 0.055)'
+  ctx.strokeStyle = 'rgba(92, 126, 168, 0.042)'
 
   for (let y = 0; y <= height + GRID_SIZE; y += GRID_SIZE) {
     const points: GridVertex[] = []
@@ -223,7 +300,7 @@ function drawInteractiveGrid(
     for (let x = 0; x <= width + GRID_SEGMENT; x += GRID_SEGMENT) {
       const offsetY =
         drift(x + 18, y + 12) +
-        resolveGridOffset(pointer.x, pointer.y, x, y, 'y', GRID_RADIUS, GRID_STRENGTH) +
+        resolveGridOffset(pointer.x, pointer.y, x, y, 'y', pointerRadius, pointerStrength) +
         resolveGridOffset(pointer.wakeX, pointer.wakeY, x, y, 'y', wakeRadius, wakeStrength)
 
       points.push({ x, y: y + offsetY })
@@ -240,8 +317,8 @@ function drawInteractiveGrid(
     height * 0.2,
     Math.max(width, height) * 0.8,
   )
-  ambientGlow.addColorStop(0, 'rgba(255,255,255,0.34)')
-  ambientGlow.addColorStop(0.38, 'rgba(255,255,255,0.12)')
+  ambientGlow.addColorStop(0, 'rgba(255,255,255,0.28)')
+  ambientGlow.addColorStop(0.38, 'rgba(255,255,255,0.09)')
   ambientGlow.addColorStop(1, 'rgba(255,255,255,0)')
 
   ctx.globalCompositeOperation = 'screen'
@@ -349,11 +426,13 @@ function drawMeshLayer(
   const globalDriftX =
     (Math.sin(time * (theme === 'dark' ? 0.16 : 0.14) + 0.8) * (theme === 'dark' ? 0.092 : 0.032) +
       Math.cos(time * (theme === 'dark' ? 0.11 : 0.1) + 2.1) * (theme === 'dark' ? 0.04 : 0.014)) *
-    width
+    width *
+    (theme === 'dark' ? DARK_GLOBAL_DRIFT_SCALE : 1)
   const globalDriftY =
     (Math.cos(time * (theme === 'dark' ? 0.13 : 0.12) + 1.4) * (theme === 'dark' ? 0.068 : 0.022) +
       Math.sin(time * (theme === 'dark' ? 0.09 : 0.08) + 0.2) * (theme === 'dark' ? 0.026 : 0.01)) *
-    height
+    height *
+    (theme === 'dark' ? DARK_GLOBAL_DRIFT_SCALE : 1)
 
   ctx.save()
   ctx.globalCompositeOperation = theme === 'dark' ? 'lighter' : 'source-over'
@@ -384,13 +463,13 @@ function drawMeshLayer(
     }
 
     if (theme === 'dark' && index === 0) {
-      travelX = Math.sin(time * 0.11 + point.ox) * width * 0.68
-      travelY = Math.cos(time * 0.09 + point.oy) * height * 0.18
+      travelX = Math.sin(time * 0.11 + point.ox) * width * 0.68 * DARK_TRAVEL_SCALE
+      travelY = Math.cos(time * 0.09 + point.oy) * height * 0.18 * DARK_TRAVEL_SCALE
     }
 
     if (theme === 'dark' && index === 4) {
-      travelX = Math.cos(time * 0.1 + point.ox) * width * 0.34
-      travelY = Math.sin(time * 0.08 + point.oy) * height * 0.1
+      travelX = Math.cos(time * 0.1 + point.ox) * width * 0.34 * DARK_TRAVEL_SCALE
+      travelY = Math.sin(time * 0.08 + point.oy) * height * 0.1 * DARK_TRAVEL_SCALE
     }
 
     const x =
@@ -413,8 +492,8 @@ function drawMeshLayer(
 
     const pulse =
       1 +
-      Math.sin(time * point.pulse + point.ox) * (theme === 'dark' ? 0.09 : 0.065) +
-      Math.cos(time * (point.pulse * 0.56 + 0.08) + point.oy) * (theme === 'dark' ? 0.028 : 0.02)
+      Math.sin(time * point.pulse + point.ox) * (theme === 'dark' ? 0.09 * DARK_PULSE_SCALE : 0.065) +
+      Math.cos(time * (point.pulse * 0.56 + 0.08) + point.oy) * (theme === 'dark' ? 0.028 * DARK_PULSE_SCALE : 0.02)
     const radius = Math.min(width, height) * point.r * pulse * 1.12
 
     let alpha = baseAlpha
@@ -428,11 +507,11 @@ function drawMeshLayer(
     }
 
     if (theme === 'dark' && point === darkPoints[4]) {
-      alpha += Math.sin(time * 1.3 + 1.2) * 0.18
+      alpha += Math.sin(time * 1.3 + 1.2) * 0.11
     }
 
     if (theme === 'dark' && point === darkPoints[0]) {
-      alpha += Math.cos(time * 1.08 + 0.4) * 0.08
+      alpha += Math.cos(time * 1.08 + 0.4) * 0.05
     }
 
     samples[index] = {
@@ -526,7 +605,33 @@ function drawThemeGlow(ctx: CanvasRenderingContext2D, width: number, height: num
   ctx.restore()
 }
 
-function render(now: number) {
+function drawScene(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  theme: MeshTheme,
+  time: number,
+  opacity = 1,
+) {
+  if (opacity <= 0.001) {
+    return
+  }
+
+  ctx.save()
+  ctx.globalAlpha = opacity
+  drawBackground(ctx, width, height, theme)
+
+  if (theme === 'light') {
+    drawInteractiveGrid(ctx, width, height, time)
+  } else {
+    drawMeshLayer(ctx, width, height, theme, time)
+    drawThemeGlow(ctx, width, height, theme)
+  }
+
+  ctx.restore()
+}
+
+function renderFrame(now: number) {
   const canvas = canvasRef.value
 
   if (!canvas) {
@@ -539,55 +644,76 @@ function render(now: number) {
     return
   }
 
-  currentTheme = resolveTheme()
-
   const width = window.innerWidth
   const height = window.innerHeight
-  const time = now * 0.0015
+  const time = prefersReducedMotion ? 0 : now * 0.00136
 
   const prevX = pointer.x
   const prevY = pointer.y
-  pointer.x += (pointer.targetX - pointer.x) * 0.2
-  pointer.y += (pointer.targetY - pointer.y) * 0.2
+  const pointerLerp = pointer.active ? 0.16 : 0.08
+  pointer.x += (pointer.targetX - pointer.x) * pointerLerp
+  pointer.y += (pointer.targetY - pointer.y) * pointerLerp
   pointer.vx += (pointer.x - prevX - pointer.vx) * 0.24
   pointer.vy += (pointer.y - prevY - pointer.vy) * 0.24
 
   const speed = Math.hypot(pointer.vx, pointer.vy)
-  pointer.wakeEnergy += (speed - pointer.wakeEnergy) * (currentTheme === 'light' ? 0.035 : 0.055)
+  const wakeTarget = pointer.active ? speed : 0
+  pointer.wakeEnergy += (wakeTarget - pointer.wakeEnergy) * 0.026
   const directionX = speed > 0.001 ? pointer.vx / speed : 0
   const directionY = speed > 0.001 ? pointer.vy / speed : 0
   const wakeDistance =
-    currentTheme === 'light'
-      ? Math.min(84, pointer.wakeEnergy * 7.5)
+    targetTheme === 'light'
+      ? Math.min(LIGHT_WAKE_MAX_DISTANCE, pointer.wakeEnergy * 5.8)
       : Math.min(138, pointer.wakeEnergy * 14)
   const wakeTargetX = pointer.x - directionX * wakeDistance
   const wakeTargetY = pointer.y - directionY * wakeDistance
 
-  const wakeLerp = currentTheme === 'light' ? 0.035 : 0.05
+  const wakeLerp = targetTheme === 'light' ? 0.028 : 0.05
   pointer.wakeX += (wakeTargetX - pointer.wakeX) * wakeLerp
   pointer.wakeY += (wakeTargetY - pointer.wakeY) * wakeLerp
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  drawBackground(ctx, width, height, currentTheme)
+  if (transitionFromTheme) {
+    const progress = Math.min((now - themeTransitionStart) / THEME_TRANSITION_DURATION, 1)
+    const easedProgress = easeOutQuart(progress)
 
-  if (currentTheme === 'light') {
-    drawInteractiveGrid(ctx, width, height, time)
+    drawScene(ctx, width, height, transitionFromTheme, time, 1)
+    drawScene(ctx, width, height, targetTheme, time, easedProgress)
+
+    if (progress >= 1) {
+      transitionFromTheme = null
+    }
   } else {
-    drawMeshLayer(ctx, width, height, currentTheme, time)
-    drawThemeGlow(ctx, width, height, currentTheme)
+    drawScene(ctx, width, height, targetTheme, time)
   }
+}
 
-  frameId = requestAnimationFrame(render)
+function render(now: number) {
+  frameId = 0
+  renderFrame(now)
+  queueFrame()
+}
+
+function handleVisibilityChange() {
+  syncAnimationLoop(true)
+}
+
+function handleReducedMotionChange(event: MediaQueryListEvent) {
+  prefersReducedMotion = event.matches
+  syncAnimationLoop(true)
 }
 
 onMounted(() => {
   currentTheme = resolveTheme()
+  targetTheme = currentTheme
   resizeCanvas()
+  reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  prefersReducedMotion = reducedMotionQuery.matches
 
   themeObserver = new MutationObserver(() => {
-    currentTheme = resolveTheme()
+    beginThemeTransition(resolveTheme())
   })
 
   themeObserver.observe(document.documentElement, {
@@ -598,16 +724,21 @@ onMounted(() => {
   window.addEventListener('resize', resizeCanvas)
   window.addEventListener('mousemove', handlePointerMove)
   window.addEventListener('mouseleave', handlePointerLeave)
-  frameId = requestAnimationFrame(render)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  reducedMotionQuery.addEventListener('change', handleReducedMotionChange)
+  syncAnimationLoop(true)
 })
 
 onBeforeUnmount(() => {
-  cancelAnimationFrame(frameId)
+  stopAnimation()
   window.removeEventListener('resize', resizeCanvas)
   window.removeEventListener('mousemove', handlePointerMove)
   window.removeEventListener('mouseleave', handlePointerLeave)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  reducedMotionQuery?.removeEventListener('change', handleReducedMotionChange)
   themeObserver?.disconnect()
   themeObserver = null
+  reducedMotionQuery = null
 })
 </script>
 
@@ -644,12 +775,12 @@ onBeforeUnmount(() => {
 
 .app-background__overlay {
   background:
-    radial-gradient(circle at center, transparent 40%, rgb(0 0 0 / 0.03) 100%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0));
+    radial-gradient(circle at center, transparent 42%, rgb(0 0 0 / 0.022) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.03), rgb(255 255 255 / 0));
 }
 
 .app-background__noise {
-  opacity: 0.012;
+  opacity: 0.009;
   background-image: radial-gradient(rgb(255 255 255 / 0.14) 0.7px, transparent 0.7px);
   background-size: 9px 9px;
   mix-blend-mode: soft-light;
@@ -657,11 +788,11 @@ onBeforeUnmount(() => {
 
 html.dark .app-background__overlay {
   background:
-    radial-gradient(circle at center, transparent 30%, rgb(0 0 0 / 0.18) 100%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.02), rgb(0 0 0 / 0.14));
+    radial-gradient(circle at center, transparent 34%, rgb(0 0 0 / 0.15) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.02), rgb(0 0 0 / 0.12));
 }
 
 html.dark .app-background__noise {
-  opacity: 0.04;
+  opacity: 0.032;
 }
 </style>

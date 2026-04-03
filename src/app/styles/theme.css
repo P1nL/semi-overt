@@ -29,6 +29,7 @@
     --color-surface-elevated: #fbfbfd;
     --color-surface-glass: rgb(255 255 255 / 0.66);
     --color-surface-glass-strong: rgb(255 255 255 / 0.94);
+    --color-surface-panel: color-mix(in srgb, var(--color-surface) 94%, transparent);
 
     --color-text: #1d1d1f;
     --color-text-muted: #6e6e73;
@@ -36,6 +37,7 @@
 
     --color-border: rgb(29 29 31 / 0.08);
     --color-border-strong: rgb(29 29 31 / 0.12);
+    --color-border-panel: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
     --color-danger: #d92c20;
     --color-success: #14863c;
     --color-warning: #b96b00;
@@ -54,6 +56,17 @@
     --shadow-button:
             0 10px 24px rgb(0 113 227 / 0.22),
             inset 0 1px 0 rgb(255 255 255 / 0.16);
+    --shadow-surface-sm: 0 6px 18px rgb(15 23 42 / 0.022);
+    --shadow-surface-md: 0 10px 28px rgb(15 23 42 / 0.028);
+    --shadow-glass-card:
+            0 16px 36px rgb(164 181 201 / 0.14),
+            0 4px 12px rgb(164 181 201 / 0.08);
+    --shadow-glass-card-hover:
+            0 22px 48px rgb(164 181 201 / 0.18),
+            0 6px 16px rgb(164 181 201 / 0.1);
+    --shadow-glass-card-compact-hover:
+            0 16px 36px rgb(164 181 201 / 0.16),
+            0 5px 12px rgb(164 181 201 / 0.1);
 
     --scrollbar-size: 0.8rem;
     --radius-base: 1rem;
@@ -63,6 +76,9 @@
     --radius-xl: calc(var(--radius-base) + 0.75rem);
     --radius-pill: 999px;
     --backdrop-blur: 22px;
+    --backdrop-blur-soft: calc(var(--backdrop-blur) * 0.7);
+    --backdrop-blur-panel: 26px;
+    --backdrop-blur-card: 16px;
 }
 
 html.dark {
@@ -78,6 +94,7 @@ html.dark {
     --color-surface-elevated: #1a1f2b;
     --color-surface-glass: rgb(20 24 33 / 0.7);
     --color-surface-glass-strong: rgb(20 24 33 / 0.84);
+    --color-surface-panel: color-mix(in srgb, var(--color-surface) 94%, transparent);
 
     --color-text: #f5f5f7;
     --color-text-muted: #a1a1a6;
@@ -85,6 +102,7 @@ html.dark {
 
     --color-border: rgb(255 255 255 / 0.08);
     --color-border-strong: rgb(255 255 255 / 0.12);
+    --color-border-panel: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
     --color-danger: #ff695f;
     --color-success: #32d74b;
     --color-warning: #ff9f0a;
@@ -103,4 +121,15 @@ html.dark {
     --shadow-button:
             0 10px 26px rgb(41 151 255 / 0.2),
             inset 0 1px 0 rgb(255 255 255 / 0.1);
+    --shadow-surface-sm: 0 6px 18px rgb(0 0 0 / 0.18);
+    --shadow-surface-md: 0 10px 28px rgb(0 0 0 / 0.24);
+    --shadow-glass-card:
+            0 16px 36px rgb(0 0 0 / 0.24),
+            0 4px 12px rgb(0 0 0 / 0.14);
+    --shadow-glass-card-hover:
+            0 22px 48px rgb(0 0 0 / 0.3),
+            0 6px 16px rgb(0 0 0 / 0.18);
+    --shadow-glass-card-compact-hover:
+            0 16px 36px rgb(0 0 0 / 0.28),
+            0 5px 12px rgb(0 0 0 / 0.16);
 }

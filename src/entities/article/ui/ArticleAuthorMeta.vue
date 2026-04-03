@@ -17,6 +17,11 @@ const props = withDefaults(
 )
 
 const tag = computed(() => (props.clickable && props.author ? 'RouterLink' : 'div'))
+const wrapperClass = computed(() =>
+  props.clickable && props.author
+    ? 'inline-flex items-center gap-2.5 text-sm text-[var(--color-text-muted)] transition-colors duration-200 hover:text-[var(--color-text)]'
+    : 'inline-flex items-center gap-2.5 text-sm text-[var(--color-text-muted)]',
+)
 </script>
 
 <template>
@@ -24,7 +29,7 @@ const tag = computed(() => (props.clickable && props.author ? 'RouterLink' : 'di
       :is="tag"
       v-if="author"
       :to="clickable ? author.profilePath : undefined"
-      class="inline-flex items-center gap-2.5 text-sm text-[var(--color-text-muted)] transition-colors duration-200 hover:text-[var(--color-text)]"
+      :class="wrapperClass"
   >
     <Avatar
         :src="author.avatarUrl ?? undefined"
@@ -34,7 +39,7 @@ const tag = computed(() => (props.clickable && props.author ? 'RouterLink' : 'di
         :size="size"
         rounded
     />
-    <span class="truncate">{{ author.displayName }}</span>
+    <span class="truncate font-medium">{{ author.displayName }}</span>
   </component>
 
   <div v-else class="inline-flex items-center gap-2.5 text-sm text-[var(--color-text-faint)]">

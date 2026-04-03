@@ -73,18 +73,23 @@ async function handleAdminDeleted() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <main class="flex-1 overflow-y-auto px-4 pb-40 pt-6 md:px-6 md:pb-44 xl:px-8">
+    <main class="flex-1 overflow-y-auto px-3 pb-56 pt-4 sm:px-4 md:px-6 md:pb-44 md:pt-6 xl:px-8">
       <div class="mx-auto w-full max-w-[1200px] space-y-6">
-        <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
+        <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
           <SectionHeader
             title="审核文章"
             description="先阅读完整内容，再在底部固定操作区执行通过、退回修改或拒绝。"
           />
         </section>
 
+        <section class="surface-1 rounded-[var(--radius-xl)] p-4 lg:hidden">
+          <SectionHeader title="目录" compact />
+          <ArticleToc :sync-key="tocSyncKey" />
+        </section>
+
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:gap-8">
           <section class="space-y-6">
-            <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
+            <section class="surface-1 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8">
               <ArticleReader
                 :key="`${articleId}-${readerKey}`"
                 :article-id="articleId"
@@ -92,7 +97,7 @@ async function handleAdminDeleted() {
               />
             </section>
 
-            <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
+            <section class="surface-1 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8">
               <SectionHeader title="审核记录" compact />
               <ReviewLogList :logs="reviewLogs" />
               <EmptyState
@@ -105,7 +110,7 @@ async function handleAdminDeleted() {
             </section>
           </section>
 
-          <div class="flex justify-end lg:sticky lg:top-6 lg:h-fit">
+          <div class="hidden justify-end lg:flex lg:sticky lg:top-6 lg:h-fit">
             <ArticleToc :sync-key="tocSyncKey" />
           </div>
         </div>
@@ -113,7 +118,7 @@ async function handleAdminDeleted() {
     </main>
 
     <div class="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_94%,transparent)] backdrop-blur-xl">
-      <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6 xl:px-8">
+      <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-3.5 sm:px-4 md:flex-row md:items-center md:justify-between md:px-6 xl:px-8">
         <div class="min-w-0">
           <p class="text-sm font-semibold tracking-[-0.02em] text-[var(--color-text)]">
             审核操作区
@@ -123,7 +128,7 @@ async function handleAdminDeleted() {
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <AdminDeleteArticleButton
             :article-id="articleId"
             text="删除文章"

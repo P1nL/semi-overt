@@ -3,6 +3,9 @@ import { computed } from 'vue'
 import { cn } from '@/shared/utils/cn'
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+type ImageLoading = 'eager' | 'lazy'
+type ImageDecoding = 'sync' | 'async' | 'auto'
+type ImageFetchPriority = 'high' | 'low' | 'auto'
 
 const props = withDefaults(
     defineProps<{
@@ -12,6 +15,9 @@ const props = withDefaults(
       size?: AvatarSize
       rounded?: boolean
       fallback?: string
+      loading?: ImageLoading
+      decoding?: ImageDecoding
+      fetchpriority?: ImageFetchPriority
     }>(),
     {
       alt: 'avatar',
@@ -19,6 +25,9 @@ const props = withDefaults(
       size: 'md',
       rounded: true,
       fallback: '',
+      loading: 'lazy',
+      decoding: 'async',
+      fetchpriority: 'auto',
     },
 )
 
@@ -56,7 +65,15 @@ const shapeClass = computed(() => (props.rounded ? 'rounded-full' : 'rounded-[va
       )
     "
   >
-    <img v-if="src" :src="src" :alt="alt" class="avatar-image absolute inset-0" />
+    <img
+      v-if="src"
+      :src="src"
+      :alt="alt"
+      :loading="loading"
+      :decoding="decoding"
+      :fetchpriority="fetchpriority"
+      class="avatar-image absolute inset-0"
+    />
     <span v-else class="relative z-10">{{ initials }}</span>
   </span>
 </template>

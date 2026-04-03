@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
@@ -16,8 +16,17 @@ const uiStore = useUiStore()
 
 const searchWrapRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
+const searchButtonRef = ref<HTMLButtonElement | null>(null)
 const searchOpen = ref(false)
 const keyword = ref(uiStore.searchQuery)
+
+const leftSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
+const actionSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
+const searchWrapClass = computed(() =>
+  searchOpen.value
+    ? 'left-0 right-0 w-auto max-md:z-20 md:left-auto md:w-[min(22rem,calc(100vw-18rem))] lg:w-[min(26rem,calc(100vw-20rem))]'
+    : 'w-[2.85rem]',
+)
 
 watch(
   () => uiStore.searchQuery,
@@ -33,11 +42,26 @@ watch(searchOpen, async (value) => {
 })
 
 onClickOutside(searchWrapRef, () => {
-  searchOpen.value = false
+  closeSearch()
 })
 
 function toggleSearch() {
+  if (!searchOpen.value) {
+    keyword.value = ''
+    uiStore.clearSearchQuery()
+  }
+
   searchOpen.value = !searchOpen.value
+}
+
+function closeSearch(options: { restoreFocus?: boolean } = {}) {
+  searchOpen.value = false
+
+  if (options.restoreFocus) {
+    void nextTick(() => {
+      searchButtonRef.value?.focus()
+    })
+  }
 }
 
 async function submitSearch() {
@@ -45,7 +69,9 @@ async function submitSearch() {
   uiStore.setSearchQuery(normalized)
 
   if (!normalized) {
-    searchOpen.value = false
+    keyword.value = ''
+    uiStore.clearSearchQuery()
+    closeSearch()
     return
   }
 
@@ -54,7 +80,9 @@ async function submitSearch() {
     query: { keyword: normalized },
   })
 
-  searchOpen.value = false
+  keyword.value = ''
+  uiStore.clearSearchQuery()
+  closeSearch()
 }
 </script>
 
@@ -62,10 +90,10 @@ async function submitSearch() {
   <div class="header-shell">
     <header class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4">
       <Container>
-        <div class="surface-1 flex min-h-13 items-center gap-3 rounded-[var(--radius-xl)] px-3.5 py-2 md:px-4">
-          <div class="flex shrink-0 items-center gap-3">
+        <div class="surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4">
+          <div class="flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
             <AppHeaderLogo />
-            <div class="h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)]" />
+            <div class="hidden h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)] md:block" />
             <CategoryMenu />
           </div>
 
@@ -73,7 +101,7 @@ async function submitSearch() {
             <div
               ref="searchWrapRef"
               class="absolute right-0 top-1/2 -translate-y-1/2 overflow-hidden transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              :class="searchOpen ? 'w-[min(26rem,calc(100vw-20rem))]' : 'w-[2.85rem]'"
+              :class="searchWrapClass"
             >
               <form
                 class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
@@ -81,10 +109,13 @@ async function submitSearch() {
                 @submit.prevent="submitSearch"
               >
                 <button
+                  ref="searchButtonRef"
                   type="button"
                   class="tool-icon-button flex h-[2.85rem] w-[2.85rem] shrink-0 items-center justify-center text-[var(--color-text-muted)]"
                   :class="searchOpen ? 'tool-icon-button-open' : ''"
-                  :aria-label="searchOpen ? '搜索' : '打开搜索'"
+                  :aria-label="searchOpen ? '提交搜索' : '打开搜索'"
+                  :aria-expanded="searchOpen"
+                  aria-controls="header-search-input"
                   @click="searchOpen ? submitSearch() : toggleSearch()"
                 >
                   <Icon name="search" :size="18" />
@@ -92,18 +123,20 @@ async function submitSearch() {
 
                 <input
                   v-if="searchOpen"
+                  id="header-search-input"
                   ref="searchInputRef"
                   v-model="keyword"
                   type="search"
                   placeholder="搜索文章"
+                  aria-label="搜索文章"
                   class="min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
-                  @keydown.esc="searchOpen = false"
+                  @keydown.esc.prevent="closeSearch({ restoreFocus: true })"
                 />
               </form>
             </div>
           </div>
 
-          <AppHeaderActions />
+          <AppHeaderActions :class="actionSectionClass" />
         </div>
       </Container>
     </header>
@@ -149,6 +182,12 @@ async function submitSearch() {
   transform: none;
 }
 
+.header-search-shell button:focus-visible,
+.header-search-shell input:focus-visible {
+  outline: none !important;
+  outline-offset: 0;
+}
+
 input[type="search"]::-webkit-search-decoration,
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-results-button,
@@ -160,8 +199,6 @@ input[type="search"],
 input[type="search"]:focus,
 input[type="search"]:focus-visible {
   border: 0;
-  outline: none;
-  box-shadow: none;
   background: transparent;
   -webkit-appearance: none;
   appearance: none;

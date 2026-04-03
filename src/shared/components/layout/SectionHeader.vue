@@ -21,10 +21,10 @@ const props = withDefaults(defineProps<Props>(), {
 <template>
   <header
       :class="
-            cn(
-                'flex flex-col gap-3',
+             cn(
+                'flex flex-col gap-2.5',
                 props.align === 'center' && 'items-center text-center',
-                props.compact ? 'mb-4' : 'mb-6 md:mb-8',
+                props.compact ? 'mb-4' : 'mb-6 md:mb-7',
                 props.class,
             )
         "
@@ -40,14 +40,14 @@ const props = withDefaults(defineProps<Props>(), {
 
       <h2
           v-if="props.title || $slots.title"
-          class="text-2xl font-semibold tracking-[-0.04em] text-[var(--color-text)] md:text-3xl"
+          class="text-[1.7rem] font-semibold tracking-[-0.04em] text-[var(--color-text)] md:text-[2rem]"
       >
         <slot name="title">{{ props.title }}</slot>
       </h2>
 
       <p
           v-if="props.description || $slots.description"
-          class="mt-3 max-w-3xl text-sm leading-7 text-muted md:text-base"
+          class="mt-2.5 max-w-3xl text-sm leading-[1.65] text-muted md:text-[0.96rem]"
       >
         <slot name="description">{{ props.description }}</slot>
       </p>

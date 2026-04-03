@@ -1,28 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { ArticleCard } from '@/entities/article/ui'
 import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
 import { useHomeQuery } from '@/shared/api/queries'
 import { SectionHeader } from '@/shared/components/layout'
-import { ROUTE_NAME } from '@/shared/constants/routes'
-import { useUiStore } from '@/stores/ui'
 import { AppHeader } from '@/widgets/app-header'
 import { HeroSection } from '@/widgets/hero-section'
 
-const router = useRouter()
-const uiStore = useUiStore()
 const homeQuery = useHomeQuery()
 
 const hiddenHomeSectionKeys = new Set(['QUICK', 'SHORT', 'DEEP'])
-const keyword = computed({
-  get: () => uiStore.searchQuery,
-  set: (value: string) => uiStore.setSearchQuery(value),
-})
-
-const loading = computed(() => homeQuery.isFetching.value)
 const contentReady = computed(() => homeQuery.isSuccess.value)
 const home = computed(() => {
   const response = homeQuery.data.value
@@ -52,17 +41,6 @@ const home = computed(() => {
       }),
   }
 })
-
-async function onSearch(query: string) {
-  const normalized = query.trim()
-  if (!normalized) return
-
-  uiStore.setSearchQuery(normalized)
-  await router.push({
-    name: ROUTE_NAME.SEARCH,
-    query: { keyword: normalized },
-  })
-}
 </script>
 
 <template>
@@ -74,10 +52,6 @@ async function onSearch(query: string) {
         :primary="home.heroPrimary"
         :secondary="home.heroSecondary"
         :revealed="contentReady"
-        :keyword="keyword"
-        :searching="loading"
-        @update:keyword="keyword = $event"
-        @search="onSearch"
       />
 
       <div v-if="contentReady" class="space-y-8 md:space-y-10">
@@ -128,6 +102,15 @@ async function onSearch(query: string) {
   100% {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-section-reveal,
+  .home-card-reveal {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 }
 </style>

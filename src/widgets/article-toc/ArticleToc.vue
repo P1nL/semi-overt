@@ -149,4 +149,26 @@ watch(
   max-width: 100%;
   opacity: 1;
 }
+
+@media (max-width: 1023px) {
+  .article-toc,
+  .article-toc--expanded {
+    width: 100%;
+    max-width: none;
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .article-toc::before,
+  .article-toc--expanded::before {
+    content: none;
+  }
+
+  .article-toc__empty,
+  .article-toc__empty--visible {
+    max-width: 100%;
+    opacity: 1;
+    text-align: left;
+  }
+}
 </style>

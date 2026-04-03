@@ -2139,8 +2139,7 @@ defineExpose({
 }
 
 .editor-content-editor :deep(.editor-resizable-image.is-selected .editor-resizable-image__frame) {
-  outline: 2px solid color-mix(in srgb, var(--color-text-faint) 24%, transparent);
-  outline-offset: 0.22rem;
+  outline: none;
   border-radius: calc(var(--radius-lg) + 0.1rem);
 }
 

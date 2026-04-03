@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { onClickOutside } from '@vueuse/core'
+import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
 import { DraftBoxDrawer } from '@/features/draft-box'
 import { ThemeSwitch } from '@/features/theme-switch'
@@ -12,10 +12,12 @@ import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
 import { useReviewStore } from '@/stores/review'
+import { useUiStore } from '@/stores/ui'
 import { AuthDialog } from '@/widgets/auth-dialog'
 
 const authStore = useAuthStore()
 const reviewStore = useReviewStore()
+const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -23,9 +25,53 @@ const toast = useToast()
 const authDialogOpen = ref(false)
 const draftMenuOpen = ref(false)
 const userMenuOpen = ref(false)
+const draftTriggerRef = ref<HTMLButtonElement | null>(null)
 const draftMenuRef = ref<HTMLElement | null>(null)
+const userTriggerRef = ref<HTMLButtonElement | null>(null)
 const userMenuRef = ref<HTMLElement | null>(null)
+const userMenuItemRefs = ref<HTMLButtonElement[]>([])
 const loggingOut = ref(false)
+const showThemeMenuItem = useMediaQuery('(max-width: 767px)')
+
+const draftMenuId = 'header-draft-box'
+const userMenuId = 'header-user-menu'
+
+function getVisibleUserMenuItems() {
+  return userMenuItemRefs.value.filter((item) => Boolean(item) && item.offsetParent !== null)
+}
+
+function setUserMenuItemRef(element: Element | null, index: number) {
+  if (!(element instanceof HTMLButtonElement)) return
+  userMenuItemRefs.value[index] = element
+}
+
+function focusUserMenuItem(index: number) {
+  const items = getVisibleUserMenuItems()
+  if (!items.length) return
+
+  const nextIndex = (index + items.length) % items.length
+  items[nextIndex]?.focus()
+}
+
+function closeDraftMenu(options: { restoreFocus?: boolean } = {}) {
+  draftMenuOpen.value = false
+
+  if (options.restoreFocus) {
+    void nextTick(() => {
+      draftTriggerRef.value?.focus()
+    })
+  }
+}
+
+function closeUserMenu(options: { restoreFocus?: boolean } = {}) {
+  userMenuOpen.value = false
+
+  if (options.restoreFocus) {
+    void nextTick(() => {
+      userTriggerRef.value?.focus()
+    })
+  }
+}
 
 watch(
   () => route.query.auth,
@@ -50,6 +96,7 @@ watch(
 
 const userLabel = computed(() => authStore.displayName || (authStore.isAdmin ? '管理员' : '个人中心'))
 const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')
+const themeMenuLabel = computed(() => (uiStore.darkMode ? '切换到浅色模式' : '切换到深色模式'))
 
 const profileRoute = computed(() => {
   if (!authStore.user?.username) return { name: ROUTE_NAME.HOME }
@@ -60,7 +107,7 @@ const profileRoute = computed(() => {
 })
 
 async function openDraftEditor(item: { id: number }) {
-  draftMenuOpen.value = false
+  closeDraftMenu()
   await router.push({
     name: ROUTE_NAME.ARTICLE_EDITOR,
     params: { id: String(item.id) },
@@ -68,8 +115,13 @@ async function openDraftEditor(item: { id: number }) {
 }
 
 async function gotoProfile() {
-  userMenuOpen.value = false
+  closeUserMenu()
   await router.push(profileRoute.value)
+}
+
+function toggleThemeMode() {
+  uiStore.setDarkMode(!uiStore.darkMode)
+  closeUserMenu()
 }
 
 function toggleDraftMenu() {
@@ -86,16 +138,104 @@ function toggleUserMenu() {
   }
 }
 
+function onDraftTriggerKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && draftMenuOpen.value) {
+    event.preventDefault()
+    closeDraftMenu({ restoreFocus: true })
+  }
+}
+
+function onDraftPanelKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeDraftMenu({ restoreFocus: true })
+  }
+}
+
+async function openUserMenuWithKeyboard(index = 0) {
+  if (!userMenuOpen.value) {
+    userMenuOpen.value = true
+  }
+
+  await nextTick()
+  focusUserMenuItem(index)
+}
+
+function onUserTriggerKeydown(event: KeyboardEvent) {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    void openUserMenuWithKeyboard(0)
+    return
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    void openUserMenuWithKeyboard(userMenuItemRefs.value.length - 1)
+    return
+  }
+
+  if (event.key === 'Escape' && userMenuOpen.value) {
+    event.preventDefault()
+    closeUserMenu({ restoreFocus: true })
+  }
+}
+
+function onUserMenuKeydown(event: KeyboardEvent) {
+  const items = getVisibleUserMenuItems()
+  const currentIndex = items.findIndex((item) => item === document.activeElement)
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeUserMenu({ restoreFocus: true })
+    return
+  }
+
+  if (!items.length) return
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    focusUserMenuItem(currentIndex < 0 ? 0 : currentIndex + 1)
+    return
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    focusUserMenuItem(currentIndex < 0 ? items.length - 1 : currentIndex - 1)
+    return
+  }
+
+  if (event.key === 'Home') {
+    event.preventDefault()
+    focusUserMenuItem(0)
+    return
+  }
+
+  if (event.key === 'End') {
+    event.preventDefault()
+    focusUserMenuItem(items.length - 1)
+  }
+}
+
 onClickOutside(draftMenuRef, () => {
   if (draftMenuOpen.value) {
-    draftMenuOpen.value = false
+    closeDraftMenu()
   }
 })
 
 onClickOutside(userMenuRef, () => {
   if (userMenuOpen.value) {
-    userMenuOpen.value = false
+    closeUserMenu()
   }
+})
+
+watch(userMenuOpen, async (open) => {
+  if (!open) {
+    userMenuItemRefs.value = []
+    return
+  }
+
+  await nextTick()
+  userMenuItemRefs.value = userMenuItemRefs.value.filter(Boolean)
 })
 
 async function handleLogout() {
@@ -122,17 +262,20 @@ async function handleLogout() {
   <div class="relative z-10 flex shrink-0 items-center gap-2">
     <template v-if="authStore.isAuthenticated">
       <div class="flex items-center gap-1">
-        <ThemeSwitch :show-label="false" />
+        <ThemeSwitch :show-label="false" class="hidden md:inline-flex" />
 
         <div ref="draftMenuRef" class="relative">
           <button
+            ref="draftTriggerRef"
             type="button"
             class="tool-icon-button"
             :class="draftMenuOpen ? 'tool-icon-button-active' : ''"
             :aria-expanded="draftMenuOpen"
+            :aria-controls="draftMenuId"
             aria-haspopup="dialog"
             aria-label="草稿箱"
             @click="toggleDraftMenu"
+            @keydown="onDraftTriggerKeydown"
           >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -154,7 +297,12 @@ async function handleLogout() {
 
           </button>
 
-          <DraftBoxDrawer v-model="draftMenuOpen" @open-editor="openDraftEditor" />
+          <DraftBoxDrawer
+            :id="draftMenuId"
+            v-model="draftMenuOpen"
+            @open-editor="openDraftEditor"
+            @keydown="onDraftPanelKeydown"
+          />
         </div>
       </div>
 
@@ -162,12 +310,15 @@ async function handleLogout() {
 
       <div ref="userMenuRef" class="relative">
         <button
+          ref="userTriggerRef"
           type="button"
           class="user-trigger"
           :aria-expanded="userMenuOpen"
+          :aria-controls="userMenuId"
           aria-haspopup="menu"
           aria-label="打开用户菜单"
           @click="toggleUserMenu"
+          @keydown="onUserTriggerKeydown"
         >
           <Avatar
             :src="authStore.user?.avatar || undefined"
@@ -188,14 +339,35 @@ async function handleLogout() {
         >
           <div
             v-if="userMenuOpen"
-            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-[11rem] rounded-[var(--radius-lg)] p-2 shadow-[var(--shadow-lg)]"
+            :id="userMenuId"
+            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-[11rem] rounded-[var(--radius-lg)] p-2 shadow-[var(--shadow-lg)] max-md:w-[min(18rem,calc(100vw-1.5rem))]"
             role="menu"
+            aria-label="用户菜单"
+            @keydown="onUserMenuKeydown"
           >
-            <button type="button" class="menu-item" role="menuitem" @click="gotoProfile">
+            <button
+              v-if="showThemeMenuItem"
+              :ref="(element) => setUserMenuItemRef(element, 0)"
+              type="button"
+              class="menu-item"
+              role="menuitem"
+              @click="toggleThemeMode"
+            >
+              {{ themeMenuLabel }}
+            </button>
+
+            <button
+              :ref="(element) => setUserMenuItemRef(element, 1)"
+              type="button"
+              class="menu-item"
+              role="menuitem"
+              @click="gotoProfile"
+            >
               {{ userLabel }}
             </button>
 
             <button
+              :ref="(element) => setUserMenuItemRef(element, 2)"
               type="button"
               class="menu-item menu-item-danger"
               role="menuitem"
@@ -210,7 +382,7 @@ async function handleLogout() {
     </template>
 
     <template v-else>
-      <Button type="button" size="sm" pill variant="secondary" @click="authDialogOpen = true">
+      <Button type="button" size="sm" pill variant="secondary" class="max-md:min-h-11" @click="authDialogOpen = true">
         登录 / 注册
       </Button>
     </template>
@@ -285,9 +457,9 @@ async function handleLogout() {
 }
 
 .header-menu-panel {
-  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
-  border-color: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
-  -webkit-backdrop-filter: blur(26px) saturate(180%);
-  backdrop-filter: blur(26px) saturate(180%);
+  background: var(--color-surface-panel);
+  border-color: var(--color-border-panel);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+  backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
 }
 </style>

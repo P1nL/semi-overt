@@ -18,7 +18,7 @@ withDefaults(
 <template>
   <section class="space-y-3">
     <div v-if="loading" class="overflow-x-auto pb-2">
-      <div class="grid min-w-full grid-flow-col auto-cols-[17rem] gap-3 sm:auto-cols-[19rem] xl:auto-cols-[calc((100%-1.5rem)/3)]">
+      <div class="grid min-w-full grid-flow-col auto-cols-[15.5rem] gap-3 sm:auto-cols-[19rem] xl:auto-cols-[calc((100%-1.5rem)/3)]">
         <div
             v-for="i in 3"
             :key="i"
@@ -28,7 +28,7 @@ withDefaults(
     </div>
 
     <div v-else-if="items.length" class="overflow-x-auto pb-2">
-      <div class="grid min-w-full grid-flow-col auto-cols-[17rem] gap-3 sm:auto-cols-[19rem] xl:auto-cols-[calc((100%-1.5rem)/3)]">
+      <div class="grid min-w-full grid-flow-col auto-cols-[15.5rem] gap-3 sm:auto-cols-[19rem] xl:auto-cols-[calc((100%-1.5rem)/3)]">
         <ReviewQueueItem
             v-for="item in items"
             :key="item.id"

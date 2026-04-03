@@ -45,7 +45,7 @@ function selectTab(value: ProfileArticleTab) {
 
 <template>
   <div
-    class="flex items-center gap-2 overflow-x-auto rounded-[var(--radius-lg)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)] p-1"
+    class="flex items-center gap-2 overflow-x-auto rounded-[var(--radius-lg)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)] p-1 [scrollbar-width:none] [-ms-overflow-style:none]"
     role="tablist"
   >
     <button
@@ -54,7 +54,7 @@ function selectTab(value: ProfileArticleTab) {
       type="button"
       role="tab"
       :aria-selected="item.value === modelValue"
-      class="flex min-w-fit flex-1 items-center justify-center gap-2 rounded-[calc(var(--radius-lg)-0.25rem)] px-4 py-2 text-sm font-medium tracking-[-0.01em] whitespace-nowrap transition-all duration-200"
+      class="flex min-w-fit shrink-0 items-center justify-center gap-2 rounded-[calc(var(--radius-lg)-0.25rem)] px-3 py-2.5 text-sm font-medium tracking-[-0.01em] whitespace-nowrap transition-all duration-200 sm:flex-1 sm:px-4 sm:py-2"
       :class="
         item.value === modelValue
           ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-xs)]'
@@ -69,3 +69,9 @@ function selectTab(value: ProfileArticleTab) {
     </button>
   </div>
 </template>
+
+<style scoped>
+div::-webkit-scrollbar {
+  display: none;
+}
+</style>

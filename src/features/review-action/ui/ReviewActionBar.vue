@@ -346,7 +346,7 @@ onClickOutside(barRef, () => {
       >
         <div
           v-if="activeReasonAction === option.value"
-          class="absolute z-20 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_96%,transparent)] p-4 shadow-[var(--shadow-lg)] backdrop-blur-xl"
+          class="absolute z-20 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_96%,transparent)] p-4 shadow-[var(--shadow-lg)] backdrop-blur-xl max-md:fixed max-md:inset-x-4 max-md:bottom-[5.5rem] max-md:w-auto"
           :class="[
             popoverPlacement === 'top'
               ? 'bottom-[calc(100%+0.75rem)] right-0 origin-bottom-right'
@@ -510,5 +510,21 @@ onClickOutside(barRef, () => {
   opacity: 1;
   transform: translateY(0) scale(1);
   filter: blur(0);
+}
+
+@media (max-width: 767px) {
+  .review-action-button {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+
+  .review-action-button--armed {
+    --review-action-width: 100%;
+  }
+
+  .review-action-confirm {
+    min-width: 7rem;
+  }
 }
 </style>

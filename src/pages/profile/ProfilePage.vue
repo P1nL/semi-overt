@@ -142,7 +142,7 @@ async function onTabChange(tab: ProfileArticleTab) {
         </p>
       </section>
 
-      <section class="surface-1 rounded-[var(--radius-xl)] p-4 md:p-5">
+      <section class="surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4 md:p-5">
         <ProfileTabs
           :model-value="activeTab"
           :counts="tabCounts"
@@ -161,7 +161,7 @@ async function onTabChange(tab: ProfileArticleTab) {
         <div
           v-else-if="contentState === 'content'"
           key="profile-content"
-          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
         >
           <div
             v-for="(item, index) in articles"
