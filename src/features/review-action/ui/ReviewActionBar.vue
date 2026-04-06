@@ -5,6 +5,10 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 
 import {
+  ARTICLE_STATUS_BADGE_VARIANT_MAP,
+  ARTICLE_STATUS_LABEL_MAP,
+} from '@/entities/article/model/article.constants'
+import {
   canReviewArticle,
   submitReviewActionByArticleId,
   validateReviewActionForm,
@@ -239,10 +243,34 @@ async function submitAction(action: ReviewActionValue) {
       action,
       reason,
     })
+    const nextStatus = result.status?.toUpperCase?.() || result.status
+
+    queryClient.setQueryData(queryKeys.articleDetail(props.articleId), (current) => {
+      if (!current || typeof current !== 'object') {
+        return current
+      }
+
+      return {
+        ...current,
+        status: {
+          value: nextStatus,
+          label:
+            ARTICLE_STATUS_LABEL_MAP[nextStatus as keyof typeof ARTICLE_STATUS_LABEL_MAP] ??
+            nextStatus,
+          variant:
+            ARTICLE_STATUS_BADGE_VARIANT_MAP[
+              nextStatus as keyof typeof ARTICLE_STATUS_BADGE_VARIANT_MAP
+            ] ?? 'default',
+        },
+      }
+    })
 
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: queryKeys.reviewPendingRoot,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.articleDetail(props.articleId),
       }),
       queryClient.invalidateQueries({
         queryKey: queryKeys.reviewLogs(props.articleId),

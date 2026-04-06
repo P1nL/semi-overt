@@ -11,6 +11,15 @@ import { CategoryMenu } from '@/widgets/category-menu'
 import AppHeaderActions from './AppHeaderActions.vue'
 import AppHeaderLogo from './AppHeaderLogo.vue'
 
+withDefaults(
+  defineProps<{
+    activeCategory?: string | null
+  }>(),
+  {
+    activeCategory: null,
+  },
+)
+
 const router = useRouter()
 const uiStore = useUiStore()
 
@@ -94,7 +103,7 @@ async function submitSearch() {
           <div class="flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
             <AppHeaderLogo />
             <div class="hidden h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)] md:block" />
-            <CategoryMenu />
+            <CategoryMenu :active-category="activeCategory" />
           </div>
 
           <div class="relative flex min-w-0 flex-1 items-center justify-end">
@@ -118,7 +127,7 @@ async function submitSearch() {
                   aria-controls="header-search-input"
                   @click="searchOpen ? submitSearch() : toggleSearch()"
                 >
-                  <Icon name="search" :size="18" />
+                  <Icon name="search" size="1.15rem" />
                 </button>
 
                 <input

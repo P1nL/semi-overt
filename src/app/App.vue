@@ -50,6 +50,13 @@ const activeSheetScroll = computed<'sheet' | 'content'>(() =>
   displayedSheetRoute.value?.meta.sheetScroll === 'content' ? 'content' : 'sheet',
 )
 
+function snapshotRoute(
+  targetRoute: RouteLocationNormalizedLoaded | null | undefined,
+): RouteLocationNormalizedLoaded | null {
+  if (!targetRoute) return null
+  return router.resolve(targetRoute.fullPath)
+}
+
 function getRouteViewKey(targetRoute: RouteLocationNormalizedLoaded): string {
   const name = targetRoute.name
 
@@ -61,6 +68,19 @@ function getRouteViewKey(targetRoute: RouteLocationNormalizedLoaded): string {
   }
 
   return targetRoute.path
+}
+
+function getRouteViewProps(targetRoute: RouteLocationNormalizedLoaded) {
+  if (
+    targetRoute.name === ROUTE_NAME.CATEGORY ||
+    targetRoute.name === ROUTE_NAME.SEARCH
+  ) {
+    return {
+      routeOverride: targetRoute,
+    }
+  }
+
+  return {}
 }
 
 function isSheetRoute(
@@ -96,6 +116,8 @@ function syncSheetRouteState(
   nextRoute: RouteLocationNormalizedLoaded,
   previousRoute: RouteLocationNormalizedLoaded | null,
 ) {
+  const nextSnapshot = snapshotRoute(nextRoute)
+  const previousSnapshot = snapshotRoute(previousRoute)
   const nextIsSheet = isSheetRoute(nextRoute)
   const previousIsSheet = isSheetRoute(previousRoute)
 
@@ -105,11 +127,11 @@ function syncSheetRouteState(
   }
 
   if (nextIsSheet) {
-    if (!previousIsSheet && previousRoute) {
-      backgroundRoute.value = previousRoute
+    if (!previousIsSheet && previousSnapshot) {
+      backgroundRoute.value = previousSnapshot
     }
 
-    displayedSheetRoute.value = nextRoute
+    displayedSheetRoute.value = nextSnapshot
     sheetVisible.value = true
     return
   }
@@ -130,11 +152,16 @@ function syncSheetRouteState(
   sheetVisible.value = false
 }
 
-const removeAfterEach = router.afterEach((to, from) => {
-  syncSheetRouteState(to, from)
-})
-
-syncSheetRouteState(router.currentRoute.value, null)
+watch(
+  () => router.currentRoute.value,
+  (to, from) => {
+    syncSheetRouteState(to, from ?? null)
+  },
+  {
+    immediate: true,
+    flush: 'sync',
+  },
+)
 
 watch(
   () => [uiStore.drawerOpen, uiStore.isDrawerClosing, uiStore.pendingRoute] as const,
@@ -171,7 +198,6 @@ onBeforeUnmount(() => {
     window.clearTimeout(sheetLeaveTimer)
   }
 
-  removeAfterEach()
 })
 </script>
 
@@ -182,7 +208,7 @@ onBeforeUnmount(() => {
     <div class="relative z-10">
       <RouterView v-if="shouldRenderBaseRoute" v-slot="{ Component, route: currentRoute }" :route="baseRenderRoute">
         <Transition name="page-fade" mode="out-in" :css="shouldAnimateBaseRoute">
-          <component :is="Component" :key="getRouteViewKey(currentRoute)" />
+          <component :is="Component" :key="getRouteViewKey(currentRoute)" v-bind="getRouteViewProps(currentRoute)" />
         </Transition>
       </RouterView>
     </div>
@@ -199,7 +225,7 @@ onBeforeUnmount(() => {
         v-slot="{ Component, route: currentRoute }"
         :route="displayedSheetRoute"
       >
-        <component :is="Component" :key="getRouteViewKey(currentRoute)" />
+        <component :is="Component" :key="getRouteViewKey(currentRoute)" v-bind="getRouteViewProps(currentRoute)" />
       </RouterView>
     </PageSheet>
 

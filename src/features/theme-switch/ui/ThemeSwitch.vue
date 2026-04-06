@@ -138,8 +138,8 @@ function onToggle() {
 }
 
 .theme-switch-icon {
-  height: 1.125rem;
-  width: 1.125rem;
+  height: 1.15rem;
+  width: 1.15rem;
 }
 
 .theme-switch-icon-enter-active,

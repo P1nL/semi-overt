@@ -1,37 +1,33 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
-import { ArticleCard } from '@/entities/article/ui'
 import { useSearchArticlesQuery } from '@/shared/api/queries'
-import { Button, EmptyState, Input, Pagination } from '@/shared/components/base'
-import Icon from '@/shared/components/base/Icon.vue'
+import { EmptyState, Pagination } from '@/shared/components/base'
+import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
-import { useUiStore } from '@/stores/ui'
+import ArticleParallaxGallery from '@/widgets/article-parallax-gallery/ArticleParallaxGallery.vue'
 import { AppHeader } from '@/widgets/app-header'
+
+const props = withDefaults(
+  defineProps<{
+    routeOverride?: RouteLocationNormalizedLoaded | null
+  }>(),
+  {
+    routeOverride: null,
+  },
+)
 
 const route = useRoute()
 const router = useRouter()
-const uiStore = useUiStore()
-
-const keyword = ref('')
 const pageSize = 10
+const currentRoute = computed(() => props.routeOverride ?? route)
 
-const routeKeyword = computed(() => String(route.query.keyword || route.query.q || '').trim())
-const page = computed(() => Number(route.query.page || 1) || 1)
+const routeKeyword = computed(() => String(currentRoute.value.query.keyword || currentRoute.value.query.q || '').trim())
+const page = computed(() => Number(currentRoute.value.query.page || 1) || 1)
 const searchQuery = useSearchArticlesQuery(routeKeyword, page, pageSize)
-const normalizedKeyword = computed(() => keyword.value.trim())
-const hasKeyword = computed(() => Boolean(normalizedKeyword.value))
-
-watch(
-  routeKeyword,
-  (value) => {
-    keyword.value = value || uiStore.searchQuery
-  },
-  { immediate: true },
-)
 
 const loading = computed(() => searchQuery.isFetching.value)
 const errorMessage = computed(() =>
@@ -48,9 +44,10 @@ const contentState = computed(() => {
   if (list.value.length) return 'content'
   return 'empty'
 })
-const activeKeyword = computed(() => routeKeyword.value || normalizedKeyword.value)
+const activeKeyword = computed(() => routeKeyword.value)
+const searchTitle = computed(() => activeKeyword.value || '搜索结果')
 const resultSummary = computed(() => {
-  if (!activeKeyword.value || !list.value.length) return ''
+  if (!activeKeyword.value) return ''
   return `共找到 ${Math.max(total.value, list.value.length)} 篇与“${activeKeyword.value}”相关的文章`
 })
 const emptyStateTitle = computed(() => {
@@ -74,33 +71,14 @@ function resolveSearchLocation(keywordValue: string, nextPage = 1) {
   }
 }
 
-async function submitSearch() {
-  const normalized = normalizedKeyword.value
-  uiStore.setSearchQuery(normalized)
-
-  const target = resolveSearchLocation(normalized, 1)
-  if (router.resolve(target).fullPath !== route.fullPath) {
-    await router.replace(target)
-    return
-  }
-
-  if (normalized) {
-    await searchQuery.refetch()
-  }
-}
-
-function clearSearchInput() {
-  uiStore.clearSearchQuery()
-}
-
 async function onPageChange(nextPage: number) {
-  const target = resolveSearchLocation(normalizedKeyword.value, nextPage)
-  if (router.resolve(target).fullPath !== route.fullPath) {
+  const target = resolveSearchLocation(routeKeyword.value, nextPage)
+  if (router.resolve(target).fullPath !== currentRoute.value.fullPath) {
     await router.replace(target)
     return
   }
 
-  if (normalizedKeyword.value) {
+  if (routeKeyword.value) {
     await searchQuery.refetch()
   }
 }
@@ -111,33 +89,14 @@ async function onPageChange(nextPage: number) {
     <AppHeader />
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
-        <div class="mb-5">
-          <h1 class="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-text)]">搜索文章</h1>
-          <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">按关键词查找文章，快速定位你想看的内容。</p>
-        </div>
-
-        <form class="surface-2 flex flex-col items-stretch gap-2 rounded-[var(--radius-xl)] p-2 sm:flex-row sm:items-center" @submit.prevent="submitSearch">
-          <Input
-            v-model="keyword"
-            class="search-page-input border-none bg-transparent shadow-none"
-            placeholder="输入关键词搜索"
-            clearable
-            @clear="clearSearchInput"
-            @enter="submitSearch"
-          >
-            <template #leading>
-              <Icon name="search" :size="16" />
-            </template>
-          </Input>
-          <Button type="submit" pill size="lg" class="w-full sm:w-auto" :loading="loading" :disabled="!hasKeyword">
-            搜索
-          </Button>
-        </form>
-
-        <p v-if="resultSummary" class="mt-4 text-sm text-[var(--color-text-muted)]">
-          {{ resultSummary }}
-        </p>
+      <section class="px-1 py-2 md:px-2 md:py-3">
+        <SectionHeader
+          class="search-page-header"
+          :title="searchTitle"
+          :description="resultSummary"
+          align="center"
+          compact
+        />
       </section>
 
       <section class="space-y-5">
@@ -153,19 +112,7 @@ async function onPageChange(nextPage: number) {
             key="search-content"
             class="space-y-5"
           >
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div
-                v-for="(item, index) in list"
-                :key="item.id"
-                class="content-rise-in"
-                :style="{ '--content-rise-delay': `${index * 55}ms` }"
-              >
-                <ArticleCard
-                  :article="item"
-                  :show-reason="false"
-                />
-              </div>
-            </div>
+            <ArticleParallaxGallery :items="list" />
 
             <section
               class="surface-1 content-rise-in rounded-[var(--radius-xl)] p-4 md:p-5"
@@ -194,8 +141,14 @@ async function onPageChange(nextPage: number) {
 </template>
 
 <style scoped>
-.search-page-input :deep(input:focus-visible) {
-  outline: none !important;
-  outline-offset: 0;
+.search-page-header :deep(h2) {
+  font-size: clamp(2.35rem, 5vw, 3.8rem);
+  line-height: 1.08;
+  letter-spacing: -0.06em;
+}
+
+.search-page-header :deep(p) {
+  margin-inline: auto;
+  text-align: center;
 }
 </style>

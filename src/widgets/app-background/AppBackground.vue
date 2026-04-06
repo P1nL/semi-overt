@@ -53,9 +53,9 @@ const GRID_STRENGTH = 15
 const LIGHT_POINTER_STRENGTH = GRID_STRENGTH * 0.78
 const LIGHT_WAKE_RADIUS = GRID_RADIUS * 0.92
 const LIGHT_WAKE_MAX_DISTANCE = 74
-const LIGHT_ARTBOARD_RATIO = 420 / 297
-const LIGHT_ARTBOARD_MARGIN_X = 16
-const LIGHT_ARTBOARD_MARGIN_Y = 16
+const LIGHT_ARTBOARD_RATIO = 420 / 250
+const LIGHT_ARTBOARD_MARGIN_X = 0
+const LIGHT_ARTBOARD_MARGIN_Y = 5
 
 const pointer = {
   x: -1000,
@@ -215,19 +215,14 @@ function resolveLightArtboard(width: number, height: number): LightArtboard {
   let artboardWidth = maxWidth
   let artboardHeight = artboardWidth / LIGHT_ARTBOARD_RATIO
 
-  // Wide screens are height-constrained with the original fit logic,
-  // which leaves large side gutters. For the background we prefer width-first
-  // sizing and allow the artboard to overflow vertically a bit.
-  if (width / height <= LIGHT_ARTBOARD_RATIO) {
-    if (artboardHeight > maxHeight) {
-      artboardHeight = maxHeight
-      artboardWidth = artboardHeight * LIGHT_ARTBOARD_RATIO
-    }
+  if (artboardHeight > maxHeight) {
+    artboardHeight = maxHeight
+    artboardWidth = artboardHeight * LIGHT_ARTBOARD_RATIO
   }
 
   return {
     x: (width - artboardWidth) * 0.5,
-    y: (height - artboardHeight) * 0.5,
+    y: (height - artboardHeight) * 0.5 + LIGHT_ARTBOARD_MARGIN_Y,
     width: artboardWidth,
     height: artboardHeight,
   }

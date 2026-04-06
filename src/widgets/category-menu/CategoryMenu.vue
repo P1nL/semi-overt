@@ -33,6 +33,18 @@ const items = computed(() =>
     CATEGORY_ORDER.map((category) => mapCategoryValueToVm(category, currentCategory.value)),
 )
 
+function getTimerIconVariant(category: string | null | undefined): 'quick' | 'short' | 'deep' {
+  switch (category?.toUpperCase()) {
+    case 'QUICK':
+      return 'quick'
+    case 'DEEP':
+      return 'deep'
+    case 'SHORT':
+    default:
+      return 'short'
+  }
+}
+
 function toggleMenu() {
   open.value = !open.value
 }
@@ -148,11 +160,24 @@ watch(open, async (isOpen) => {
         class="surface-2 flex h-11 items-center justify-between gap-2 rounded-(--radius-pill) px-3 text-sm font-medium tracking-[-0.01em] text-(--color-text) transition-all duration-300 hover:border-(--color-border-strong) md:h-9 md:px-4"
         :aria-expanded="open ? 'true' : 'false'"
         :aria-controls="panelId"
+        aria-label="栏目"
         aria-haspopup="true"
         @click="toggleMenu"
         @keydown="onTriggerKeydown"
     >
-      <span>栏目</span>
+      <svg
+          class="category-menu-trigger__icon"
+          viewBox="0 0 1024 1024"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          focusable="false"
+      >
+        <path d="M0 0m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571429l0 182.857142q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-182.857142q0-36.571429 36.571429-36.571429Z" fill="#BFCBD9" />
+        <path d="M0 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
+        <path d="M768 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
+        <path d="M384 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
+        <path d="M384 0m36.571429 0l566.857142 0q36.571429 0 36.571429 36.571429l0 182.857142q0 36.571429-36.571429 36.571429l-566.857142 0q-36.571429 0-36.571429-36.571429l0-182.857142q0-36.571429 36.571429-36.571429Z" fill="#BFCBD9" />
+      </svg>
       <Icon
           name="chevron-down"
           :size="16"
@@ -172,7 +197,7 @@ watch(open, async (isOpen) => {
       <nav
           v-if="open"
           :id="panelId"
-          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[18rem] -translate-x-1/2 rounded-xl p-2 max-md:fixed max-md:left-3 max-md:right-3 max-md:top-[5.35rem] max-md:w-auto max-md:translate-x-0 max-md:overflow-y-auto max-md:p-3"
+          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[5rem] -translate-x-1/2 rounded-xl p-2 max-md:fixed max-md:left-3 max-md:right-3 max-md:top-[5.35rem] max-md:w-auto max-md:translate-x-0 max-md:overflow-y-auto max-md:p-3"
           aria-label="栏目导航"
           @keydown="onPanelKeydown"
       >
@@ -181,7 +206,9 @@ watch(open, async (isOpen) => {
             <RouterLink
                 :ref="(element) => setItemRef(element, index)"
                 :to="item.path"
-                class="flex items-start justify-between gap-3 rounded-lg px-3 py-3 transition-all duration-200"
+                :aria-label="item.label"
+                :title="item.label"
+                class="flex items-center justify-center rounded-lg px-3 py-1 transition-all duration-200"
                 :class="
                   item.isActive
                     ? 'bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-surface)_90%)] text-(--color-primary)'
@@ -189,20 +216,48 @@ watch(open, async (isOpen) => {
                 "
                 @click="closeMenu()"
             >
-              <span class="min-w-0">
-                <span class="block text-sm font-medium tracking-[-0.01em]">
-                  {{ item.label }}
-                </span>
-                <span class="mt-1 block text-xs leading-5 text-(--color-text-muted)">
-                  {{ item.description }}
-                </span>
-              </span>
-              <Icon
-                  v-if="item.isActive"
-                  name="check"
-                  :size="16"
-                  class="mt-0.5 shrink-0"
-              />
+              <svg
+                  v-if="getTimerIconVariant(item.value) === 'quick'"
+                  class="category-menu-item__icon"
+                  viewBox="0 0 96 96"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  focusable="false"
+              >
+                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
+                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
+                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 65.678 34.322 Z" fill="#30B86A"/>
+                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
+                <path d="M48 52L62 38" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+              <svg
+                  v-else-if="getTimerIconVariant(item.value) === 'short'"
+                  class="category-menu-item__icon"
+                  viewBox="0 0 96 96"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  focusable="false"
+              >
+                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
+                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
+                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 73.000 52.000 Z" fill="#F2A33A"/>
+                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
+                <path d="M48 52L68 52" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+              <svg
+                  v-else
+                  class="category-menu-item__icon"
+                  viewBox="0 0 96 96"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  focusable="false"
+              >
+                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
+                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
+                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 65.678 69.678 Z" fill="#E45A5A"/>
+                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
+                <path d="M48 52L62 66" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
+              </svg>
             </RouterLink>
           </li>
         </ul>
@@ -212,11 +267,25 @@ watch(open, async (isOpen) => {
 </template>
 
 <style scoped>
+.category-menu-trigger__icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+  flex: 0 0 auto;
+}
+
 .category-menu-panel {
-  background: var(--color-surface-panel);
+  background: var(--color-surface);
   border-color: var(--color-border-panel);
-  -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
-  backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.category-menu-item__icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: block;
+  flex: 0 0 auto;
 }
 </style>
 

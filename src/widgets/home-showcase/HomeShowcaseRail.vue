@@ -26,6 +26,15 @@ const props = withDefaults(
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
+const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
+const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
+
+const getItemStyle = (index: number) => ({
+  '--item-index': index,
+  '--showcase-item-lift': (props.featured ? featuredLiftPattern : regularLiftPattern)[
+    index % (props.featured ? featuredLiftPattern.length : regularLiftPattern.length)
+  ],
+})
 
 // --- 🌟 动画核心逻辑开始 ---
 const hoveredIndex = ref<number | null>(null)
@@ -61,7 +70,7 @@ const getMotionState = (index: number): Variant => {
       transition: {
         type: 'spring',
         stiffness: 120,
-        damping: 16,
+        damping: 25,
         mass: 1,
       },
     }
@@ -70,14 +79,14 @@ const getMotionState = (index: number): Variant => {
   // 3. 左右相邻的第一张卡片
   if (Math.abs(distance) === 1) {
     return {
-      y: -150,
-      x: Math.sign(distance) * 20, // 向两侧微微推开
-      rotate: Math.sign(distance) * 2, // 微微倾斜
-      opacity: 0.95,
+      y: -100,
+      x: Math.sign(distance) * 40, // 向两侧微微推开
+      rotate: Math.sign(distance) * 4, // 微微倾斜
+      opacity: 1,
       transition: {
         type: 'spring',
         stiffness: 120,
-        damping: 16,
+        damping: 25,
         mass: 1,
       },
     }
@@ -89,11 +98,11 @@ const getMotionState = (index: number): Variant => {
       y: -40,
       x: Math.sign(distance) * 10,
       rotate: Math.sign(distance) * 1,
-      opacity: 0.9,
+      opacity: 1,
       transition: {
         type: 'spring',
         stiffness: 120,
-        damping: 16,
+        damping: 25,
         mass: 1,
       },
     }
@@ -103,11 +112,11 @@ const getMotionState = (index: number): Variant => {
     y: 0,
     x: 0,
     rotate: 0,
-    opacity: 0.8,
+    opacity: 1,
     transition: {
       type: 'spring',
       stiffness: 120,
-      damping: 16,
+      damping: 30,
       mass: 1,
     },
   }
@@ -139,7 +148,7 @@ watch([hoveredIndex, visibleItems], () => {
             v-for="(item, index) in visibleItems"
             :key="item.id"
             class="home-showcase-rail__item"
-            :style="{ '--item-index': index }"
+            :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
             v-motion="getMotionKey(index)"
             :initial="{ y: 0, x: 0, rotate: 0, opacity: 1 }"
@@ -224,6 +233,7 @@ watch([hoveredIndex, visibleItems], () => {
     width: var(--showcase-circle-size);
     flex: 0 0 auto;
     scroll-snap-align: start;
+    margin-block-end: var(--showcase-item-lift, 0rem);
 
     /* 开启硬件加速，匹配 JS 需要操作的属性 */
     will-change: transform, opacity;

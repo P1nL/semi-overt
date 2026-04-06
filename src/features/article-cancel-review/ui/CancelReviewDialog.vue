@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import { articleApi } from '@/shared/api/modules/article'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { Button, Dialog } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
@@ -28,6 +30,7 @@ const emit = defineEmits<{
 
 const editorStore = useEditorStore()
 const reviewStore = useReviewStore()
+const queryClient = useQueryClient()
 const toast = useToast()
 const loading = ref(false)
 const errorMessage = ref('')
@@ -45,7 +48,9 @@ async function handleCancelReview() {
   try {
     const result = await cancelReviewByArticleId(props.articleId)
     const detail = await articleApi.getArticleDetail(props.articleId)
-    editorStore.setCurrentArticle(mapArticleDetailDtoToVm(detail))
+    const nextArticle = mapArticleDetailDtoToVm(detail)
+    editorStore.setCurrentArticle(nextArticle)
+    queryClient.setQueryData(queryKeys.articleDetail(props.articleId), nextArticle)
     void reviewStore.refreshPendingListIfInitialized()
 
     emit('canceled', result)

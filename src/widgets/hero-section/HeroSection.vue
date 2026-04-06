@@ -14,7 +14,7 @@ const props = withDefaults(
   }>(),
   {
     secondary: () => [],
-    title: '一切都沉溺于半公开空间中.',
+    title: '一切存在于半公开•空间🪨',
     description: '',
     revealed: false,
   },
@@ -50,7 +50,7 @@ const hasCards = computed(() => heroItems.value.length > 0)
     >
       <HomeShowcaseRail
         :items="heroItems"
-        category-label="精选内容"
+        category-label="day"
         featured
         :revealed="revealed"
         :delay-base="40"

@@ -8,15 +8,15 @@ export const CATEGORY_TAB = {
 export type CategoryValue = (typeof CATEGORY_TAB)[keyof typeof CATEGORY_TAB]
 
 export const CATEGORY_LABEL_MAP: Record<CategoryValue, string> = {
-    QUICK: '速读',
-    SHORT: '短读',
-    DEEP: '深读',
+    QUICK: '<3min',
+    SHORT: '3min~8min',
+    DEEP: '>8min',
 }
 
 export const CATEGORY_DESCRIPTION_MAP: Record<CategoryValue, string> = {
-    QUICK: '适合快速浏览，短时间完成阅读。',
-    SHORT: '轻量阅读，适合碎片时间。',
-    DEEP: '完整深入，适合专注阅读。',
+    QUICK: '',
+    SHORT: '',
+    DEEP: '',
 }
 
 export const CATEGORY_ORDER: CategoryValue[] = ['QUICK', 'SHORT', 'DEEP']

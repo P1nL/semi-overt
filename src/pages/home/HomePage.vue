@@ -95,6 +95,15 @@ const home = computed(() => {
   overflow: hidden;
 }
 
+:global(html.home-scroll-locked) {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+:global(body.home-scroll-locked) {
+  block-size: 100vh;
+}
+
 .home-sections {
   position: relative;
   z-index: 1;

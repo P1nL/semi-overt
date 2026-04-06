@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article/model/article.constants'
@@ -14,6 +15,7 @@ import {
 } from '@/features/article-editor'
 import { submitArticleById } from '@/features/article-submit'
 import { articleApi } from '@/shared/api/modules/article'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { useToast } from '@/shared/composables/useToast'
 import { Icon } from '@/shared/components/base'
 import { ARTICLE_STATUS } from '@/shared/constants/article'
@@ -27,6 +29,7 @@ import { useReviewStore } from '@/stores/review'
 
 const route = useRoute()
 const router = useRouter()
+const queryClient = useQueryClient()
 const editorStore = useEditorStore()
 const reviewStore = useReviewStore()
 const toast = useToast()
@@ -575,21 +578,27 @@ async function submitArticle() {
     const result = await submitArticleById(article.id)
     const submittedAt = parseLocalDateTime(result.lastSubmittedAt)
     const cooldownUntil = (submittedAt || Date.now()) + PUBLISH_COOLDOWN_MS
-
-    publishCooldownUntil.value = cooldownUntil
-    persistPublishCooldownUntil(String(article.id), cooldownUntil)
-
-    editorStore.setCurrentArticle({
+    const nextArticle = {
       ...article,
       status: {
         value: ARTICLE_STATUS.PENDING,
         label: ARTICLE_STATUS_LABEL_MAP.PENDING,
         variant: ARTICLE_STATUS_BADGE_VARIANT_MAP.PENDING,
       },
+      latestReviewReason: null,
       submitCount: result.submitCount,
       submitCountText: `已提交 ${result.submitCount} 次`,
       lastSubmittedAt: formatDateOnly(result.lastSubmittedAt),
       lastSubmittedAtRaw: result.lastSubmittedAt,
+    }
+
+    publishCooldownUntil.value = cooldownUntil
+    persistPublishCooldownUntil(String(article.id), cooldownUntil)
+
+    editorStore.setCurrentArticle(nextArticle)
+    queryClient.setQueryData(queryKeys.articleDetail(article.id), nextArticle)
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.articleDetail(article.id),
     })
     editorStore.dirty = false
 
@@ -633,7 +642,9 @@ async function cancelReview() {
   try {
     await cancelReviewByArticleId(article.id)
     const detail = await articleApi.getArticleDetail(article.id)
-    editorStore.setCurrentArticle(mapArticleDetailDtoToVm(detail))
+    const nextArticle = mapArticleDetailDtoToVm(detail)
+    editorStore.setCurrentArticle(nextArticle)
+    queryClient.setQueryData(queryKeys.articleDetail(article.id), nextArticle)
     void reviewStore.refreshPendingListIfInitialized()
 
     await onCanceled()

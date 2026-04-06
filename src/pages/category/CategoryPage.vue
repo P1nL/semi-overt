@@ -1,20 +1,30 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 
-import { ArticleCard } from '@/entities/article/ui'
 import { CATEGORY_TAB } from '@/entities/category/model/category.constants'
 import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
 import { useCategoryArticlesQuery } from '@/shared/api/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
+import ArticleParallaxGallery from '@/widgets/article-parallax-gallery/ArticleParallaxGallery.vue'
 import { AppHeader } from '@/widgets/app-header'
 
+const props = withDefaults(
+  defineProps<{
+    routeOverride?: RouteLocationNormalizedLoaded | null
+  }>(),
+  {
+    routeOverride: null,
+  },
+)
+
 const route = useRoute()
+const currentRoute = computed(() => props.routeOverride ?? route)
 
 const activeCategory = computed(() => {
-  const value = String(route.params.tab || CATEGORY_TAB.SHORT).toUpperCase()
+  const value = String(currentRoute.value.params.tab || CATEGORY_TAB.SHORT).toUpperCase()
   if (value in CATEGORY_TAB) return value
   return CATEGORY_TAB.SHORT
 })
@@ -43,13 +53,15 @@ const contentState = computed(() => {
 
 <template>
   <div class="min-h-screen">
-    <AppHeader />
+    <AppHeader :active-category="activeCategory" />
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <section class="surface-1 rounded-[var(--radius-xl)] p-6 md:p-8">
+      <section class="px-1 py-2 md:px-2 md:py-3">
         <SectionHeader
-          :title="`${sectionMeta.label}栏目`"
+          class="category-page-header"
+          :title="`${sectionMeta.label}`"
           :description="sectionMeta.description"
+          align="center"
           compact
         />
       </section>
@@ -61,23 +73,11 @@ const contentState = computed(() => {
           class="content-loading-shell"
         />
 
-        <div
+        <ArticleParallaxGallery
           v-else-if="contentState === 'content'"
           key="category-content"
-          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-        >
-          <div
-            v-for="(item, index) in list"
-            :key="item.id"
-            class="content-rise-in"
-            :style="{ '--content-rise-delay': `${index * 55}ms` }"
-          >
-            <ArticleCard
-              :article="item"
-              :show-reason="false"
-            />
-          </div>
-        </div>
+          :items="list"
+        />
 
         <div v-else key="category-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
           <EmptyState
@@ -90,3 +90,16 @@ const contentState = computed(() => {
     </main>
   </div>
 </template>
+
+<style scoped>
+.category-page-header :deep(h2) {
+  font-size: clamp(2.35rem, 5vw, 3.8rem);
+  line-height: 1.08;
+  letter-spacing: -0.06em;
+}
+
+.category-page-header :deep(p) {
+  margin-inline: auto;
+  text-align: center;
+}
+</style>
