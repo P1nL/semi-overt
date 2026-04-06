@@ -31,11 +31,15 @@ type GridVertex = {
   y: number
 }
 
+type LightArtboard = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const THEME_TRANSITION_DURATION = 420
-const LIGHT_POINTER_STRENGTH = GRID_STRENGTH * 0.78
-const LIGHT_WAKE_RADIUS = GRID_RADIUS * 0.92
-const LIGHT_WAKE_MAX_DISTANCE = 74
 const DARK_TRAVEL_SCALE = 0.72
 const DARK_PULSE_SCALE = 0.78
 const LIGHT_GRID_DRIFT_SCALE = 0.8
@@ -45,6 +49,13 @@ const GRID_SIZE = 42
 const GRID_SEGMENT = 8
 const GRID_RADIUS = 150
 const GRID_STRENGTH = 15
+
+const LIGHT_POINTER_STRENGTH = GRID_STRENGTH * 0.78
+const LIGHT_WAKE_RADIUS = GRID_RADIUS * 0.92
+const LIGHT_WAKE_MAX_DISTANCE = 74
+const LIGHT_ARTBOARD_RATIO = 420 / 297
+const LIGHT_ARTBOARD_MARGIN_X = 16
+const LIGHT_ARTBOARD_MARGIN_Y = 16
 
 const pointer = {
   x: -1000,
@@ -182,20 +193,44 @@ function resizeCanvas() {
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, theme: MeshTheme) {
-  const gradient = ctx.createLinearGradient(0, 0, 0, height)
-
   if (theme === 'dark') {
+    const gradient = ctx.createLinearGradient(0, 0, 0, height)
     gradient.addColorStop(0, '#08152b')
     gradient.addColorStop(0.56, '#0d1a3d')
     gradient.addColorStop(1, '#15153c')
-  } else {
-    gradient.addColorStop(0, '#fcfdff')
-    gradient.addColorStop(0.52, '#f4f7fb')
-    gradient.addColorStop(1, '#edf2f8')
+
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, width, height)
+    return
   }
 
-  ctx.fillStyle = gradient
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, height)
+}
+
+function resolveLightArtboard(width: number, height: number): LightArtboard {
+  const maxWidth = Math.max(240, width - LIGHT_ARTBOARD_MARGIN_X)
+  const maxHeight = Math.max(180, height - LIGHT_ARTBOARD_MARGIN_Y)
+
+  let artboardWidth = maxWidth
+  let artboardHeight = artboardWidth / LIGHT_ARTBOARD_RATIO
+
+  // Wide screens are height-constrained with the original fit logic,
+  // which leaves large side gutters. For the background we prefer width-first
+  // sizing and allow the artboard to overflow vertically a bit.
+  if (width / height <= LIGHT_ARTBOARD_RATIO) {
+    if (artboardHeight > maxHeight) {
+      artboardHeight = maxHeight
+      artboardWidth = artboardHeight * LIGHT_ARTBOARD_RATIO
+    }
+  }
+
+  return {
+    x: (width - artboardWidth) * 0.5,
+    y: (height - artboardHeight) * 0.5,
+    width: artboardWidth,
+    height: artboardHeight,
+  }
 }
 
 function resolveGridOffset(
@@ -261,69 +296,75 @@ function drawInteractiveGrid(
   height: number,
   time: number,
 ) {
-  const pointerRadius = pointer.active ? GRID_RADIUS : 0
-  const pointerStrength = pointer.active ? LIGHT_POINTER_STRENGTH : 0
-  const drift = (pointX: number, pointY: number) =>
-    (
-      Math.sin(time * 0.2 + pointX * 0.0022 + pointY * 0.0015) +
-      Math.cos(time * 0.14 + pointX * 0.0012 - pointY * 0.001) * 0.6
-    ) * 0.08 * LIGHT_GRID_DRIFT_SCALE
-  const wakeRadius = LIGHT_WAKE_RADIUS + Math.min(64, pointer.wakeEnergy * 6.4)
-  const wakeStrength = Math.min(4.3, 0.9 + pointer.wakeEnergy * 0.12)
+  const artboard = resolveLightArtboard(width, height)
+  const maxLines = Math.max(2, Math.floor(artboard.width / 15))
+  const maxPoints = Math.max(2, Math.floor(artboard.height / 90))
+  const gapX = artboard.width / Math.max(maxLines - 1, 1)
+  const gapY = artboard.height / Math.max(maxPoints - 1, 1)
+  const animationTime = time / 0.00136
 
   ctx.save()
   ctx.lineWidth = 1
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(64, 97, 143, 0.062)'
+  ctx.strokeStyle = '#000000'
 
-  for (let x = 0; x <= width + GRID_SIZE; x += GRID_SIZE) {
-    const points: GridVertex[] = []
+  for (let lineIndex = 0; lineIndex < maxLines; lineIndex += 1) {
+    const points: Array<GridVertex & { offsetX: number; offsetY: number }> = []
+    const baseX = lineIndex * gapX
 
-    for (let y = 0; y <= height + GRID_SEGMENT; y += GRID_SEGMENT) {
-      const offsetX =
-        drift(x, y) +
-        resolveGridOffset(pointer.x, pointer.y, x, y, 'x', pointerRadius, pointerStrength) +
-        resolveGridOffset(pointer.wakeX, pointer.wakeY, x, y, 'x', wakeRadius, wakeStrength)
+    for (let pointIndex = 0; pointIndex < maxPoints; pointIndex += 1) {
+      const baseY = pointIndex * gapY
+      let offsetY = Math.cos(baseX * 0.025 + animationTime * 0.00025) * 40
+      let offsetX = Math.sin((baseY + offsetY) * 0.02 + animationTime * 0.000125) * gapX * 2.5
 
-      points.push({ x: x + offsetX, y })
+      if (pointIndex === 0 || pointIndex === maxPoints - 1) {
+        offsetX = 0
+        offsetY = 0
+      }
+
+      points.push({ x: baseX, y: baseY, offsetX, offsetY })
     }
 
-    drawSmoothGridPath(ctx, points)
+    ctx.beginPath()
+
+    points.forEach((point, pointIndex) => {
+      const x = artboard.x + point.x + point.offsetX
+      const y = artboard.y + point.y + point.offsetY
+
+      if (pointIndex === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        const previousBasePoint =
+          pointIndex > 0 && pointIndex < points.length - 1
+            ? points[pointIndex - 1]
+            : point
+
+        const controlX = artboard.x + point.x
+        const controlY = artboard.y + (y - artboard.y + previousBasePoint.y) * 0.5
+
+        ctx.quadraticCurveTo(controlX, controlY, x, y)
+      }
+    })
+
+    ctx.stroke()
+
+    points.forEach((point) => {
+      const x = artboard.x + point.x + point.offsetX
+      const y = artboard.y + point.y + point.offsetY
+
+      ctx.beginPath()
+      ctx.arc(x, y, 1, 0, Math.PI * 2)
+      ctx.stroke()
+    })
   }
 
-  ctx.strokeStyle = 'rgba(92, 126, 168, 0.042)'
-
-  for (let y = 0; y <= height + GRID_SIZE; y += GRID_SIZE) {
-    const points: GridVertex[] = []
-
-    for (let x = 0; x <= width + GRID_SEGMENT; x += GRID_SEGMENT) {
-      const offsetY =
-        drift(x + 18, y + 12) +
-        resolveGridOffset(pointer.x, pointer.y, x, y, 'y', pointerRadius, pointerStrength) +
-        resolveGridOffset(pointer.wakeX, pointer.wakeY, x, y, 'y', wakeRadius, wakeStrength)
-
-      points.push({ x, y: y + offsetY })
-    }
-
-    drawSmoothGridPath(ctx, points)
-  }
-
-  const ambientGlow = ctx.createRadialGradient(
-    width * 0.24,
-    height * 0.2,
-    0,
-    width * 0.24,
-    height * 0.2,
-    Math.max(width, height) * 0.8,
-  )
-  ambientGlow.addColorStop(0, 'rgba(255,255,255,0.28)')
-  ambientGlow.addColorStop(0.38, 'rgba(255,255,255,0.09)')
-  ambientGlow.addColorStop(1, 'rgba(255,255,255,0)')
-
-  ctx.globalCompositeOperation = 'screen'
-  ctx.fillStyle = ambientGlow
-  ctx.fillRect(0, 0, width, height)
+  ctx.beginPath()
+  ctx.moveTo(artboard.x, artboard.y)
+  ctx.lineTo(artboard.x + artboard.width, artboard.y)
+  ctx.moveTo(artboard.x + artboard.width, artboard.y + artboard.height)
+  ctx.lineTo(artboard.x, artboard.y + artboard.height)
+  ctx.stroke()
   ctx.restore()
 }
 
@@ -774,16 +815,11 @@ onBeforeUnmount(() => {
 }
 
 .app-background__overlay {
-  background:
-    radial-gradient(circle at center, transparent 42%, rgb(0 0 0 / 0.022) 100%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.03), rgb(255 255 255 / 0));
+  background: none;
 }
 
 .app-background__noise {
-  opacity: 0.009;
-  background-image: radial-gradient(rgb(255 255 255 / 0.14) 0.7px, transparent 0.7px);
-  background-size: 9px 9px;
-  mix-blend-mode: soft-light;
+  opacity: 0;
 }
 
 html.dark .app-background__overlay {

@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { MotionPlugin } from '@vueuse/motion'
 
 import App from './App.vue'
 import { pinia } from '@/app/providers/pinia'
@@ -12,6 +13,7 @@ const app = createApp(App)
 const router = createAppRouter()
 
 app.use(pinia)
+app.use(MotionPlugin)
 setupQueryClient(app)
 app.use(router)
 

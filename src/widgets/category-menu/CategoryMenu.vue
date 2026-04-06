@@ -37,9 +37,11 @@ function toggleMenu() {
   open.value = !open.value
 }
 
-function setItemRef(element: Element | null, index: number) {
-  if (!(element instanceof HTMLAnchorElement)) return
-  itemRefs.value[index] = element
+function setItemRef(element: any, index: number) {
+  // Extract the DOM element if element is a Vue component instance
+  const el = element && '$el' in element ? element.$el : element;
+  if (!(el instanceof HTMLAnchorElement)) return
+  itemRefs.value[index] = el
 }
 
 function focusItem(index: number) {
@@ -59,10 +61,11 @@ async function openMenuWithKeyboard(index = 0) {
   focusItem(index)
 }
 
-function closeMenu(options: { restoreFocus?: boolean } = {}) {
+function closeMenu(eventOrOptions?: PointerEvent | { restoreFocus?: boolean }) {
   open.value = false
 
-  if (options.restoreFocus) {
+  const restoreFocus = eventOrOptions && !(eventOrOptions instanceof Event) && eventOrOptions.restoreFocus;
+  if (restoreFocus) {
     void nextTick(() => {
       triggerRef.value?.focus()
     })
@@ -142,7 +145,7 @@ watch(open, async (isOpen) => {
     <button
         ref="triggerRef"
         type="button"
-        class="surface-2 flex h-11 items-center justify-between gap-2 rounded-[var(--radius-pill)] px-3 text-sm font-medium tracking-[-0.01em] text-[var(--color-text)] transition-all duration-300 hover:border-[var(--color-border-strong)] md:h-9 md:px-4"
+        class="surface-2 flex h-11 items-center justify-between gap-2 rounded-(--radius-pill) px-3 text-sm font-medium tracking-[-0.01em] text-(--color-text) transition-all duration-300 hover:border-(--color-border-strong) md:h-9 md:px-4"
         :aria-expanded="open ? 'true' : 'false'"
         :aria-controls="panelId"
         aria-haspopup="true"
@@ -169,7 +172,7 @@ watch(open, async (isOpen) => {
       <nav
           v-if="open"
           :id="panelId"
-          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[18rem] -translate-x-1/2 rounded-[var(--radius-xl)] p-2 max-md:fixed max-md:left-3 max-md:right-3 max-md:top-[5.35rem] max-md:w-auto max-md:translate-x-0 max-md:overflow-y-auto max-md:p-3"
+          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[18rem] -translate-x-1/2 rounded-xl p-2 max-md:fixed max-md:left-3 max-md:right-3 max-md:top-[5.35rem] max-md:w-auto max-md:translate-x-0 max-md:overflow-y-auto max-md:p-3"
           aria-label="栏目导航"
           @keydown="onPanelKeydown"
       >
@@ -178,19 +181,19 @@ watch(open, async (isOpen) => {
             <RouterLink
                 :ref="(element) => setItemRef(element, index)"
                 :to="item.path"
-                class="flex items-start justify-between gap-3 rounded-[var(--radius-lg)] px-3 py-3 transition-all duration-200"
+                class="flex items-start justify-between gap-3 rounded-lg px-3 py-3 transition-all duration-200"
                 :class="
                   item.isActive
-                    ? 'bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-surface)_90%)] text-[var(--color-primary)]'
-                    : 'text-[var(--color-text)] hover:bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)]'
+                    ? 'bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-surface)_90%)] text-(--color-primary)'
+                    : 'text-(--color-text) hover:bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)]'
                 "
-                @click="closeMenu"
+                @click="closeMenu()"
             >
               <span class="min-w-0">
                 <span class="block text-sm font-medium tracking-[-0.01em]">
                   {{ item.label }}
                 </span>
-                <span class="mt-1 block text-xs leading-5 text-[var(--color-text-muted)]">
+                <span class="mt-1 block text-xs leading-5 text-(--color-text-muted)">
                   {{ item.description }}
                 </span>
               </span>
@@ -216,3 +219,4 @@ watch(open, async (isOpen) => {
   backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
 }
 </style>
+

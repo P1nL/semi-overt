@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
-import { ArticleCard } from '@/entities/article/ui'
 import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
 import { useHomeQuery } from '@/shared/api/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { AppHeader } from '@/widgets/app-header'
 import { HeroSection } from '@/widgets/hero-section'
+import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
 
 const homeQuery = useHomeQuery()
 
 const hiddenHomeSectionKeys = new Set(['QUICK', 'SHORT', 'DEEP'])
 const contentReady = computed(() => homeQuery.isSuccess.value)
+
+onMounted(() => {
+  document.documentElement.classList.add('home-scroll-locked')
+  document.body.classList.add('home-scroll-locked')
+})
+
+onBeforeUnmount(() => {
+  document.documentElement.classList.remove('home-scroll-locked')
+  document.body.classList.remove('home-scroll-locked')
+})
+
 const home = computed(() => {
   const response = homeQuery.data.value
 
@@ -47,34 +58,31 @@ const home = computed(() => {
   <div class="min-h-screen">
     <AppHeader />
 
-    <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
+    <main class="pt-8 pb-0 md:pt-10 md:pb-0">
       <HeroSection
         :primary="home.heroPrimary"
         :secondary="home.heroSecondary"
         :revealed="contentReady"
       />
 
-      <div v-if="contentReady" class="space-y-8 md:space-y-10">
+      <div v-if="contentReady" class="home-sections space-y-8 pt-8 md:space-y-10 md:pt-10 lg:pt-0">
         <section
           v-for="(section, sectionIndex) in home.sections"
           :key="section.key"
-          class="home-section-reveal space-y-5"
-          :style="{ '--home-section-delay': `${260 + sectionIndex * 120}ms` }"
+          class="space-y-5"
         >
-          <SectionHeader :title="section.title" :description="section.description" compact />
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div
-              v-for="(item, itemIndex) in section.list"
-              :key="item.id"
-              class="home-card-reveal"
-              :style="{ '--home-card-delay': `${320 + sectionIndex * 120 + itemIndex * 55}ms` }"
-            >
-              <ArticleCard
-                :article="item"
-                :show-reason="false"
-              />
-            </div>
+          <div
+            class="page-container home-section-header-reveal"
+            :style="{ '--home-section-delay': `${260 + sectionIndex * 120}ms` }"
+          >
+            <SectionHeader :title="section.title" :description="section.description" compact />
           </div>
+          <HomeShowcaseRail
+            :items="section.list"
+            :category-label="section.title"
+            :revealed="contentReady"
+            :delay-base="320 + sectionIndex * 120"
+          />
         </section>
       </div>
     </main>
@@ -82,15 +90,19 @@ const home = computed(() => {
 </template>
 
 <style scoped>
-.home-section-reveal {
-  animation: home-rise-in 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--home-section-delay, 0ms);
+:global(html.home-scroll-locked),
+:global(body.home-scroll-locked) {
+  overflow: hidden;
 }
 
-.home-card-reveal {
-  opacity: 0;
-  animation: home-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--home-card-delay, 0ms);
+.home-sections {
+  position: relative;
+  z-index: 1;
+}
+
+.home-section-header-reveal {
+  animation: home-rise-in 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--home-section-delay, 0ms);
 }
 
 @keyframes home-rise-in {
@@ -106,8 +118,7 @@ const home = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-section-reveal,
-  .home-card-reveal {
+  .home-section-header-reveal {
     opacity: 1;
     transform: none;
     animation: none;

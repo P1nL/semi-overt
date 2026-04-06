@@ -40,9 +40,10 @@ function getVisibleUserMenuItems() {
   return userMenuItemRefs.value.filter((item) => Boolean(item) && item.offsetParent !== null)
 }
 
-function setUserMenuItemRef(element: Element | null, index: number) {
-  if (!(element instanceof HTMLButtonElement)) return
-  userMenuItemRefs.value[index] = element
+function setUserMenuItemRef(element: Element | null | any, index: number) {
+  if (element instanceof HTMLButtonElement) {
+    userMenuItemRefs.value[index] = element
+  }
 }
 
 function focusUserMenuItem(index: number) {
@@ -340,7 +341,7 @@ async function handleLogout() {
           <div
             v-if="userMenuOpen"
             :id="userMenuId"
-            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-[11rem] rounded-[var(--radius-lg)] p-2 shadow-[var(--shadow-lg)] max-md:w-[min(18rem,calc(100vw-1.5rem))]"
+            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-44 rounded-lg p-2 shadow-(--shadow-lg) max-md:w-[min(18rem,calc(100vw-1.5rem))]"
             role="menu"
             aria-label="用户菜单"
             @keydown="onUserMenuKeydown"

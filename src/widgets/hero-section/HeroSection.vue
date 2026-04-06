@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import type { ArticleCardVm } from '@/entities/article/model/article.types'
-import { ArticleCard } from '@/entities/article/ui'
+import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -14,20 +14,28 @@ const props = withDefaults(
   }>(),
   {
     secondary: () => [],
-    title: '发现值得细读的文章',
-    description: '浏览精选内容，按栏目探索，快速进入真正值得你花时间阅读的作品。',
+    title: '一切都沉溺于半公开空间中.',
+    description: '',
     revealed: false,
   },
 )
 
-const heroSecondary = computed(() => props.secondary.slice(0, 3))
-const hasCards = computed(() => !!props.primary || heroSecondary.value.length > 0)
+const heroItems = computed(() => {
+  const list: ArticleCardVm[] = []
+
+  if (props.primary) {
+    list.push(props.primary)
+  }
+
+  return list.concat(props.secondary.slice(0, 10))
+})
+
+const hasCards = computed(() => heroItems.value.length > 0)
 </script>
 
 <template>
-  <section class="relative isolate overflow-hidden px-2 py-6 md:px-4 md:py-8 lg:px-6 lg:py-9">
-    <div class="relative mb-7 space-y-4 px-2 md:mb-8 md:px-4">
-      <div class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-primary)]">精选内容</div>
+  <section class="hero-section relative isolate overflow-visible pt-6 md:pt-8 lg:pt-10">
+    <div class="page-container hero-section__intro relative mb-3 space-y-4 md:mb-4">
       <h1 class="max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-[var(--color-text)] md:text-5xl lg:text-[3.5rem]">
         {{ title }}
       </h1>
@@ -38,67 +46,36 @@ const hasCards = computed(() => !!props.primary || heroSecondary.value.length > 
 
     <div
       v-if="hasCards"
-      class="relative grid gap-4 lg:grid-cols-12"
+      class="hero-section__rail"
     >
-      <div
-        v-if="primary"
-        class="hero-reveal lg:col-span-8"
-        :class="{ 'hero-reveal--visible': revealed }"
-        style="--hero-reveal-delay: 40ms"
-      >
-        <ArticleCard
-          :article="primary"
-          cover-eager
-        />
-      </div>
-
-      <div class="space-y-4 lg:col-span-4 lg:pt-1">
-        <div
-          v-for="(item, index) in heroSecondary"
-          :key="item.id"
-          class="hero-reveal"
-          :class="[{ 'hero-reveal--visible': revealed }, index > 0 && 'hidden sm:block']"
-          :style="{ '--hero-reveal-delay': `${120 + index * 80}ms` }"
-        >
-          <ArticleCard
-            :article="item"
-            compact
-          />
-        </div>
-      </div>
+      <HomeShowcaseRail
+        :items="heroItems"
+        category-label="精选内容"
+        featured
+        :revealed="revealed"
+        :delay-base="40"
+        :max-visible="11"
+      />
     </div>
   </section>
 </template>
 
 <style scoped>
-.hero-reveal {
-  opacity: 0;
-  transform: translateY(28px);
-}
-
-.hero-reveal--visible {
-  animation: hero-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--hero-reveal-delay, 0ms);
-}
-
-@keyframes hero-rise-in {
-  0% {
-    opacity: 0;
-    transform: translateY(28px);
+@media (min-width: 1024px) {
+  .hero-section {
+    --hero-rail-visible-height: clamp(15rem, 17vw, 19rem);
+    min-block-size: max(20rem, calc(100svh + var(--hero-rail-visible-height) - 0rem));
+    padding-bottom: 0;
   }
 
-  100% {
-    opacity: 1;
-    transform: translateY(0);
+  .hero-section__intro {
+    margin-bottom: 0;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .hero-reveal,
-  .hero-reveal--visible {
-    opacity: 1;
-    transform: none;
-    animation: none;
+  .hero-section__rail {
+    position: sticky;
+    top: calc(100svh - var(--hero-rail-visible-height));
+    z-index: 1;
   }
 }
 </style>
