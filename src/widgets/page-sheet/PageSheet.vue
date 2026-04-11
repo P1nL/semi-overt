@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
                   props.scrollMode === 'content' ? 'overflow-y-hidden' : 'overflow-y-auto',
                 ]
               : [
-                  props.inset === 'article' ? 'top-20 md:top-24' : 'top-[4.75rem] md:top-[5.5rem]',
+                  props.inset === 'article' ? 'top-20 md:top-24' : 'top-[calc(var(--header-height)-0.75rem)] md:top-[var(--header-height)]',
                   props.scrollMode === 'content' ? 'overflow-y-hidden' : 'overflow-y-auto',
                   'rounded-t-[2rem] border-x border-t border-[color-mix(in_srgb,var(--color-border)_82%,white_14%)] shadow-[0_-18px_48px_rgb(15_23_42_/_0.12)]',
                 ]
