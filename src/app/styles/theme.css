@@ -41,6 +41,7 @@
     --color-danger: #d92c20;
     --color-success: #14863c;
     --color-warning: #b96b00;
+    --color-profile-divider: #d97706;
     --color-overlay: rgb(9 12 20 / 0.28);
     --color-scrollbar-thumb: rgb(29 29 31 / 0.24);
     --color-scrollbar-thumb-hover: rgb(29 29 31 / 0.36);
@@ -79,6 +80,9 @@
     --backdrop-blur-soft: calc(var(--backdrop-blur) * 0.7);
     --backdrop-blur-panel: 26px;
     --backdrop-blur-card: 16px;
+
+    --header-height: 5.5rem;
+    --header-height-md: 5.75rem;
 }
 
 html.dark {
@@ -106,6 +110,7 @@ html.dark {
     --color-danger: #ff695f;
     --color-success: #32d74b;
     --color-warning: #ff9f0a;
+    --color-profile-divider: color-mix(in srgb, var(--color-border) 88%, white 10%);
     --color-overlay: rgb(4 6 11 / 0.5);
     --color-scrollbar-thumb: rgb(255 255 255 / 0.18);
     --color-scrollbar-thumb-hover: rgb(255 255 255 / 0.28);
