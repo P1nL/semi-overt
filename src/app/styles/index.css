@@ -109,6 +109,7 @@
     }
 
     .content-rise-in {
+        --content-rise-delay: 0ms;
         opacity: 0;
         animation: content-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
         animation-delay: var(--content-rise-delay, 0ms);
