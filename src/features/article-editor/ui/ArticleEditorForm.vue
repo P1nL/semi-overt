@@ -3,6 +3,10 @@ import Highlight from '@tiptap/extension-highlight'
 import Heading from '@tiptap/extension-heading'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Table } from '@tiptap/extension-table'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableRow } from '@tiptap/extension-table-row'
 import TextAlign from '@tiptap/extension-text-align'
 import StarterKit from '@tiptap/starter-kit'
 import {
@@ -89,11 +93,16 @@ const workingArticleId = ref<number | string | undefined>(props.articleId)
 const sidePanelOpen = ref(true)
 const titleTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const bodyImageInputRef = ref<HTMLInputElement | null>(null)
+const formatToolbarRef = ref<HTMLElement | null>(null)
 const bodyImageUploading = ref(false)
 const syncingEditorContent = ref(false)
 const headingMenuOpen = ref(false)
 const headingMenuRef = ref<HTMLElement | null>(null)
 const headingMenuTriggerRef = ref<HTMLButtonElement | null>(null)
+const tableMenuOpen = ref(false)
+const tableMenuRef = ref<HTMLElement | null>(null)
+const tableMenuTriggerRef = ref<HTMLButtonElement | null>(null)
+const toolbarSentinelRef = ref<HTMLElement | null>(null)
 
 const errors = reactive<{
   title: string
@@ -106,6 +115,7 @@ const errors = reactive<{
 })
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let toolbarObserver: IntersectionObserver | null = null
 const MIN_SAVE_FEEDBACK_MS = 560
 
 const disabledState = computed(() => props.disabled || loading.value || editorStore.submitting)
@@ -169,6 +179,10 @@ const contentEditor = useEditor({
       inline: false,
       allowBase64: false,
     }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
     Placeholder.configure({
       placeholder: '开始写作，支持标题、列表、引用、代码块、分割线和图片。',
     }),
@@ -513,10 +527,28 @@ function setHeadingLevel(level: 2 | 3 | 4) {
 function toggleHeadingMenu() {
   if (disabledState.value) return
   headingMenuOpen.value = !headingMenuOpen.value
+  if (headingMenuOpen.value) tableMenuOpen.value = false
 }
 
 function closeHeadingMenu() {
   headingMenuOpen.value = false
+}
+
+function toggleTableMenu() {
+  if (disabledState.value) return
+  tableMenuOpen.value = !tableMenuOpen.value
+  if (tableMenuOpen.value) headingMenuOpen.value = false
+}
+
+function closeTableMenu() {
+  tableMenuOpen.value = false
+}
+
+function insertTablePreset(rows: number, cols: number, withHeaderRow: boolean) {
+  runEditorCommand((editor) =>
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run()
+  )
+  closeTableMenu()
 }
 
 function applyHeadingLevel(level: HeadingLevel) {
@@ -620,6 +652,12 @@ function insertDivider() {
   runEditorCommand((editor) => editor.chain().focus().setHorizontalRule().run())
 }
 
+function insertTable() {
+  runEditorCommand((editor) =>
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+  )
+}
+
 function undo() {
   runEditorCommand((editor) => editor.chain().focus().undo().run())
 }
@@ -689,19 +727,26 @@ function triggerBodyImagePicker() {
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (!headingMenuOpen.value) return
-
   const target = event.target
   if (!(target instanceof Node)) return
-  if (headingMenuRef.value?.contains(target)) return
-  if (headingMenuTriggerRef.value?.contains(target)) return
 
-  closeHeadingMenu()
+  if (headingMenuOpen.value) {
+    if (!headingMenuRef.value?.contains(target) && !headingMenuTriggerRef.value?.contains(target)) {
+      closeHeadingMenu()
+    }
+  }
+
+  if (tableMenuOpen.value) {
+    if (!tableMenuRef.value?.contains(target) && !tableMenuTriggerRef.value?.contains(target)) {
+      closeTableMenu()
+    }
+  }
 }
 
 function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
   closeHeadingMenu()
+  closeTableMenu()
 }
 
 async function handleBodyImageChange(event: Event) {
@@ -822,12 +867,27 @@ onMounted(async () => {
   }
 
   ready.value = true
+
+  // 用哨兵元素检测工具栏是否吸顶：哨兵离开视口 = 工具栏已吸顶
+  if (toolbarSentinelRef.value && formatToolbarRef.value) {
+    const toolbar = formatToolbarRef.value
+    toolbarObserver = new IntersectionObserver(
+      ([entry]) => {
+        // 哨兵不可见时，工具栏已吸顶，tooltip 应向下展示
+        toolbar.classList.toggle('is-stuck', !entry.isIntersecting)
+      },
+      { threshold: [0] }
+    )
+    toolbarObserver.observe(toolbarSentinelRef.value)
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   document.removeEventListener('keydown', handleDocumentKeydown)
   clearSaveTimer()
+  toolbarObserver?.disconnect()
+  toolbarObserver = null
   contentEditor.value?.destroy()
 })
 
@@ -909,7 +969,7 @@ defineExpose({
 
       <div class="editor-content-region">
         <div class="editor-canvas-region">
-          <aside class="editor-insert-bar">
+          <aside class="editor-insert-bar editor-insert-bar--canvas">
             <button type="button" class="editor-insert-item" :disabled="disabledState" @click="toggleHeadingBlock">
               <span class="editor-insert-icon">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -1000,7 +1060,10 @@ defineExpose({
 
               <div class="editor-canvas-separator" />
 
-              <div class="editor-format-toolbar editor-format-toolbar--icons">
+              <!-- 哨兵：工具栏上方 1px，离开视口即表示工具栏已吸顶 -->
+              <div ref="toolbarSentinelRef" class="editor-toolbar-sentinel" aria-hidden="true" />
+
+              <div ref="formatToolbarRef" class="editor-format-toolbar editor-format-toolbar--icons">
                 <button
                   type="button"
                   class="editor-tool-button"
@@ -1053,6 +1116,78 @@ defineExpose({
                     </button>
                   </div>
                 </Transition>
+                </div>
+
+                <!-- 表格下拉 -->
+                <div class="editor-heading-dropdown">
+                  <button
+                    ref="tableMenuTriggerRef"
+                    type="button"
+                    class="editor-tool-button editor-tool-button--heading"
+                    data-tooltip="表格"
+                    :class="{ 'editor-tool-button--active': isToolbarActive('table') }"
+                    :disabled="disabledState"
+                    aria-label="插入表格"
+                    :aria-expanded="tableMenuOpen"
+                    aria-haspopup="menu"
+                    @click="toggleTableMenu"
+                  >
+                    <span class="editor-heading-trigger__badge editor-table-trigger__badge">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                        <line x1="3" y1="8" x2="21" y2="8" />
+                        <line x1="8" y1="8" x2="8" y2="21" />
+                      </svg>
+                    </span>
+                    <ChevronDown class="editor-tool-button-caret" :size="12" :stroke-width="1.8" />
+                  </button>
+
+                  <Transition name="editor-toolbar-dropdown-menu">
+                    <div
+                      v-if="tableMenuOpen"
+                      ref="tableMenuRef"
+                      class="editor-toolbar-dropdown-menu editor-table-dropdown-menu"
+                      role="menu"
+                      aria-label="插入表格"
+                    >
+                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(3, 3, true)">
+                        <span class="editor-table-dropdown-item__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="3" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="3" y1="15" x2="21" y2="15" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                            <line x1="15" y1="3" x2="15" y2="21" />
+                          </svg>
+                        </span>
+                        <span>3×3 含表头</span>
+                      </button>
+                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(4, 4, true)">
+                        <span class="editor-table-dropdown-item__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="7.5" x2="21" y2="7.5"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16.5" x2="21" y2="16.5"/><line x1="7.5" y1="3" x2="7.5" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16.5" y1="3" x2="16.5" y2="21"/></svg>
+                        </span>
+                        <span>4×4 含表头</span>
+                      </button>
+                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(3, 2, true)">
+                        <span class="editor-table-dropdown-item__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
+                        </span>
+                        <span>2 列对比表</span>
+                      </button>
+                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(4, 3, false)">
+                        <span class="editor-table-dropdown-item__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="7.5" y1="3" x2="7.5" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16.5" y1="3" x2="16.5" y2="21"/></svg>
+                        </span>
+                        <span>4×3 无表头</span>
+                      </button>
+                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(2, 5, true)">
+                        <span class="editor-table-dropdown-item__icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="8" x2="21" y2="8"/><line x1="6.6" y1="8" x2="6.6" y2="21"/><line x1="10.2" y1="8" x2="10.2" y2="21"/><line x1="13.8" y1="8" x2="13.8" y2="21"/><line x1="17.4" y1="8" x2="17.4" y2="21"/></svg>
+                        </span>
+                        <span>5 列宽表</span>
+                      </button>
+                    </div>
+                  </Transition>
                 </div>
 
                 <button
@@ -1414,7 +1549,14 @@ defineExpose({
 }
 
 .editor-left-rail {
+  /* 左侧插入栏：固定在视口纵向中线，不随画布滚动 */
   display: none;
+  position: fixed;
+  top: 50vh;
+  /* 向画布内侧收一点，减少与正文的视觉距离 */
+  left: max(3rem, calc((100vw - var(--editor-canvas-width) - var(--editor-toolbar-width) - var(--editor-side-width) - var(--editor-side-gap) - var(--editor-side-toggle-width)) / 2 + 7rem));
+  z-index: 8;
+  transform: translateY(-50%);
 }
 
 .editor-content-region {
@@ -1455,6 +1597,10 @@ defineExpose({
   align-items: flex-start;
   gap: 0.4rem;
   transform: translateY(-50%);
+}
+
+.editor-insert-bar--canvas {
+  display: none;
 }
 
 .editor-insert-item {
@@ -1696,6 +1842,18 @@ defineExpose({
 .editor-tool-button:hover::after,
 .editor-tool-button:focus-visible::after {
   opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* 工具栏吸顶时，tooltip 改为向下展示，避免被视口裁剪 */
+.editor-format-toolbar.is-stuck .editor-tool-button::after {
+  bottom: auto;
+  top: calc(100% + 0.55rem);
+  transform: translate(-50%, -6px);
+}
+
+.editor-format-toolbar.is-stuck .editor-tool-button:hover::after,
+.editor-format-toolbar.is-stuck .editor-tool-button:focus-visible::after {
   transform: translate(-50%, 0);
 }
 
@@ -2181,6 +2339,46 @@ defineExpose({
   cursor: nwse-resize;
 }
 
+.editor-content-editor :deep(.editor-content-surface table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.editor-content-editor :deep(.editor-content-surface th),
+.editor-content-editor :deep(.editor-content-surface td) {
+  position: relative;
+  min-width: 3rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 65%, transparent);
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.editor-content-editor :deep(.editor-content-surface th) {
+  background: color-mix(in srgb, var(--color-surface-elevated) 85%, transparent);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.editor-content-editor :deep(.editor-content-surface td) {
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+  color: var(--color-text);
+}
+
+.editor-content-editor :deep(.editor-content-surface .selectedCell::after) {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  z-index: 2;
+}
+
 .editor-wordcount {
   display: flex;
   flex-wrap: wrap;
@@ -2404,6 +2602,10 @@ defineExpose({
     margin-bottom: 1rem;
   }
 
+  .editor-insert-bar--canvas {
+    display: flex;
+  }
+
   .editor-canvas-shell {
     width: 100%;
     margin-left: 0;
@@ -2428,5 +2630,83 @@ defineExpose({
     border-left: none;
     border-top: 1px solid var(--color-border);
   }
+
+  /* 小屏隐藏左侧固定栏 */
+  .editor-left-rail {
+    display: none !important;
+  }
+}
+
+/* 大屏（>960px）时显示左侧固定插入栏 */
+@media (min-width: 961px) {
+  .editor-left-rail {
+    display: block;
+  }
+
+  /* 左侧栏内的 .editor-insert-bar 使用固定定位的父元素，
+     所以这里让内部 bar 恢复相对父容器定位 */
+  .editor-left-rail .editor-insert-bar--rail {
+    position: static;
+    transform: none;
+    width: auto;
+  }
+}
+
+/* 哨兵元素：零高度，工具栏上方，用于 IntersectionObserver 检测吸顶 */
+.editor-toolbar-sentinel {
+  height: 1px;
+  margin-bottom: -1px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* 表格下拉触发按钮：图标徽标 */
+.editor-table-trigger__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.3rem;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.editor-table-trigger__badge svg {
+  width: 0.88rem;
+  height: 0.88rem;
+}
+
+/* 表格下拉菜单：比标题菜单稍宽，选项左对齐 */
+.editor-table-dropdown-menu {
+  min-width: 9rem;
+}
+
+.editor-table-dropdown-item {
+  justify-content: flex-start !important;
+  gap: 0.6rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0.9rem !important;
+  font-size: 0.82rem !important;
+  text-align: left !important;
+}
+
+.editor-table-dropdown-item__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+.editor-table-dropdown-item__icon svg {
+  width: 1.3rem;
+  height: 1rem;
+}
+
+.editor-table-dropdown-item:hover:not(:disabled) .editor-table-dropdown-item__icon {
+  color: var(--color-text);
 }
 </style>
