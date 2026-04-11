@@ -98,7 +98,7 @@ async function submitSearch() {
 <template>
   <div class="header-shell">
     <header class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4">
-      <Container>
+      <Container class="app-header-container">
         <div class="surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4">
           <div class="flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
             <AppHeaderLogo />
@@ -150,11 +150,15 @@ async function submitSearch() {
       </Container>
     </header>
 
-    <div aria-hidden="true" class="h-[5.5rem] md:h-[5.75rem]" />
+    <div aria-hidden="true" class="h-[var(--header-height)] md:h-[var(--header-height-md)]" />
   </div>
 </template>
 
 <style scoped>
+.header-shell :deep(.app-header-container) {
+  width: min(100% - 1.5rem, 1216px);
+}
+
 .header-search-shell {
   background: transparent;
   border: 0;
