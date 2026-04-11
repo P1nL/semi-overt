@@ -303,6 +303,34 @@ html.dark .home-showcase-card__chip {
   color: rgb(203 213 225);
 }
 
+/*
+ * 主题切换期间：
+ *
+ * 卡片基础样式是 opacity:0 + transform:translateY(28px)，
+ * 由 --revealed 的 home-showcase-card-rise 动画填充到最终状态。
+ * 如果在 theme-switching 期间用另一个 animation 覆盖 rise，
+ * theme-switching class 移除后 rise 动画会被浏览器重新触发 →
+ * 部分卡片闪回 opacity:0 再重新入场。
+ *
+ * 修复：不替换 animation，而是用 !important 强制保持最终态：
+ * opacity:1 + transform:none，让入场动画的 fill 值被静态属性压过。
+ * theme-switching 移除后 rise 动画的 fill 自然恢复，但状态不变（已是1/none），
+ * 不会产生视觉跳变。
+ */
+:global(html.theme-switching) .home-showcase-card {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+:global(html.theme-switching) .home-showcase-card::before {
+  filter: none !important;
+  transition: none !important;
+}
+:global(html.theme-switching) .home-showcase-card::after,
+:global(html.theme-switching) .home-showcase-card * {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-showcase-card,
   .home-showcase-card--revealed {
