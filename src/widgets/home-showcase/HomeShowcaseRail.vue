@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { useMotions, type Variant } from '@vueuse/motion'
+import { useMediaQuery } from '@vueuse/core'
 
 import type { ArticleCardVm } from '@/entities/article/model/article.types'
 
@@ -26,14 +27,29 @@ const props = withDefaults(
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
+const isDesktopRail = useMediaQuery('(min-width: 1024px)')
+const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
+const regularRotatePattern = ['-1.8deg', '1.2deg', '-0.9deg', '2.4deg', '-1.4deg', '0.8deg'] as const
+const featuredRotatePattern = ['-2.2deg', '1.4deg', '-1deg', '2.6deg', '-1.5deg', '0.9deg'] as const
+
+const getStaticRotate = (index: number) => {
+  if (!isDesktopRail.value || prefersReducedMotion.value) {
+    return '0deg'
+  }
+
+  return (props.featured ? featuredRotatePattern : regularRotatePattern)[
+    index % (props.featured ? featuredRotatePattern.length : regularRotatePattern.length)
+  ]
+}
 
 const getItemStyle = (index: number) => ({
   '--item-index': index,
   '--showcase-item-lift': (props.featured ? featuredLiftPattern : regularLiftPattern)[
     index % (props.featured ? featuredLiftPattern.length : regularLiftPattern.length)
   ],
+  '--showcase-item-rotate': getStaticRotate(index),
 })
 
 // --- 🌟 动画核心逻辑开始 ---
@@ -42,12 +58,14 @@ const hoveredIndex = ref<number | null>(null)
 const getMotionKey = (index: number) => `${motionIdPrefix}-${index}`
 
 const getMotionState = (index: number): Variant => {
+  const staticRotate = parseFloat(getStaticRotate(index))
+
   // 1. 无悬停时：全部归位
   if (hoveredIndex.value === null) {
     return {
       y: 0,
       x: 0,
-      rotate: 0,
+      rotate: staticRotate,
       opacity: 1,
       transition: {
         type: 'spring',
@@ -111,7 +129,7 @@ const getMotionState = (index: number): Variant => {
   return {
     y: 0,
     x: 0,
-    rotate: 0,
+    rotate: staticRotate,
     opacity: 1,
     transition: {
       type: 'spring',
@@ -130,7 +148,7 @@ async function syncMotionState() {
   })
 }
 
-watch([hoveredIndex, visibleItems], () => {
+watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
   void syncMotionState()
 }, { immediate: true, flush: 'post' })
 // --- 🌟 动画核心逻辑结束 ---
@@ -151,7 +169,7 @@ watch([hoveredIndex, visibleItems], () => {
             :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
             v-motion="getMotionKey(index)"
-            :initial="{ y: 0, x: 0, rotate: 0, opacity: 1 }"
+            :initial="getMotionState(index)"
         >
           <HomeShowcaseCard
               :article="item"
@@ -204,7 +222,7 @@ watch([hoveredIndex, visibleItems], () => {
   }
 
   .home-showcase-rail--featured {
-    --showcase-rail-shift: clamp(10rem, 10vw, 5rem);
+    --showcase-rail-shift: clamp(11.6rem, 10vw, 5rem);
     --showcase-circle-size: min(50rem, 55vw);
     --showcase-hover-buffer: 30rem;
     --showcase-item-overlap: clamp(-45rem, -55vw, -50rem);
@@ -247,6 +265,10 @@ watch([hoveredIndex, visibleItems], () => {
 @media (prefers-reduced-motion: reduce) {
   .home-showcase-rail__viewport {
     scroll-behavior: auto;
+  }
+
+  .home-showcase-rail__item {
+    --showcase-item-rotate: 0deg;
   }
 
   /* 禁用动画偏好时，直接覆盖内联样式 */
