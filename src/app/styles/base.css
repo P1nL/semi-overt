@@ -150,17 +150,8 @@ html.dark #app::after {
     opacity: 1;
 }
 
-html.theme-switching::view-transition-group(root) {
-    animation-duration: 620ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-html.theme-switching::view-transition-old(root),
-html.theme-switching::view-transition-new(root) {
-    animation-duration: 620ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-    mix-blend-mode: normal;
-}
+/* View Transition API 已禁用（见 stores/ui.ts setDarkMode 注释）。
+   保留空规则防止未来误用时无样式兜底。 */
 
 html::-webkit-scrollbar {
     width: var(--scrollbar-size);
