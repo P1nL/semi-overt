@@ -7,12 +7,6 @@ import { localStore } from '@/shared/utils/storage'
 
 export type DrawerType = 'menu' | 'search' | null
 
-type DocumentWithViewTransition = Document & {
-    startViewTransition?: (callback: () => void) => {
-        finished: Promise<void>
-    }
-}
-
 function readDarkModeFromStorage() {
     return localStore?.get<boolean>(STORAGE_KEY.DARK_MODE, false) ?? false
 }
@@ -44,11 +38,6 @@ function markThemeSwitching(duration = 620) {
     ;(root as typeof root & { __themeSwitchTimer?: number }).__themeSwitchTimer = window.setTimeout(() => {
         root.classList.remove('theme-switching')
     }, duration)
-}
-
-function prefersReducedMotion() {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 export const useUiStore = defineStore('ui', () => {
@@ -131,20 +120,13 @@ export const useUiStore = defineStore('ui', () => {
             applyDarkMode(enabled)
         }
 
-        const doc = typeof document !== 'undefined' ? (document as DocumentWithViewTransition) : null
-
-        if (!doc?.startViewTransition || prefersReducedMotion()) {
-            markThemeSwitching()
-            commitTheme()
-            return
-        }
-
-        markThemeSwitching(700)
-        void doc.startViewTransition(() => {
-            commitTheme()
-        }).finished.catch(() => {
-            // Fall back silently if the browser cancels the transition.
-        })
+        // 不使用 View Transition API：
+        // 页面包含 filter:blur、isolation:isolate、复杂合成层的卡片，
+        // startViewTransition 截图时部分区域无法正确光栅化，导致闪白/缺失。
+        // 已有的 CSS transition 体系（theme-switching class + 540ms 过渡 +
+        // #app::before/::after 背景交叉淡入）足以提供平滑的主题切换效果。
+        markThemeSwitching()
+        commitTheme()
     }
 
     function toggleDarkMode() {
