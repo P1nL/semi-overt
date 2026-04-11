@@ -6,7 +6,6 @@ import { UserRoleBadge } from '@/entities/user/ui'
 import { ProfileEditButton } from '@/features/profile-edit'
 import { Avatar } from '@/shared/components'
 import { useAuthStore } from '@/stores/auth'
-import ProfileHeaderStats from './ProfileHeaderStats.vue'
 
 const props = defineProps<{
   profile: UserProfileVm
@@ -22,52 +21,27 @@ const isOwner = computed(
   () => authStore.user?.username === props.profile.username,
 )
 
-const visibleStats = computed(() => {
-  if (isOwner.value) return props.profile.stats
-
-  return props.profile.stats.filter((item) =>
-    item.key === 'approved' || item.key === 'totalWordCount',
-  )
-})
-
-const coverStyle = computed(() => {
-  if (!props.profile.coverUrl) return undefined
-
-  return {
-    backgroundImage: `url("${props.profile.coverUrl}")`,
-  }
-})
 </script>
 
 <template>
-  <section class="surface-1 relative overflow-hidden rounded-[var(--radius-xl)]">
-    <div class="absolute inset-0">
-      <div
-        v-if="profile.coverUrl"
-        class="absolute inset-x-4 top-4 h-48 scale-[1.02] rounded-[calc(var(--radius-xl)+0.5rem)] bg-cover bg-center opacity-16 blur-lg sm:inset-x-6 sm:top-6 sm:h-64 md:inset-x-8 md:top-8 md:h-72"
-        :style="coverStyle"
+  <section class="relative overflow-hidden rounded-[var(--radius-xl)]">
+    <div v-if="profile.coverUrl" class="absolute inset-0">
+      <img
+        :src="profile.coverUrl"
+        :alt="`${profile.displayName} cover`"
+        loading="eager"
+        decoding="async"
+        fetchpriority="high"
+        class="size-full object-cover"
       />
-      <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06)_42%,transparent)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03)_42%,transparent)]" />
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,113,227,0.16),transparent_46%)]" />
     </div>
 
     <div class="relative px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 md:px-8 md:pb-8 md:pt-8">
       <div
         v-if="profile.coverUrl"
-        class="relative mt-3 h-[18rem] overflow-hidden rounded-[calc(var(--radius-xl)+0.25rem)] border border-white/35 bg-[var(--color-surface-elevated)] shadow-[0_24px_60px_rgb(15_23_42_/_0.12)] sm:mt-4 sm:h-[22rem] md:h-[26rem]"
+        class="relative min-h-[22rem] sm:min-h-[26rem] md:min-h-[30rem]"
       >
-        <img
-          :src="profile.coverUrl"
-          :alt="`${profile.displayName} cover`"
-          loading="eager"
-          decoding="async"
-          fetchpriority="high"
-          class="absolute inset-0 size-full object-cover"
-        />
-        <div class="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,15,34,0.18),rgba(8,15,34,0.1)_34%,rgba(8,15,34,0.62))]" />
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_42%)]" />
-
-        <div class="absolute right-4 top-4 z-20 md:right-5 md:top-5">
+        <div class="absolute bottom-3 right-3 z-20 md:bottom-4 md:right-4">
           <ProfileEditButton
             v-if="isOwner"
             :profile="profile"
@@ -75,7 +49,7 @@ const coverStyle = computed(() => {
           />
         </div>
 
-        <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-4 pt-8 text-center sm:px-6 sm:pb-5 sm:pt-10 md:px-8 md:pb-6">
+        <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-10 pt-8 text-center sm:px-6 sm:pb-12 sm:pt-10 md:px-8 md:pb-14">
           <Avatar
             :src="profile.avatarUrl ?? undefined"
             :alt="profile.displayName"
@@ -113,8 +87,8 @@ const coverStyle = computed(() => {
         </div>
       </div>
 
-      <div v-else>
-        <div class="flex justify-end">
+      <div v-else class="relative">
+        <div class="absolute bottom-0.5 right-0.5 z-20 md:bottom-1 md:right-1">
           <ProfileEditButton
             v-if="isOwner"
             :profile="profile"
@@ -122,7 +96,7 @@ const coverStyle = computed(() => {
           />
         </div>
 
-        <div class="mt-2 flex flex-col items-center text-center">
+        <div class="mt-10 flex min-h-[18rem] flex-col items-center justify-end pb-8 text-center sm:mt-12 sm:min-h-[20rem] sm:pb-10 md:mt-14 md:min-h-[22rem] md:pb-12">
           <Avatar
             :src="profile.avatarUrl ?? undefined"
             :alt="profile.displayName"
@@ -160,9 +134,6 @@ const coverStyle = computed(() => {
         </div>
       </div>
 
-      <div class="mt-6 flex justify-center sm:mt-7">
-        <ProfileHeaderStats :stats="visibleStats" />
-      </div>
     </div>
   </section>
 </template>
