@@ -261,9 +261,10 @@ async function handleLogout() {
 
 <template>
   <div class="relative z-10 flex shrink-0 items-center gap-2">
+    <ThemeSwitch :show-label="false" class="hidden md:inline-flex" />
+
     <template v-if="authStore.isAuthenticated">
       <div class="flex items-center gap-1">
-        <ThemeSwitch :show-label="false" class="hidden md:inline-flex" />
 
         <div ref="draftMenuRef" class="relative">
           <button
