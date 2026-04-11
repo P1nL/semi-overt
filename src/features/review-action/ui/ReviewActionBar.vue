@@ -374,7 +374,7 @@ onClickOutside(barRef, () => {
       >
         <div
           v-if="activeReasonAction === option.value"
-          class="absolute z-20 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_96%,transparent)] p-4 shadow-[var(--shadow-lg)] backdrop-blur-xl max-md:fixed max-md:inset-x-4 max-md:bottom-[5.5rem] max-md:w-auto"
+          class="absolute z-20 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_96%,transparent)] p-4 shadow-[var(--shadow-lg)] backdrop-blur-xl max-md:fixed max-md:inset-x-4 max-md:bottom-[var(--header-height)] max-md:w-auto"
           :class="[
             popoverPlacement === 'top'
               ? 'bottom-[calc(100%+0.75rem)] right-0 origin-bottom-right'
