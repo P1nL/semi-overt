@@ -2,8 +2,6 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { ArticleCard } from '@/entities/article/ui'
-import { EmptyState } from '@/shared/components/base'
 import { usePendingReviewsQuery, useUserProfileQuery } from '@/shared/api/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -11,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { type ProfileArticleTab } from '@/stores/profile'
 import { AppHeader } from '@/widgets/app-header'
 import { ProfileHeader } from '@/widgets/profile-header'
+import { ProfileCardQueue } from '@/widgets/profile-card-queue'
 import { ProfileTabs } from '@/widgets/profile-tabs'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
@@ -19,12 +18,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const username = computed(() => String(route.params.username || '').trim())
+const defaultTab = computed<ProfileArticleTab>(() => (
+  authStore.user?.username === username.value ? 'all' : 'approved'
+))
 const activeTab = computed<ProfileArticleTab>(() => {
-  const rawTab = String(route.query.tab || 'approved').toLowerCase()
+  const rawTab = String(route.query.tab || defaultTab.value).toLowerCase()
   if (['all', 'approved', 'pending', 'returned', 'rejected', 'draft'].includes(rawTab)) {
     return rawTab as ProfileArticleTab
   }
-  return 'approved'
+  return defaultTab.value
 })
 
 const profileQuery = useUserProfileQuery(username, computed(() => ({
@@ -35,12 +37,6 @@ const profileQuery = useUserProfileQuery(username, computed(() => ({
 
 const profile = computed(() => profileQuery.data.value ?? null)
 const articles = computed(() => profile.value?.articles ?? [])
-const pageError = computed(() =>
-  profileQuery.error.value
-    ? getErrorMessage(profileQuery.error.value, '个人主页加载失败，请稍后重试。')
-    : '',
-)
-
 const tabCounts = computed(() => {
   const stats = profile.value?.stats || []
   const statusTotal = stats.reduce((sum, item) => {
@@ -79,8 +75,7 @@ const tabCounts = computed(() => {
 const hasResolvedProfile = computed(() => profile.value !== null)
 const contentState = computed(() => {
   if (!hasResolvedProfile.value && profileQuery.isFetching.value) return 'loading'
-  if (articles.value.length) return 'content'
-  return 'empty'
+  return null
 })
 
 const isOwnerProfile = computed(
@@ -102,7 +97,7 @@ const reviewQueueError = computed(() =>
 async function onTabChange(tab: ProfileArticleTab) {
   const nextQuery = {
     ...route.query,
-    tab: tab === 'approved' ? undefined : tab,
+    tab: tab === defaultTab.value ? undefined : tab,
   }
 
   await router.replace({
@@ -142,49 +137,91 @@ async function onTabChange(tab: ProfileArticleTab) {
         </p>
       </section>
 
-      <section class="surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4 md:p-5">
-        <ProfileTabs
-          :model-value="activeTab"
-          :counts="tabCounts"
-          :public-only="!isOwnerProfile"
-          @change="onTabChange"
-        />
-      </section>
+      <section class="profile-content-layout">
+        <aside class="profile-content-layout__tabs">
+          <ProfileTabs
+            :model-value="activeTab"
+            :counts="tabCounts"
+            :public-only="!isOwnerProfile"
+            orientation="vertical"
+            @change="onTabChange"
+          />
+        </aside>
 
-      <Transition name="content-fade" mode="out-in">
-        <div
-          v-if="contentState === 'loading'"
-          key="profile-loading"
-          class="content-loading-shell"
-        />
-
-        <div
-          v-else-if="contentState === 'content'"
-          key="profile-content"
-          class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
-        >
-          <div
-            v-for="(item, index) in articles"
-            :key="item.id"
-            class="content-rise-in"
-            :style="{ '--content-rise-delay': `${index * 55}ms` }"
-          >
-            <ArticleCard
-              :article="item"
-              :show-status="true"
-              :show-reason="true"
+        <div class="profile-content-layout__main">
+          <div class="profile-content-layout__tabs-mobile surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4">
+            <ProfileTabs
+              :model-value="activeTab"
+              :counts="tabCounts"
+              :public-only="!isOwnerProfile"
+              @change="onTabChange"
             />
           </div>
-        </div>
 
-        <div v-else key="profile-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
-          <EmptyState
-            title="还没有文章"
-            :description="pageError || '这个主页下暂时没有可见文章。'"
-            emoji="P"
-          />
+          <Transition name="content-fade" mode="out-in">
+            <div
+              v-if="contentState === 'loading'"
+              key="profile-loading"
+              class="content-loading-shell"
+            />
+
+            <div v-else key="profile-content">
+              <ProfileCardQueue :articles="articles" />
+            </div>
+          </Transition>
         </div>
-      </Transition>
+      </section>
     </main>
   </div>
 </template>
+
+<style scoped>
+.profile-content-layout {
+  display: block;
+}
+
+.profile-content-layout__tabs {
+  display: none;
+}
+
+.profile-content-layout__main {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .profile-content-layout {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem;
+  }
+
+  .profile-content-layout__tabs {
+    position: sticky;
+    top: calc(var(--header-height-md) + 1rem);
+    display: block;
+    border-radius: var(--radius-xl);
+    padding: 0.75rem;
+  }
+
+  .profile-content-layout__main {
+    position: relative;
+  }
+
+  .profile-content-layout__main::before {
+    content: '';
+    position: absolute;
+    left: -0.75rem;
+    top: 0.75rem;
+    bottom: 22rem;
+    width: 1px;
+    background: var(--color-profile-divider);
+    pointer-events: none;
+  }
+
+  .profile-content-layout__tabs-mobile {
+    display: none;
+  }
+}
+</style>
