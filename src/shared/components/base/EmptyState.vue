@@ -27,7 +27,7 @@ const sizeClassMap: Record<EmptyStateSize, string> = {
 
 <template>
   <div :class="cn('flex flex-col items-center justify-center rounded-[var(--radius-xl)] text-center', sizeClassMap[size])">
-    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_82%,transparent)] text-3xl shadow-[var(--shadow-xs)]" aria-hidden="true">{{ emoji }}</div>
+    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full  text-5xl" aria-hidden="true">{{ emoji }}</div>
     <h3 class="text-lg font-semibold tracking-[-0.02em] text-[var(--color-text)]">{{ title }}</h3>
     <p v-if="description" class="mt-3 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
       {{ description }}
