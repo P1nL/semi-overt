@@ -5,6 +5,9 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  optimizeDeps: {
+    include: ['gsap', 'gsap/dist/Flip'],
+  },
   build: {
     rollupOptions: {
       output: {
