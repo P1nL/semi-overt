@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
 
               <button
                 type="button"
-                class="surface-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors duration-200 hover:text-[var(--color-text)]"
+                class="flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent text-[var(--color-text-muted)] shadow-none transition-colors duration-200 hover:bg-transparent hover:text-[var(--color-text)]"
                 aria-label="关闭登录弹窗"
                 @click="closeDialog"
               >
