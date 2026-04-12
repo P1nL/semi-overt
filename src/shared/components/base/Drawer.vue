@@ -203,7 +203,13 @@ onBeforeUnmount(() => {
               </p>
             </div>
 
-            <IconButton ariaLabel="Close drawer" variant="ghost" size="sm" @click="close">
+            <IconButton
+              ariaLabel="Close drawer"
+              variant="ghost"
+              size="sm"
+              class="!border-transparent !bg-transparent !shadow-none hover:!border-transparent hover:!bg-transparent"
+              @click="close"
+            >
               <Icon name="close" :size="16" />
             </IconButton>
           </header>
