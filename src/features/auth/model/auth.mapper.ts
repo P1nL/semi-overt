@@ -15,11 +15,12 @@ export function mapLoginFormToDto(values: LoginFormValues) {
     }
 }
 
-export function mapRegisterFormToDto(values: RegisterFormValues) {
+export function mapRegisterFormToDto(values: RegisterFormValues, cfTurnstileToken: string) {
     return {
         email: values.email.trim(),
         username: values.username.trim(),
         password: values.password,
+        cfTurnstileToken,
     }
 }
 
