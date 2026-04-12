@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import AnimatedCloseIcon from './AnimatedCloseIcon.vue'
+import AnimatedSearchIcon from './AnimatedSearchIcon.vue'
+
 const props = withDefaults(
     defineProps<{
       name: string
@@ -38,12 +41,27 @@ const iconMap: Record<string, string[]> = {
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
 }
 
+const isAnimatedClose = computed(() => props.name === 'close' || props.name === 'x')
+const isAnimatedSearch = computed(() => props.name === 'search')
 const paths = computed(() => iconMap[props.name] ?? iconMap.info)
 const pxSize = computed(() => (typeof props.size === 'number' ? `${props.size}px` : props.size))
 </script>
 
 <template>
+  <AnimatedCloseIcon
+      v-if="isAnimatedClose"
+      :size="size"
+      :decorative="decorative"
+      :title="title"
+  />
+  <AnimatedSearchIcon
+      v-else-if="isAnimatedSearch"
+      :size="size"
+      :decorative="decorative"
+      :title="title"
+  />
   <svg
+      v-else
       xmlns="http://www.w3.org/2000/svg"
       :width="pxSize"
       :height="pxSize"
