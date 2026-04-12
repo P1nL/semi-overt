@@ -21,10 +21,14 @@ const isOwner = computed(
   () => authStore.user?.username === props.profile.username,
 )
 
+
 </script>
 
 <template>
-  <section class="relative overflow-hidden rounded-[var(--radius-xl)]">
+  <section
+    class="profile-header-reveal relative overflow-hidden rounded-[var(--radius-xl)]"
+  >
+    <!-- 有封面图 -->
     <div v-if="profile.coverUrl" class="absolute inset-0">
       <img
         :src="profile.coverUrl"
@@ -33,6 +37,7 @@ const isOwner = computed(
         decoding="async"
         fetchpriority="high"
         class="size-full object-cover"
+        style="mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 65%, transparent 100%); -webkit-mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 65%, transparent 100%);"
       />
     </div>
 
@@ -50,18 +55,20 @@ const isOwner = computed(
         </div>
 
         <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-10 pt-8 text-center sm:px-6 sm:pb-12 sm:pt-10 md:px-8 md:pb-14">
-          <Avatar
-            :src="profile.avatarUrl ?? undefined"
-            :alt="profile.displayName"
-            :name="profile.displayName"
-            :fallback="profile.displayName.slice(0, 1)"
-            size="xl"
-            rounded
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            class="size-[4.5rem] border-white/70 bg-white/15 text-xl text-white shadow-[0_18px_40px_rgb(15_23_42_/_0.3)] ring-4 ring-white/35 backdrop-blur-sm sm:size-20 sm:text-2xl md:size-24 md:text-3xl"
-          />
+          <div class="inline-flex">
+            <Avatar
+              :src="profile.avatarUrl ?? undefined"
+              :alt="profile.displayName"
+              :name="profile.displayName"
+              :fallback="profile.displayName.slice(0, 1)"
+              size="xl"
+              rounded
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
+              class="size-[4.5rem] border-white/70 bg-white/15 text-xl text-white shadow-[0_18px_40px_rgb(15_23_42_/_0.3)] ring-4 ring-white/35 backdrop-blur-sm sm:size-20 sm:text-2xl md:size-24 md:text-3xl"
+            />
+          </div>
 
           <div class="mt-3 space-y-2">
             <div>
@@ -87,6 +94,7 @@ const isOwner = computed(
         </div>
       </div>
 
+      <!-- 无封面图 -->
       <div v-else class="relative">
         <div class="absolute bottom-0.5 right-0.5 z-20 md:bottom-1 md:right-1">
           <ProfileEditButton
@@ -97,18 +105,20 @@ const isOwner = computed(
         </div>
 
         <div class="mt-10 flex min-h-[18rem] flex-col items-center justify-end pb-8 text-center sm:mt-12 sm:min-h-[20rem] sm:pb-10 md:mt-14 md:min-h-[22rem] md:pb-12">
-          <Avatar
-            :src="profile.avatarUrl ?? undefined"
-            :alt="profile.displayName"
-            :name="profile.displayName"
-            :fallback="profile.displayName.slice(0, 1)"
-            size="xl"
-            rounded
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            class="size-24 border-white/50 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-2xl text-[var(--color-text)] shadow-[0_18px_40px_rgb(15_23_42_/_0.16)] ring-4 ring-white/40 sm:size-28 sm:text-3xl md:size-36 md:text-4xl"
-          />
+          <div class="inline-flex">
+            <Avatar
+              :src="profile.avatarUrl ?? undefined"
+              :alt="profile.displayName"
+              :name="profile.displayName"
+              :fallback="profile.displayName.slice(0, 1)"
+              size="xl"
+              rounded
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
+              class="size-24 border-white/50 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-2xl text-[var(--color-text)] shadow-[0_18px_40px_rgb(15_23_42_/_0.16)] ring-4 ring-white/40 sm:size-28 sm:text-3xl md:size-36 md:text-4xl"
+            />
+          </div>
 
           <div class="mt-4 space-y-3 sm:mt-5">
             <div>
@@ -135,5 +145,8 @@ const isOwner = computed(
       </div>
 
     </div>
+
+
   </section>
 </template>
+
