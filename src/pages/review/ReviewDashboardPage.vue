@@ -27,7 +27,7 @@ function refreshPending() {
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
-        <SectionHeader title="Review queue" description="Process pending articles and keep the editorial flow moving.">
+        <SectionHeader title="Review queue" description="">
           <template #actions>
             <Button type="button" variant="secondary" pill class="w-full sm:w-auto" :loading="pendingReviewsQuery.isFetching.value" @click="refreshPending">
               Refresh queue
