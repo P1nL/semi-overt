@@ -103,10 +103,9 @@ onBeforeUnmount(() => {
           <div class="pointer-events-auto">
             <IconButton
               ariaLabel="Close"
-              variant="secondary"
+              variant="ghost"
               size="lg"
-              pill
-              class="bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_92%,transparent)] shadow-[0_12px_30px_rgb(15_23_42_/_0.12)] backdrop-blur-xl"
+              class="!border-transparent !bg-transparent !shadow-none hover:!border-transparent hover:!bg-transparent"
               @click="emit('close')"
             >
               <Icon name="close" :size="18" />
