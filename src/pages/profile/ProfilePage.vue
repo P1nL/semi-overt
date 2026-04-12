@@ -120,7 +120,7 @@ async function onTabChange(tab: ProfileArticleTab) {
         v-if="showAdminReviewQueue"
         class="surface-1 rounded-[var(--radius-xl)] p-4 md:p-5"
       >
-        <SectionHeader title="待审核文章" description="仅管理员可见，点击卡片可直接进入审核。" compact />
+        <SectionHeader title="审核" description="" compact />
 
         <div class="mt-4">
           <ReviewQueueStrip
