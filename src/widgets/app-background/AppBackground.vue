@@ -39,7 +39,7 @@ type LightArtboard = {
 }
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const THEME_TRANSITION_DURATION = 420
+const THEME_TRANSITION_DURATION = 540
 const DARK_TRAVEL_SCALE = 0.72
 const DARK_PULSE_SCALE = 0.78
 const LIGHT_GRID_DRIFT_SCALE = 0.8
@@ -79,11 +79,16 @@ const lightPoints: MeshPoint[] = [
 ]
 
 const darkPoints: MeshPoint[] = [
-  { color: [41, 76, 255], x: 0.18, y: 0.17, r: 0.34, ax: 0.06, ay: 0.048, dx: 0.02, dy: 0.012, sx: 0.16, sy: 0.12, pulse: 0.42, ox: 0.4, oy: 1.1 },
-  { color: [77, 53, 196], x: 0.79, y: 0.24, r: 0.31, ax: 0.034, ay: 0.026, dx: 0.012, dy: 0.011, sx: 0.11, sy: 0.14, pulse: 0.36, ox: 1.8, oy: 0.6 },
-  { color: [20, 34, 68], x: 0.5, y: 0.52, r: 0.48, ax: 0.02, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.09, sy: 0.1, pulse: 0.28, ox: 2.7, oy: 1.4 },
-  { color: [16, 84, 206], x: 0.38, y: 0.7, r: 0.36, ax: 0.03, ay: 0.024, dx: 0.012, dy: 0.01, sx: 0.13, sy: 0.17, pulse: 0.39, ox: 3.6, oy: 1.8 },
-  { color: [124, 72, 255], x: 0.66, y: 0.5, r: 0.24, ax: 0.022, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.15, sy: 0.12, pulse: 0.52, ox: 4.1, oy: 2.4 },
+  // color1: 18,113,255 — 亮蓝，主光晕，大范围漂移
+  { color: [18, 113, 255], x: 0.18, y: 0.17, r: 0.34, ax: 0.06, ay: 0.048, dx: 0.02, dy: 0.012, sx: 0.16, sy: 0.12, pulse: 0.42, ox: 0.4, oy: 1.1 },
+  // color2: 107,74,255 — 蓝紫，右上角
+  { color: [107, 74, 255], x: 0.79, y: 0.24, r: 0.31, ax: 0.034, ay: 0.026, dx: 0.012, dy: 0.011, sx: 0.11, sy: 0.14, pulse: 0.36, ox: 1.8, oy: 0.6 },
+  // color5: 80,47,122 — 深紫，中央大底色光晕
+  { color: [80, 47, 122], x: 0.5, y: 0.52, r: 0.48, ax: 0.02, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.09, sy: 0.1, pulse: 0.28, ox: 2.7, oy: 1.4 },
+  // color4: 50,160,220 — 天蓝，左下
+  { color: [50, 160, 220], x: 0.38, y: 0.7, r: 0.36, ax: 0.03, ay: 0.024, dx: 0.012, dy: 0.01, sx: 0.13, sy: 0.17, pulse: 0.39, ox: 3.6, oy: 1.8 },
+  // color3: 100,100,255 — 中蓝紫，右中，cluster 小光晕
+  { color: [100, 100, 255], x: 0.66, y: 0.5, r: 0.24, ax: 0.022, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.15, sy: 0.12, pulse: 0.52, ox: 4.1, oy: 2.4 },
 ]
 
 let frameId = 0
@@ -194,10 +199,11 @@ function resizeCanvas() {
 
 function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, theme: MeshTheme) {
   if (theme === 'dark') {
-    const gradient = ctx.createLinearGradient(0, 0, 0, height)
-    gradient.addColorStop(0, '#08152b')
-    gradient.addColorStop(0.56, '#0d1a3d')
-    gradient.addColorStop(1, '#15153c')
+    // 对齐参考文件：--color-bg1: rgb(8,10,15)  --color-bg2: rgb(0,17,32)
+    const gradient = ctx.createLinearGradient(0, 0, width * 0.6, height)
+    gradient.addColorStop(0, 'rgb(0, 17, 32)')
+    gradient.addColorStop(0.52, 'rgb(5, 12, 22)')
+    gradient.addColorStop(1, 'rgb(8, 10, 15)')
 
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
@@ -611,6 +617,13 @@ function drawMeshLayer(
     drawPoint(ctx, sample.x, sample.y, sample.radius, points[index].color, sample.alpha)
   })
 
+  // interactive 鼠标跟随光晕：color-interactive = 140,100,255（仅暗色）
+  if (theme === 'dark' && pointer.active) {
+    const interactiveRadius = Math.min(width, height) * 0.46
+    const interactiveAlpha = Math.min(0.7, pointer.wakeEnergy * 0.12 + 0.28)
+    drawPoint(ctx, pointer.wakeX, pointer.wakeY, interactiveRadius, [140, 100, 255], interactiveAlpha)
+  }
+
   ctx.restore()
 }
 
@@ -810,7 +823,9 @@ onBeforeUnmount(() => {
 }
 
 .app-background__overlay {
-  background: none;
+  background:
+    radial-gradient(ellipse 70% 88% at 50% 38%, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.08) 42%, rgb(255 255 255 / 0.03) 74%, transparent 92%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.02));
 }
 
 .app-background__noise {
@@ -822,6 +837,16 @@ html.dark .app-background__overlay {
     radial-gradient(circle at center, transparent 34%, rgb(0 0 0 / 0.15) 100%),
     linear-gradient(180deg, rgb(255 255 255 / 0.02), rgb(0 0 0 / 0.12));
 }
+
+/* 主题切换期间禁用 overlay 的 backdrop-filter，
+   避免底层 canvas 过渡时触发逐帧 GPU 重合成导致闪烁 */
+html.theme-switching .app-background__overlay {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* settling 阶段（无 backdrop-filter，保留规则占位供后续扩展） */
+html.theme-settling .app-background__overlay {}
 
 html.dark .app-background__noise {
   opacity: 0.032;
