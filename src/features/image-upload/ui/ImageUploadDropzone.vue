@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import AnimatedUploadFileIcon from '@/shared/components/base/AnimatedUploadFileIcon.vue'
 import { Button } from '@/shared/components/base'
 import { useToast } from '@/shared/composables/useToast'
 import { ARTICLE_IMAGE_ACCEPTED_EXTENSIONS } from '@/shared/constants/article'
@@ -131,11 +132,21 @@ async function onInputChange(event: Event) {
           size="sm"
           :loading="uploading"
           :disabled="disabledState"
+          aria-label="选择图片"
+          icon-only
+          class="image-upload-dropzone__button"
           @click.stop="triggerPicker"
       >
-        选择图片
+        <AnimatedUploadFileIcon size="1.05rem" :decorative="true" />
       </Button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.image-upload-dropzone__button {
+  width: 3rem;
+  border-radius: var(--radius-lg);
+}
+</style>
 
