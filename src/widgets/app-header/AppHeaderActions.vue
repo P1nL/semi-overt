@@ -6,7 +6,9 @@ import { onClickOutside, useMediaQuery } from '@vueuse/core'
 import { DraftBoxDrawer } from '@/features/draft-box'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { authApi } from '@/shared/api/modules/auth'
-import { Avatar, Button } from '@/shared/components/base'
+import { Avatar } from '@/shared/components/base'
+import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
+import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -279,65 +281,7 @@ async function handleLogout() {
             @click="toggleDraftMenu"
             @keydown="onDraftTriggerKeydown"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 254 204"
-              class="draft-box-icon"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="draftBodyGrad" x1="127" y1="34" x2="127" y2="187" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stop-color="#5D4A71"/>
-                  <stop offset="1" stop-color="#564967"/>
-                </linearGradient>
-                <linearGradient id="draftInnerGrad" x1="127" y1="35" x2="127" y2="116" gradientUnits="userSpaceOnUse">
-                  <stop offset="0" stop-color="#58496A"/>
-                  <stop offset="1" stop-color="#473B59"/>
-                </linearGradient>
-                <linearGradient id="draftYellowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#FFD95B"/>
-                  <stop offset="1" stop-color="#F5C94A"/>
-                </linearGradient>
-                <linearGradient id="draftGreenGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#57DD87"/>
-                  <stop offset="1" stop-color="#39C970"/>
-                </linearGradient>
-                <linearGradient id="draftBlueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#5896EE"/>
-                  <stop offset="1" stop-color="#4280DF"/>
-                </linearGradient>
-                <linearGradient id="draftRedGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#FF5374"/>
-                  <stop offset="1" stop-color="#FB4066"/>
-                </linearGradient>
-                <linearGradient id="draftHandleOuter" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#9168DE"/>
-                  <stop offset="1" stop-color="#7B58C5"/>
-                </linearGradient>
-                <linearGradient id="draftHandleInner" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#C9B8F2"/>
-                  <stop offset="1" stop-color="#B09CE6"/>
-                </linearGradient>
-              </defs>
-              <rect x="34" y="36" width="174" height="151" rx="14" fill="url(#draftBodyGrad)"/>
-              <rect x="44" y="36" width="154" height="80" rx="10" fill="url(#draftInnerGrad)"/>
-              <rect x="48" y="41" width="146" height="70" rx="8" fill="#6A5B86"/>
-              <rect x="34" y="103" width="174" height="84" rx="0 0 14 14" fill="#594C6A"/>
-              <path d="M34 103H208V173C208 180.732 201.732 187 194 187H48C40.268 187 34 180.732 34 173V103Z" fill="#594C6A"/>
-              <rect x="44" y="44" width="9" height="64" rx="4.5" fill="#4F4261"/>
-              <rect x="189" y="44" width="9" height="64" rx="4.5" fill="#4F4261"/>
-              <rect x="131" y="23" width="40" height="24" rx="7" fill="url(#draftGreenGrad)"/>
-              <rect x="86" y="35" width="104" height="54" rx="14" fill="url(#draftYellowGrad)"/>
-              <rect x="102" y="48" width="38" height="16" rx="5.5" fill="url(#draftBlueGrad)"/>
-              <rect x="67" y="60" width="123" height="48" rx="14" fill="url(#draftYellowGrad)"/>
-              <rect x="71" y="72" width="38" height="16" rx="5.5" fill="url(#draftRedGrad)"/>
-              <rect x="53" y="83" width="137" height="29" rx="10" fill="url(#draftYellowGrad)"/>
-              <rect x="95" y="134" width="51" height="38" rx="9" fill="url(#draftHandleOuter)"/>
-              <rect x="101" y="140" width="39" height="26" rx="6" fill="url(#draftHandleInner)"/>
-              <path d="M98 37H178" stroke="#FFE07D" stroke-width="2" stroke-linecap="round" opacity="0.28"/>
-              <path d="M80 62H183" stroke="#FFE07D" stroke-width="2" stroke-linecap="round" opacity="0.22"/>
-              <path d="M66 85H182" stroke="#FFE07D" stroke-width="2" stroke-linecap="round" opacity="0.18"/>
-            </svg>
+            <AnimatedDraftBoxIcon size="1.55rem" class="draft-box-icon" />
 
           </button>
 
@@ -426,9 +370,14 @@ async function handleLogout() {
     </template>
 
     <template v-else>
-      <Button type="button" size="sm" pill variant="secondary" class="max-md:min-h-11" @click="authDialogOpen = true">
-        登录 / 注册
-      </Button>
+      <button
+        type="button"
+        class="tool-icon-button auth-trigger-button"
+        aria-label="登录 / 注册"
+        @click="authDialogOpen = true"
+      >
+        <AnimatedAttributionIcon size="1.45rem" title="登录 / 注册" :decorative="false" />
+      </button>
     </template>
 
     <AuthDialog v-model="authDialogOpen" initial-mode="login" />
@@ -467,6 +416,11 @@ async function handleLogout() {
   width: 1.55rem;
   height: auto;
   display: block;
+}
+
+.auth-trigger-button {
+  min-height: 2.85rem;
+  min-width: 2.85rem;
 }
 
 .tool-icon-button:active,
