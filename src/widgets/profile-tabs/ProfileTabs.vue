@@ -154,8 +154,8 @@ function selectTab(value: ProfileArticleTab) {
         : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'"
       @click="selectTab(item.value)"
     >
-      <span>{{ item.label }}</span>
-      <span class="text-[11px] opacity-60">{{ item.badge }}</span>
+      <span class="ptab-label">{{ item.label }}</span>
+      <span class="ptab-count">{{ item.badge }}</span>
     </button>
   </div>
 
@@ -179,8 +179,8 @@ function selectTab(value: ProfileArticleTab) {
       :class="item.value === modelValue ? 'ptab-v--active' : 'ptab-v--idle'"
       @click="selectTab(item.value)"
     >
-      <span>{{ item.label }}</span>
-      <span class="text-[11px] opacity-60">{{ item.badge }}</span>
+      <span class="ptab-label">{{ item.label }}</span>
+      <span class="ptab-count">{{ item.badge }}</span>
     </button>
   </div>
 </template>
@@ -212,19 +212,35 @@ function selectTab(value: ProfileArticleTab) {
   font-weight: 500;
   letter-spacing: -0.01em;
   border-radius: var(--radius-md);
-  transition: color 160ms ease, background-color 160ms ease;
+  transition: color 240ms ease-in-out;
+}
+
+.ptab-label {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: color 240ms ease-in-out;
+}
+
+.ptab-count {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
 }
 
 .ptab-v--active {
   color: var(--color-text);
 }
 
+.ptab-v--active .ptab-label {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
 .ptab-v--idle {
   color: var(--color-text-muted);
 }
 
-.ptab-v--idle:hover {
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+.ptab-v--idle:hover .ptab-label {
+  color: var(--color-primary);
 }
 </style>
