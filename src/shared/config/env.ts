@@ -14,7 +14,7 @@ function normalizeBasePath(value: string | undefined, fallback = '/') {
 }
 
 export const ENV: AppEnv = {
-    appName: import.meta.env.VITE_APP_NAME?.trim() || 'Now',
+    appName: import.meta.env.VITE_APP_NAME?.trim() || 'Semi-Overt',
     apiBaseUrl: import.meta.env.VITE_API_BASE_URL?.trim() || '/api/v1',
     assetBaseUrl: import.meta.env.VITE_ASSET_BASE_URL?.trim() || '',
     routerBase: normalizeBasePath(import.meta.env.BASE_URL, '/'),
