@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import { Checkbox, Input } from '@/shared/components/base'
+import AnimatedDisabledIcon from '@/shared/components/base/AnimatedDisabledIcon.vue'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -13,6 +14,7 @@ import { authApi } from '@/features/auth/api'
 import { mapAuthRespToSession, mapLoginFormToDto } from '@/features/auth/model'
 import type { AuthFieldErrors, LoginFormValues } from '@/features/auth/model'
 import AuthActionButton from './AuthActionButton.vue'
+import PasswordToggleButton from './PasswordToggleButton.vue'
 
 const emit = defineEmits<{
   success: []
@@ -39,6 +41,7 @@ const touched = reactive<Record<keyof LoginFormValues, boolean>>({
 const errors = reactive<AuthFieldErrors<LoginFormValues>>({})
 const submitting = ref(false)
 const submitError = ref('')
+const passwordVisible = ref(false)
 
 function validateAccount(value: string): string {
   if (!value.trim()) return '请输入邮箱或用户名'
@@ -77,6 +80,10 @@ function validateAll(): boolean {
   return nextErrors.every((item) => !item)
 }
 
+function delay(ms: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, ms))
+}
+
 async function handleSubmit() {
   submitError.value = ''
 
@@ -89,6 +96,9 @@ async function handleSubmit() {
     authStore.setAuth(mapAuthRespToSession(result), {
       persistence: form.rememberMe ? 'local' : 'session',
     })
+
+    // 让转圈动效多转一会儿再跳转
+    await delay(900)
 
     toast.success('登录成功')
 
@@ -103,7 +113,6 @@ async function handleSubmit() {
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : '登录失败，请稍后重试'
     toast.error(submitError.value)
-  } finally {
     submitting.value = false
   }
 }
@@ -130,12 +139,19 @@ async function handleSubmit() {
       <Input
         id="login-password"
         v-model="form.password"
-        type="password"
+        :type="passwordVisible ? 'text' : 'password'"
         placeholder="请输入密码"
         :error="touched.password ? errors.password : ''"
         autocomplete="current-password"
         @blur="onBlur('password')"
-      />
+      >
+        <template #trailing>
+          <PasswordToggleButton
+            :visible="passwordVisible"
+            @toggle="passwordVisible = !passwordVisible"
+          />
+        </template>
+      </Input>
       <FieldError :message="touched.password ? errors.password : ''" />
     </FormField>
 
@@ -165,8 +181,10 @@ async function handleSubmit() {
         type="submit"
         :loading="submitting"
         :disabled="submitting || hasErrors"
+        icon-only
+        aria-label="登录"
       >
-        登录
+        <AnimatedDisabledIcon size="1.5rem" title="登录" :decorative="false" />
       </AuthActionButton>
     </div>
 
