@@ -67,6 +67,7 @@ export interface RegisterReqDto {
     email: string
     username: string
     password: string
+    cfTurnstileToken: string
 }
 
 export interface ForgotPasswordReqDto {
