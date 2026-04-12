@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { Input } from '@/shared/components/base'
+import AnimatedDisabledIcon from '@/shared/components/base/AnimatedDisabledIcon.vue'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -13,6 +14,10 @@ import { authApi } from '@/features/auth/api'
 import { mapAuthRespToSession, mapRegisterFormToDto } from '@/features/auth/model'
 import type { AuthFieldErrors, RegisterFormValues } from '@/features/auth/model'
 import AuthActionButton from './AuthActionButton.vue'
+import TurnstileWidget from './TurnstileWidget.vue'
+
+// 替换为实际 Site Key
+const TURNSTILE_SITE_KEY = '0x4AAAAAAC73EXynsyIK3EcJ'
 
 const emit = defineEmits<{
   success: []
@@ -40,6 +45,10 @@ const touched = reactive<Record<keyof RegisterFormValues, boolean>>({
 const errors = reactive<AuthFieldErrors<RegisterFormValues>>({})
 const submitting = ref(false)
 const submitError = ref('')
+
+const turnstileEl = ref<InstanceType<typeof TurnstileWidget> | null>(null)
+const turnstileToken = ref('')
+const turnstileError = ref(false)
 
 function validateEmail(value: string): string {
   if (!value.trim()) return '请输入邮箱'
@@ -108,16 +117,27 @@ function validateAll(): boolean {
   return nextErrors.every((item) => !item)
 }
 
+function delay(ms: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, ms))
+}
+
 async function handleSubmit() {
   submitError.value = ''
 
   if (!validateAll()) return
 
+  if (!turnstileToken.value) {
+    turnstileError.value = true
+    return
+  }
+
   submitting.value = true
 
   try {
-    const result = await authApi.register(mapRegisterFormToDto(form))
+    const result = await authApi.register(mapRegisterFormToDto(form, turnstileToken.value))
     authStore.setAuth(mapAuthRespToSession(result))
+
+    await delay(900)
 
     toast.success('注册成功，已自动登录')
     await router.push({ name: ROUTE_NAME.HOME })
@@ -126,7 +146,10 @@ async function handleSubmit() {
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : '注册失败，请稍后重试'
     toast.error(submitError.value)
-  } finally {
+    // token 已消耗或验证失败，重置 widget
+    turnstileToken.value = ''
+    turnstileError.value = false
+    turnstileEl.value?.reset()
     submitting.value = false
   }
 }
@@ -190,6 +213,19 @@ async function handleSubmit() {
       <FieldError :message="touched.confirmPassword ? errors.confirmPassword : ''" />
     </FormField>
 
+    <div class="flex flex-col items-center gap-1.5">
+      <TurnstileWidget
+        ref="turnstileEl"
+        :site-key="TURNSTILE_SITE_KEY"
+        @verified="token => { turnstileToken = token; turnstileError = false }"
+        @expired="() => { turnstileToken = ''; turnstileError = false }"
+        @error="() => { turnstileToken = ''; turnstileError = false }"
+      />
+      <p v-if="turnstileError" class="text-xs text-[var(--color-danger)]">
+        请完成安全验证
+      </p>
+    </div>
+
     <InlineMessage
       v-if="submitError"
       tone="error"
@@ -201,8 +237,10 @@ async function handleSubmit() {
         type="submit"
         :loading="submitting"
         :disabled="submitting || hasErrors"
+        icon-only
+        aria-label="注册"
       >
-        注册
+        <AnimatedDisabledIcon size="1.5rem" title="注册" :decorative="false" />
       </AuthActionButton>
     </div>
 
