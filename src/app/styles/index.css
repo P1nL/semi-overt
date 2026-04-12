@@ -68,7 +68,6 @@
 
     .surface-1 {
         background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
-        border: 1px solid color-mix(in srgb, var(--color-border) 80%, white 15%);
         box-shadow: var(--shadow-surface-md);
         backdrop-filter: blur(var(--backdrop-blur)) saturate(180%);
     }
@@ -84,8 +83,7 @@
         background: color-mix(in srgb, var(--color-surface-glass-strong) 96%, transparent);
         border: 1px solid color-mix(in srgb, var(--color-border) 16%, transparent);
         box-shadow:
-                0 4px 14px rgb(15 23 42 / 0.018),
-                inset 0 1px 0 rgb(255 255 255 / 0.28);
+                0 4px 14px rgb(15 23 42 / 0.018);
         backdrop-filter: blur(var(--backdrop-blur-soft)) saturate(160%);
     }
 
@@ -114,6 +112,17 @@
         animation: content-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
         animation-delay: var(--content-rise-delay, 0ms);
         will-change: transform, opacity;
+    }
+
+    /* 主题切换期间：content-rise-in 基础样式 opacity:0，
+       由动画 fill 到最终态。html class 变化可能重触发动画，
+       导致元素闪回 opacity:0。强制保持最终态防止闪烁。
+       settling 阶段同样保持，避免 switching→settling class 切换时重触发。 */
+    html.theme-switching .content-rise-in,
+    html.theme-settling .content-rise-in {
+        opacity: 1 !important;
+        transform: none !important;
+        animation-play-state: paused !important;
     }
 
     .content-card-shell {
@@ -246,19 +255,31 @@
         box-shadow: var(--shadow-glass-card-compact-hover);
     }
 
+    /* 主题切换期间：暂停所有 backdrop-filter 玻璃拟态效果。
+       底层背景（canvas + #app 伪元素）在同时过渡，backdrop-filter 会导致
+       每个使用它的元素每帧都触发 GPU 重合成，叠加后产生可见闪烁。 */
+    html.theme-switching .surface-1,
+    html.theme-switching .surface-2,
+    html.theme-switching .control-surface,
+    html.theme-switching .content-card-shell {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* settling 阶段：颜色过渡已完成，让 backdrop-filter 平滑恢复 */
+    html.theme-settling .surface-1,
+    html.theme-settling .surface-2,
+    html.theme-settling .control-surface,
+    html.theme-settling .content-card-shell {
+        transition: backdrop-filter 320ms ease-out, -webkit-backdrop-filter 320ms ease-out;
+    }
+
     @media (prefers-reduced-motion: reduce) {
         html {
             scroll-behavior: auto;
         }
 
-        html.theme-switching body,
-        html.theme-switching #app,
-        html.theme-switching button,
-        html.theme-switching input,
-        html.theme-switching textarea,
-        html.theme-switching select,
-        html.theme-switching a,
-        html.theme-switching svg,
+        html.theme-switching *,
         html.theme-switching *::before,
         html.theme-switching *::after,
         .page-fade-enter-active,
