@@ -99,12 +99,9 @@ function onClear() {
           @keydown="onKeydown"
       />
 
-      <span
-          v-if="$slots.trailing && !(clearable && model)"
-          class="pointer-events-none absolute inset-y-0 right-4 inline-flex items-center text-[var(--color-text-muted)]"
-      >
+      <template v-if="$slots.trailing && !(clearable && model)">
         <slot name="trailing" />
-      </span>
+      </template>
 
       <IconButton
           v-if="clearable && model"
