@@ -153,7 +153,7 @@ watch(
             ariaLabel="关闭编辑资料"
             variant="ghost"
             size="sm"
-            class="mt-1"
+            class="mt-1 !border-transparent !bg-transparent !shadow-none hover:!border-transparent hover:!bg-transparent"
             @click="closeDialog"
           >
             <Icon name="close" :size="16" />
