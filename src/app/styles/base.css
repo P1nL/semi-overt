@@ -34,14 +34,13 @@ body {
     min-width: 320px;
 }
 
-html.theme-switching body,
-html.theme-switching #app,
-html.theme-switching button,
-html.theme-switching input,
-html.theme-switching textarea,
-html.theme-switching select,
-html.theme-switching a,
-html.theme-switching svg,
+
+
+/* 主题切换期间：为所有元素注入颜色平滑过渡。
+   使用 * 通配符确保无遗漏（div, span, p, h1-h6, section 等内容元素
+   之前未被覆盖，导致颜色/背景瞬变闪烁）。
+   该规则仅在 theme-switching 期间（580ms）生效，性能影响可忽略。 */
+html.theme-switching *,
 html.theme-switching *::before,
 html.theme-switching *::after {
     transition:
@@ -50,8 +49,7 @@ html.theme-switching *::after {
             color 540ms cubic-bezier(0.22, 1, 0.36, 1),
             fill 540ms cubic-bezier(0.22, 1, 0.36, 1),
             stroke 540ms cubic-bezier(0.22, 1, 0.36, 1),
-            box-shadow 540ms cubic-bezier(0.22, 1, 0.36, 1),
-            backdrop-filter 540ms cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow 540ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body,
@@ -123,23 +121,28 @@ textarea {
     inset: 0;
     pointer-events: none;
     z-index: -1;
-    transition: opacity 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 540ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 #app::before {
     opacity: 1;
     background:
-            radial-gradient(circle at top, rgb(0 113 227 / 0.12), transparent 38%),
-            radial-gradient(circle at 85% 18%, rgb(0 113 227 / 0.07), transparent 24%),
+            radial-gradient(ellipse 70% 50% at 20% 10%, rgb(0 113 227 / 0.18), transparent),
+            radial-gradient(ellipse 50% 40% at 80% 5%, rgb(100 180 255 / 0.13), transparent),
+            radial-gradient(ellipse 60% 50% at 60% 80%, rgb(52 199 89 / 0.07), transparent),
             linear-gradient(180deg, #fbfbfd, #f5f5f7);
+    filter: blur(48px);
+    transform: scale(1.15);
 }
 
 #app::after {
     opacity: 0;
+    /* 深色背景：对齐参考文件 --color-bg1/bg2 的深蓝海军蓝色调 + 蓝紫光晕 */
     background:
-            radial-gradient(circle at top, rgb(41 151 255 / 0.14), transparent 42%),
-            radial-gradient(circle at 82% 16%, rgb(41 151 255 / 0.1), transparent 28%),
-            linear-gradient(180deg, #11141b, #0b0d12);
+            radial-gradient(ellipse 60% 40% at 20% 0%, rgba(18, 113, 255, 0.18), transparent),
+            radial-gradient(ellipse 45% 35% at 80% 8%, rgba(107, 74, 255, 0.14), transparent),
+            radial-gradient(ellipse 55% 45% at 50% 90%, rgba(80, 47, 122, 0.12), transparent),
+            linear-gradient(160deg, rgb(0 17 32), rgb(8 10 15));
 }
 
 html.dark #app::before {
@@ -148,6 +151,25 @@ html.dark #app::before {
 
 html.dark #app::after {
     opacity: 1;
+}
+
+/* 主题切换期间：
+   1. 禁用 #app::before 的 filter:blur(48px)，
+      该 filter 在 opacity 交叉淡入时会触发昂贵的逐帧光栅化。
+   2. 同时禁用 ::before/::after 的 opacity 过渡——
+      让 canvas 背景的交叉淡入（540ms easeOutQuart）完全接管视觉切换，
+      避免伪元素 opacity 与 filter 禁用不同步导致的锐利化闪烁。 */
+html.theme-switching #app::before,
+html.theme-switching #app::after {
+    filter: none;
+    transform: none;
+    transition: opacity 0ms !important;
+}
+
+/* settling 阶段：颜色过渡已完成，让 filter/transform 平滑恢复 */
+html.theme-settling #app::before,
+html.theme-settling #app::after {
+    transition: filter 320ms ease-out, transform 320ms ease-out;
 }
 
 /* View Transition API 已禁用（见 stores/ui.ts setDarkMode 注释）。
