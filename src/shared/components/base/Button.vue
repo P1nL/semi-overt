@@ -89,8 +89,8 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
       @click="onClick"
   >
     <Spinner v-if="loading" :size="size === 'lg' ? 'md' : 'sm'" />
-    <slot v-else-if="hasLeftIcon" name="icon" />
-    <slot />
+    <slot v-if="!loading && hasLeftIcon" name="icon" />
+    <slot v-if="!loading" />
     <slot v-if="!loading && hasRightIcon" name="trailing" />
   </button>
 </template>
