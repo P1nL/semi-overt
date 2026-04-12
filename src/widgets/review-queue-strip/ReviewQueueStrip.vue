@@ -40,8 +40,8 @@ withDefaults(
     <EmptyState
         v-else
         title="No pending reviews"
-        description="The review queue is clear for now."
-        emoji="R"
+        description=""
+        emoji="🙂"
         size="sm"
     />
   </section>
