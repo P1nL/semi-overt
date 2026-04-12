@@ -313,7 +313,6 @@ onClickOutside(barRef, () => {
   >
     <Button
       type="button"
-      pill
       :variant="approvePending ? 'success' : 'secondary'"
       :disabled="!canAct"
       :loading="loadingAction === REVIEW_ACTION.APPROVE"
@@ -343,7 +342,6 @@ onClickOutside(barRef, () => {
     >
       <Button
         type="button"
-        pill
         :variant="activeReasonAction === option.value ? 'warning' : 'secondary'"
         :disabled="!canAct"
         class="review-action-button"
@@ -454,12 +452,17 @@ onClickOutside(barRef, () => {
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
     width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 220ms ease,
-    filter 220ms ease,
-    background-color 220ms ease,
-    border-color 220ms ease,
-    color 220ms ease;
+    box-shadow 280ms ease-in-out,
+    filter 280ms ease-in-out,
+    background-color 320ms ease-in-out,
+    border-color 320ms ease-in-out,
+    color 280ms ease-in-out;
   will-change: transform, width;
+}
+
+.review-action-button:hover,
+.review-action-button:active {
+  transform: none;
 }
 
 .review-action-button--armed {
