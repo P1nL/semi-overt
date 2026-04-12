@@ -27,6 +27,7 @@ const STACK_X_STEP = 100
 const STACK_Y_STEP = 13
 const MAX_VISIBLE_CARDS = 5
 const WHEEL_THRESHOLD = 60
+const GRID_THRESHOLD = 5
 
 /**
  * visualOrder 是一个「逻辑堆叠数组」：
@@ -57,6 +58,7 @@ const SWIPE_THRESHOLD = 48
 
 const count = computed(() => displayedArticles.value.length)
 const hasArticles = computed(() => count.value > 0)
+const isGridMode = computed(() => count.value > GRID_THRESHOLD)
 const desktopMode = computed(() => hasArticles.value && !isCompactViewport.value)
 
 /** 当前视觉顶层卡片的原始索引 */
@@ -132,6 +134,7 @@ function getCardEl(originalIndex: number): HTMLElement | null {
  * 不移动 DOM，只改 CSS transform / zIndex / opacity。
  */
 function applyStackPositions(animate = false) {
+  if (isGridMode.value) return
   const total = visualOrder.value.length
   const visibleCount = Math.min(total, MAX_VISIBLE_CARDS)
   const centerXShift = ((visibleCount - 1) * STACK_X_STEP) / 2
@@ -190,7 +193,7 @@ function rotateVisualOrder() {
  * DOM 节点始终不动，图片不会被销毁/重建/移动，不会闪烁。
  */
 function advanceDeck() {
-  if (isAnimating || !desktopMode.value || count.value < 2 || !cardsRef.value) return
+  if (isAnimating || !desktopMode.value || count.value < 2 || !cardsRef.value || isGridMode.value) return
 
   isAnimating = true
 
@@ -300,7 +303,7 @@ function advanceDeck() {
 // ─── Wheel ────────────────────────────────────────────────────────────────────
 
 function handleWheel(e: WheelEvent) {
-  if (!desktopMode.value || count.value < 2) return
+  if (!desktopMode.value || count.value < 2 || isGridMode.value) return
   e.preventDefault()
 
   wheelAccum += e.deltaY
@@ -321,7 +324,7 @@ function handleTouchStart(e: TouchEvent) {
 }
 
 function handleTouchEnd(e: TouchEvent) {
-  if (!desktopMode.value || count.value < 2) return
+  if (!desktopMode.value || count.value < 2 || isGridMode.value) return
   const touch = e.changedTouches[0]
   const dx = touch.clientX - touchStartX
   const dy = touch.clientY - touchStartY
@@ -381,11 +384,17 @@ async function fadeInDeck() {
 async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
   const token = ++articleTransitionToken
 
-  if (prefersReducedMotion.value || !cardsRef.value) {
+  if (prefersReducedMotion.value) {
     displayedArticles.value = [...nextArticles]
+    await nextTick()
+    if (!isGridMode.value) {
+      await resetDeck()
+      for (const el of getFadeTargets()) gsap.set(el, { opacity: 1 })
+    }
     return
   }
 
+  // 离场：只在有 cardsRef（堆叠模式）或平铺模式有可见卡片时淡出
   const leavingTargets = getFadeTargets()
   if (leavingTargets.length) {
     await waitForTween(leavingTargets, {
@@ -400,6 +409,18 @@ async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
   if (token !== articleTransitionToken) return
 
   displayedArticles.value = [...nextArticles]
+
+  // 等 Vue 重渲染：isGridMode 会根据新数据重新计算，cardsRef 也会重新挂载
+  await nextTick()
+
+  if (token !== articleTransitionToken) return
+
+  if (isGridMode.value) {
+    // 平铺模式：CSS Transition 负责入场，不需要 GSAP
+    return
+  }
+
+  // 堆叠模式：正常走 resetDeck + 入场动画
   await resetDeck()
 
   if (token !== articleTransitionToken) return
@@ -472,8 +493,8 @@ onBeforeUnmount(() => {
         </div>
       </Transition>
 
-      <!-- 卡片态：始终挂载，GSAP 控制每张卡的 opacity/transform -->
-      <div class="ptm__gallery-state" aria-label="文章卡片堆栈">
+      <!-- 堆叠模式：≤5 张时，GSAP 控制每张卡的 opacity/transform -->
+      <div v-if="!isGridMode" class="ptm__gallery-state" aria-label="文章卡片堆栈">
         <header class="ptm__header">
         </header>
 
@@ -508,6 +529,29 @@ onBeforeUnmount(() => {
           </article>
         </div>
       </div>
+
+      <!-- 平铺模式：>5 张时，2×2 网格可滚动 -->
+      <Transition name="ptm-grid-fade">
+      <div v-if="isGridMode" class="ptm__gallery-state ptm__grid-state" aria-label="文章卡片列表">
+        <div class="ptm__grid">
+          <RouterLink
+            v-for="article in displayedArticles"
+            :key="article.id"
+            :to="article.articlePath"
+            class="ptm__grid-item"
+          >
+            <ArticleCard
+              :article="article"
+              :clickable="false"
+              :show-author="true"
+              :show-status="true"
+              :show-reason="true"
+              :fill-height="true"
+            />
+          </RouterLink>
+        </div>
+      </div>
+      </Transition>
     </div>
 
     <div v-else-if="hasArticles" class="ptm__mobile-strip content-rise-in" aria-label="文章列表">
@@ -878,8 +922,145 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
     radial-gradient(circle at 10% 10%, rgb(255 255 255 / 0.08), transparent 18%);
 }
 
+/* ── 平铺模式入场动画 ── */
+.ptm-grid-fade-enter-active {
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.ptm-grid-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* ── 平铺模式 ── */
+.ptm__grid-state {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-border) 60%, transparent) transparent;
+}
+
+.ptm__grid-state::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ptm__grid-state::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-border) 60%, transparent);
+  border-radius: 2px;
+}
+
+.ptm__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+}
+
+.ptm__grid-item {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-xl);
+  transition: transform 220ms ease;
+  will-change: transform;
+}
+
+.ptm__grid-item:hover {
+  transform: translateY(-4px);
+}
+
+/* 缩小后的卡片内部样式重置，保持等比缩小视觉 */
+.ptm__grid-item :deep(.content-card-shell) {
+  min-height: 0;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
+  background: #fff;
+  box-shadow:
+    0 6px 18px rgb(15 23 42 / 0.07),
+    inset 0 1px 0 rgb(255 255 255 / 0.96);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: box-shadow 220ms ease;
+}
+
+.ptm__grid-item:hover :deep(.content-card-shell) {
+  box-shadow:
+    0 12px 28px rgb(15 23 42 / 0.11),
+    inset 0 1px 0 rgb(255 255 255 / 0.96);
+}
+
+.ptm__grid-item :deep(.content-card-shell::before) {
+  background: none;
+}
+
+.ptm__grid-item :deep(.content-card-shell > :first-child) {
+  min-height: 0;
+  height: clamp(9.5rem, 18vw, 13rem);
+  flex: 0 0 clamp(9.5rem, 18vw, 13rem);
+}
+
+.ptm__grid-item :deep(.content-card-shell > :last-child) {
+  gap: 0.4rem;
+  padding-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.ptm__grid-item :deep(h3) {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.ptm__grid-item :deep(p[class*='line-clamp-']) {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.ptm__grid-item :deep(.flex-wrap) {
+  font-size: 0.72rem;
+}
+
+html.dark .ptm__grid-item :deep(.content-card-shell) {
+  border-color: rgb(255 255 255 / 0.08);
+  background: rgb(20 24 33);
+  box-shadow:
+    0 6px 18px rgb(0 0 0 / 0.18),
+    0 2px 6px rgb(0 0 0 / 0.1);
+}
+
+html.dark .ptm__grid-item:hover :deep(.content-card-shell) {
+  box-shadow:
+    0 12px 28px rgb(0 0 0 / 0.26),
+    0 4px 10px rgb(0 0 0 / 0.14);
+}
+
+html.dark .ptm__grid-item :deep(.content-card-shell::before) {
+  background:
+    linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.1),
+      transparent 24%,
+      transparent 74%,
+      rgb(255 255 255 / 0.04)
+    ),
+    radial-gradient(circle at 10% 10%, rgb(255 255 255 / 0.08), transparent 18%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ptm__action {
+    transition: none;
+  }
+
+  .ptm__grid-item {
     transition: none;
   }
 }
