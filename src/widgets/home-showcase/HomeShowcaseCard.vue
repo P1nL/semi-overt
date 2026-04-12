@@ -317,17 +317,21 @@ html.dark .home-showcase-card__chip {
  * theme-switching 移除后 rise 动画的 fill 自然恢复，但状态不变（已是1/none），
  * 不会产生视觉跳变。
  */
-:global(html.theme-switching) .home-showcase-card {
+:global(html.theme-switching) .home-showcase-card,
+:global(html.theme-settling) .home-showcase-card {
   opacity: 1 !important;
   transform: none !important;
   transition: none !important;
 }
-:global(html.theme-switching) .home-showcase-card::before {
+:global(html.theme-switching) .home-showcase-card::before,
+:global(html.theme-settling) .home-showcase-card::before {
   filter: none !important;
   transition: none !important;
 }
 :global(html.theme-switching) .home-showcase-card::after,
-:global(html.theme-switching) .home-showcase-card * {
+:global(html.theme-switching) .home-showcase-card *,
+:global(html.theme-settling) .home-showcase-card::after,
+:global(html.theme-settling) .home-showcase-card * {
   transition: none !important;
 }
 
