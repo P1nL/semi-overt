@@ -6,11 +6,15 @@ withDefaults(
     type?: 'button' | 'submit' | 'reset'
     loading?: boolean
     disabled?: boolean
+    iconOnly?: boolean
+    ariaLabel?: string
   }>(),
   {
     type: 'button',
     loading: false,
     disabled: false,
+    iconOnly: false,
+    ariaLabel: '',
   },
 )
 </script>
@@ -21,11 +25,14 @@ withDefaults(
     variant="secondary"
     size="lg"
     class="auth-action-button"
+    :class="iconOnly ? 'auth-action-button--icon-only' : ''"
+    :icon-only="iconOnly"
     :loading="loading"
     :disabled="disabled"
+    :aria-label="ariaLabel || undefined"
   >
-    <span aria-hidden="true" class="auth-action-button__glow" />
-    <span class="auth-action-button__label">
+    <span v-if="!iconOnly" aria-hidden="true" class="auth-action-button__glow" />
+    <span class="auth-action-button__label" :class="iconOnly ? 'auth-action-button__label--icon-only' : ''">
       <slot />
     </span>
   </Button>
@@ -52,11 +59,29 @@ withDefaults(
     filter 220ms ease;
 }
 
+.auth-action-button--icon-only {
+  width: 5.5rem;
+  border-color: transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  box-shadow: none;
+}
+
 .auth-action-button:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.94), rgb(255 255 255 / 0.76)),
+    color-mix(in srgb, var(--color-surface) 88%, white);
   box-shadow:
-    0 18px 38px rgb(0 113 227 / 0.16),
-    inset 0 1px 0 rgb(255 255 255 / 0.92);
+    0 16px 34px rgb(0 113 227 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.86);
+  transform: none;
+}
+
+.auth-action-button--icon-only:hover {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .auth-action-button:active {
@@ -65,10 +90,18 @@ withDefaults(
     inset 0 1px 0 rgb(255 255 255 / 0.9);
 }
 
+.auth-action-button--icon-only:active {
+  box-shadow: none;
+}
+
 .auth-action-button:disabled {
   box-shadow:
     0 12px 24px rgb(15 23 42 / 0.08),
     inset 0 1px 0 rgb(255 255 255 / 0.75);
+}
+
+.auth-action-button--icon-only:disabled {
+  box-shadow: none;
 }
 
 .auth-action-button__glow {
@@ -86,13 +119,7 @@ withDefaults(
     filter 220ms ease;
 }
 
-.auth-action-button:hover .auth-action-button__glow {
-  transform: scale(1.04);
-  opacity: 1;
-}
-
 .auth-action-button:active .auth-action-button__glow {
-  transform: scale(0.98);
   filter: saturate(1.12);
 }
 
@@ -105,5 +132,14 @@ withDefaults(
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
+}
+
+.auth-action-button__label--icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  -webkit-background-clip: initial;
+  color: currentColor;
 }
 </style>
