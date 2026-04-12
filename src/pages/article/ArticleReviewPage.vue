@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
 
 import {
   ARTICLE_STATUS_BADGE_VARIANT_MAP,
@@ -9,20 +8,16 @@ import {
 } from '@/entities/article/model/article.constants'
 import type { ArticleDetailVm } from '@/entities/article/model/article.types'
 import { ReviewLogList } from '@/entities/review/ui'
-import { AdminDeleteArticleButton } from '@/features/admin-article-delete'
 import { ReviewActionBar, type ReviewActionResult } from '@/features/review-action'
 import { useReviewLogsQuery } from '@/shared/api/queries'
-import { queryKeys } from '@/shared/api/queryKeys'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
-import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
 
 const route = useRoute()
 const router = useRouter()
-const queryClient = useQueryClient()
 
 const articleId = computed(() => String(route.params.id || ''))
 const readerKey = ref(0)
@@ -63,32 +58,20 @@ function onLoaded(value: ArticleDetailVm) {
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
 }
 
-async function handleAdminDeleted() {
-  await queryClient.invalidateQueries({
-    queryKey: queryKeys.reviewPendingRoot,
-  })
-  await router.push({ name: ROUTE_NAME.REVIEW_DASHBOARD })
-}
 </script>
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <main class="flex-1 overflow-y-auto px-3 pb-56 pt-4 sm:px-4 md:px-6 md:pb-44 md:pt-6 xl:px-8">
       <div class="mx-auto w-full max-w-[1200px] space-y-6">
-        <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
-          <SectionHeader
-            title="审核文章"
-            description="先阅读完整内容，再在底部固定操作区执行通过、退回修改或拒绝。"
-          />
-        </section>
 
         <section class="surface-1 rounded-[var(--radius-xl)] p-4 lg:hidden">
           <SectionHeader title="目录" compact />
           <ArticleToc :sync-key="tocSyncKey" />
         </section>
 
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:gap-8">
-          <section class="space-y-6">
+        <div class="grid gap-6 xl:gap-8">
+          <section class="mx-auto w-full max-w-[900px] space-y-6">
             <section class="surface-1 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8">
               <ArticleReader
                 :key="`${articleId}-${readerKey}`"
@@ -109,10 +92,6 @@ async function handleAdminDeleted() {
               />
             </section>
           </section>
-
-          <div class="hidden justify-end lg:flex lg:sticky lg:top-6 lg:h-fit">
-            <ArticleToc :sync-key="tocSyncKey" />
-          </div>
         </div>
       </div>
     </main>
@@ -123,19 +102,9 @@ async function handleAdminDeleted() {
           <p class="text-sm font-semibold tracking-[-0.02em] text-[var(--color-text)]">
             审核操作区
           </p>
-          <p class="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-            通过和删除都需要二次确认；退回修改和拒绝需要填写原因。
-          </p>
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <AdminDeleteArticleButton
-            :article-id="articleId"
-            text="删除文章"
-            confirm-text="确认删除"
-            @deleted="handleAdminDeleted"
-          />
-
           <ReviewActionBar
             :article-id="articleId"
             :status="article?.status?.value"
