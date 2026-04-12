@@ -137,13 +137,19 @@ onClickOutside(rootRef, () => {
 .admin-delete-button {
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 220ms ease,
-    border-color 220ms ease,
-    color 220ms ease;
+    background-color 320ms ease-in-out,
+    border-color 320ms ease-in-out,
+    color 280ms ease-in-out,
+    box-shadow 280ms ease-in-out;
   background: var(--color-warning);
   color: white;
   border-color: transparent;
   box-shadow: 0 14px 28px rgb(185 107 0 / 0.18);
+}
+
+.admin-delete-button:hover,
+.admin-delete-button:active {
+  transform: none;
 }
 
 .admin-delete-button__label {
