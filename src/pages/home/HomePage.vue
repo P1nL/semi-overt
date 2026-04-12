@@ -126,6 +126,20 @@ const home = computed(() => {
   }
 }
 
+/*
+ * 主题切换期间：
+ * section header 基础样式 opacity:0，由 home-rise-in 动画 fill 到最终态。
+ * theme-switching class 变化可能导致浏览器重新评估 animation-fill-mode，
+ * 使 header 闪回 opacity:0 再重新入场。
+ * 修复策略与 HomeShowcaseCard 一致：强制保持最终态。
+ */
+:global(html.theme-switching) .home-section-header-reveal,
+:global(html.theme-settling) .home-section-header-reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-section-header-reveal {
     opacity: 1;
