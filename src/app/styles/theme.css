@@ -92,12 +92,13 @@ html.dark {
     --color-primary-strong: #54adff;
     --color-primary-soft: rgb(41 151 255 / 0.18);
 
-    --color-bg: #0b0d12;
-    --color-bg-elevated: #11141b;
-    --color-surface: #141821;
-    --color-surface-elevated: #1a1f2b;
-    --color-surface-glass: rgb(20 24 33 / 0.7);
-    --color-surface-glass-strong: rgb(20 24 33 / 0.84);
+    /* 背景色调来自参考文件 --color-bg1/bg2：深蓝海军蓝 */
+    --color-bg: rgb(8 10 15);
+    --color-bg-elevated: rgb(0 17 32);
+    --color-surface: rgb(10 18 30);
+    --color-surface-elevated: rgb(14 24 40);
+    --color-surface-glass: rgb(0 17 32 / 0.72);
+    --color-surface-glass-strong: rgb(8 10 15 / 0.88);
     --color-surface-panel: color-mix(in srgb, var(--color-surface) 94%, transparent);
 
     --color-text: #f5f5f7;
@@ -117,6 +118,15 @@ html.dark {
     --color-scrollbar-track: rgb(255 255 255 / 0);
     --color-selection-bg: rgb(41 151 255 / 0.42);
     --color-selection-text: #f5f5f7;
+
+    /* 光晕渐变颜色（来自参考文件 gradient-bg） */
+    --glow-color1: 18, 113, 255;
+    --glow-color2: 107, 74, 255;
+    --glow-color3: 100, 100, 255;
+    --glow-color4: 50, 160, 220;
+    --glow-color5: 80, 47, 122;
+    --glow-color-interactive: 140, 100, 255;
+    --glow-blending: hard-light;
 
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.22);
     --shadow-sm: 0 12px 32px rgb(0 0 0 / 0.28);
