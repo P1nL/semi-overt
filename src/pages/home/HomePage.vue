@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 
-import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
-import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
-import { useHomeQuery } from '@/shared/api/queries'
+import { mapArticleCardDtoToVm } from '@/entities/article'
+import { mapCategoryValueToVm } from '@/entities/category'
+import { useHomeQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { AppHeader } from '@/widgets/app-header'
 import { HeroSection } from '@/widgets/hero-section'

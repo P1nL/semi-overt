@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 
-import { CATEGORY_TAB } from '@/entities/category/model/category.constants'
-import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
-import { useCategoryArticlesQuery } from '@/shared/api/queries'
+import { CATEGORY_TAB } from '@/entities/category'
+import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category'
+import { useCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'

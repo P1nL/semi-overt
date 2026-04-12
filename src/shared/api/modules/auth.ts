@@ -1,5 +1,5 @@
 import request from '../request'
-import { normalizeAuthResp } from '../adapters'
+import { normalizeAuthResp, type BackendAuthResp } from '../adapters'
 import type {
     AuthRespDto,
     ForgotPasswordReqDto,
@@ -11,13 +11,13 @@ import type {
 const AUTH_BASE = '/auth'
 
 export function register(payload: RegisterReqDto): Promise<AuthRespDto> {
-    return request.post<any>(`${AUTH_BASE}/register`, payload, {
+    return request.post<BackendAuthResp>(`${AUTH_BASE}/register`, payload, {
         withAuth: false,
     }).then(normalizeAuthResp)
 }
 
 export function login(payload: LoginReqDto): Promise<AuthRespDto> {
-    return request.post<any>(`${AUTH_BASE}/login`, payload, {
+    return request.post<BackendAuthResp>(`${AUTH_BASE}/login`, payload, {
         withAuth: false,
     }).then(normalizeAuthResp)
 }

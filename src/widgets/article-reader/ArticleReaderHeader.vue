@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArticleAuthorMeta, ArticleMetaLine, ArticleStatusBadge } from '@/entities/article/ui'
-import type { ArticleDetailVm } from '@/entities/article/model/article.types'
+import type { ArticleDetailVm } from '@/entities/article'
 
 withDefaults(
     defineProps<{

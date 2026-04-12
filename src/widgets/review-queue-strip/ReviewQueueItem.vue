@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PendingReviewItemVm } from '@/entities/review/model/review.types'
+import type { PendingReviewItemVm } from '@/entities/review'
 
 defineProps<{
   item: PendingReviewItemVm

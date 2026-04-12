@@ -1,5 +1,10 @@
 import request from '../request'
-import { normalizeProfileDto, normalizeUserProfileResp } from '../adapters'
+import {
+    normalizeProfileDto,
+    normalizeUserProfileResp,
+    type BackendUserInfoResp,
+    type BackendUserProfileResp,
+} from '../adapters'
 import type {
     PaginationParams,
     ProfileDto,
@@ -14,11 +19,11 @@ export interface GetUserProfileParams extends PaginationParams {
 }
 
 export function getCurrentUser(): Promise<ProfileDto & { email?: string | null; role?: string }> {
-    return request.get<any>(`${USER_BASE}/me`).then(normalizeProfileDto)
+    return request.get<BackendUserInfoResp>(`${USER_BASE}/me`).then(normalizeProfileDto)
 }
 
 export function updateMyProfile(payload: UpdateProfileReqDto): Promise<ProfileDto> {
-    return request.put<any>(`${USER_BASE}/me/profile`, payload).then(normalizeProfileDto)
+    return request.put<BackendUserInfoResp>(`${USER_BASE}/me/profile`, payload).then(normalizeProfileDto)
 }
 
 export function getUserProfile(
@@ -26,7 +31,7 @@ export function getUserProfile(
     params?: GetUserProfileParams,
 ): Promise<UserProfileRespDto> {
     return request
-        .get<any>(`${USER_BASE}/${encodeURIComponent(username)}/profile`, params)
+        .get<BackendUserProfileResp>(`${USER_BASE}/${encodeURIComponent(username)}/profile`, params)
         .then(normalizeUserProfileResp)
 }
 

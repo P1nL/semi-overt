@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
-import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
-import { CATEGORY_ORDER } from '@/entities/category/model/category.constants'
+import { mapCategoryValueToVm } from '@/entities/category'
+import { CATEGORY_ORDER } from '@/entities/category'
 import AnimatedFolderIcon from '@/shared/components/base/AnimatedFolderIcon.vue'
 import Icon from '@/shared/components/base/Icon.vue'
 
@@ -50,9 +50,9 @@ function toggleMenu() {
   open.value = !open.value
 }
 
-function setItemRef(element: any, index: number) {
+function setItemRef(element: Element | ComponentPublicInstance | null, index: number) {
   // Extract the DOM element if element is a Vue component instance
-  const el = element && '$el' in element ? element.$el : element;
+  const el = element && '$el' in element ? element.$el : element
   if (!(el instanceof HTMLAnchorElement)) return
   itemRefs.value[index] = el
 }
@@ -77,7 +77,7 @@ async function openMenuWithKeyboard(index = 0) {
 function closeMenu(eventOrOptions?: PointerEvent | { restoreFocus?: boolean }) {
   open.value = false
 
-  const restoreFocus = eventOrOptions && !(eventOrOptions instanceof Event) && eventOrOptions.restoreFocus;
+  const restoreFocus = eventOrOptions && !(eventOrOptions instanceof Event) && eventOrOptions.restoreFocus
   if (restoreFocus) {
     void nextTick(() => {
       triggerRef.value?.focus()

@@ -5,11 +5,11 @@ import { useRoute } from 'vue-router'
 import {
   ARTICLE_STATUS_BADGE_VARIANT_MAP,
   ARTICLE_STATUS_LABEL_MAP,
-} from '@/entities/article/model/article.constants'
-import type { ArticleDetailVm } from '@/entities/article/model/article.types'
+} from '@/entities/article'
+import type { ArticleDetailVm } from '@/entities/article'
 import { ReviewLogList } from '@/entities/review/ui'
 import { ReviewActionBar, type ReviewActionResult } from '@/features/review-action'
-import { useReviewLogsQuery } from '@/shared/api/queries'
+import { useReviewLogsQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'

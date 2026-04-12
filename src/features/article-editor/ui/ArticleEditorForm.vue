@@ -28,7 +28,7 @@ import { TextSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, type Editor as TiptapEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
+import { mapArticleDetailDtoToVm } from '@/entities/article'
 import {
   buildEditorStats,
   createEmptyEditorFormValues,
@@ -40,7 +40,7 @@ import {
   type EditorDraftSavedPayload,
   type EditorFormValues,
 } from '@/features/article-editor/model'
-import { ImageUploadButton, ImageUploadPreview, uploadImageFile } from '@/features/image-upload'
+import { ImageUploadButton, ImageUploadPreview, uploadImageFile } from '@/shared/image-upload'
 import { articleApi } from '@/shared/api/modules/article'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'

@@ -1,6 +1,7 @@
 import request from '../request'
 import {
     normalizeReviewLogListResp,
+    type BackendReviewLogResp,
 } from '../adapters'
 import type {
     PageRespDto,
@@ -25,7 +26,7 @@ export function submitReviewAction(
 }
 
 export function getReviewLogs(articleId: number | string): Promise<ReviewLogRespDto[]> {
-    return request.get<any>(`${REVIEW_BASE}/${articleId}/logs`).then(normalizeReviewLogListResp)
+    return request.get<BackendReviewLogResp[]>(`${REVIEW_BASE}/${articleId}/logs`).then(normalizeReviewLogListResp)
 }
 
 export const reviewApi = {

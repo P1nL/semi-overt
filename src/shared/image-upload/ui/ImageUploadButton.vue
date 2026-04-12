@@ -8,7 +8,7 @@ import { ARTICLE_IMAGE_ACCEPTED_EXTENSIONS } from '@/shared/constants/article'
 import {
     uploadImageFile,
     type ImageUploadResult,
-} from '@/features/image-upload/model'
+} from '@/shared/image-upload/model'
 import type { UploadBizType } from '@/shared/types/api'
 
 const props = withDefaults(

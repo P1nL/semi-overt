@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
-import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article/model/article.constants'
+import { mapArticleDetailDtoToVm } from '@/entities/article'
+import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article'
 import { cancelReviewByArticleId } from '@/features/article-cancel-review'
 import {
   ArticleEditorForm,
@@ -21,17 +20,15 @@ import { Icon } from '@/shared/components/base'
 import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { STORAGE_KEY } from '@/shared/constants/storage'
+import { queryClient } from '@/shared/lib/queryClient'
 import { getErrorMessage } from '@/shared/utils/error'
 import { localStore } from '@/shared/utils/storage'
 import { calcWordCount, canCancelReview, canEditArticle, canSubmitArticle } from '@/shared/utils/article'
 import { useEditorStore } from '@/stores/editor'
-import { useReviewStore } from '@/stores/review'
 
 const route = useRoute()
 const router = useRouter()
-const queryClient = useQueryClient()
 const editorStore = useEditorStore()
-const reviewStore = useReviewStore()
 const toast = useToast()
 const PUBLISH_COOLDOWN_MS = 30 * 60 * 1000
 const MIN_SUBMIT_CONTENT_LENGTH = 50
@@ -605,7 +602,9 @@ async function submitArticle() {
     resetPublishConfirm()
     setSaveFeedback('idle')
     toast.success('文章已提交审核')
-    void reviewStore.refreshPendingListIfInitialized()
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.reviewPendingRoot,
+    })
 
   } catch (error) {
     const message = getErrorMessage(error, '提交失败，请稍后重试')
@@ -645,7 +644,9 @@ async function cancelReview() {
     const nextArticle = mapArticleDetailDtoToVm(detail)
     editorStore.setCurrentArticle(nextArticle)
     queryClient.setQueryData(queryKeys.articleDetail(article.id), nextArticle)
-    void reviewStore.refreshPendingListIfInitialized()
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.reviewPendingRoot,
+    })
 
     await onCanceled()
     toast.success('已取消审核，文章恢复为草稿')

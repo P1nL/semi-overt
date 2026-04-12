@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import type { UserProfileVm } from '@/entities/user/model/user.types'
+import type { UserProfileVm } from '@/entities/user'
 import { Button } from '@/shared/components/base'
 import ProfileEditDialog from './ProfileEditDialog.vue'
 

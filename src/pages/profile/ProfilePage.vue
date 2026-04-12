@@ -2,11 +2,11 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { usePendingReviewsQuery, useUserProfileQuery } from '@/shared/api/queries'
+import { usePendingReviewsQuery, useUserProfileQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
+import type { ProfileArticleTab } from '@/shared/types/profile'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
-import { type ProfileArticleTab } from '@/stores/profile'
 import { AppHeader } from '@/widgets/app-header'
 import { ProfileHeader } from '@/widgets/profile-header'
 import { ProfileCardQueue } from '@/widgets/profile-card-queue'

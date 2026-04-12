@@ -1,6 +1,7 @@
 import request from '../request'
 import {
     normalizeCategoryResp,
+    type BackendCategoryResp,
 } from '../adapters'
 import type {
     CategoryRespDto,
@@ -14,7 +15,7 @@ export function getCategoryArticles(
     params?: PaginationParams,
 ): Promise<CategoryRespDto> {
     return request
-        .get<any>(`/categories/${category}/articles`, params)
+        .get<BackendCategoryResp>(`/categories/${category}/articles`, params)
         .then(normalizeCategoryResp)
 }
 

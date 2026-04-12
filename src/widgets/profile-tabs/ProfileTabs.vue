@@ -2,7 +2,7 @@
 import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import gsap from 'gsap'
 
-import type { ProfileArticleTab } from '@/stores/profile'
+import type { ProfileArticleTab } from '@/shared/types/profile'
 
 const props = withDefaults(
   defineProps<{
@@ -52,11 +52,12 @@ function getActiveButton(): HTMLElement | null {
 }
 
 function moveIndicator(animate: boolean) {
+  const list = listRef.value
   const indicator = indicatorRef.value
   const btn = getActiveButton()
-  if (!indicator || !btn) return
+  if (!list || !indicator || !btn) return
 
-  const listTop = listRef.value!.getBoundingClientRect().top
+  const listTop = list.getBoundingClientRect().top
   const btnRect = btn.getBoundingClientRect()
   const targetY = btnRect.top - listTop
   const targetH = btnRect.height

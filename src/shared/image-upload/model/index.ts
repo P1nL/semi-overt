@@ -4,7 +4,7 @@ import {
 } from '@/shared/constants/article'
 import { resolveAssetUrl } from '@/shared/utils/asset'
 import { getErrorMessage } from '@/shared/utils/error'
-import { imageUploadApi } from '@/features/image-upload/api'
+import { imageUploadApi } from '@/shared/image-upload/api'
 import type {
     ImageUploadParams,
     ImageUploadResult,

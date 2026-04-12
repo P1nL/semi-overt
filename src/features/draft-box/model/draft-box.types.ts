@@ -1,4 +1,4 @@
-import type { ArticleCardVm, ArticleStatusVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm, ArticleStatusVm } from '@/entities/article'
 
 export interface DraftBoxItem {
     id: number

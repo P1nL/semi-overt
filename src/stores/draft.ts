@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
-import type { ArticleCardEntityDto, ArticleCardVm } from '@/entities/article/model/article.types'
+import { mapArticleCardDtoToVm } from '@/entities/article'
+import type { ArticleCardEntityDto, ArticleCardVm } from '@/entities/article'
 import { articleApi } from '@/shared/api/modules/article'
 import { calcReadMinutes, resolveDurationCategory } from '@/shared/utils/article'
 

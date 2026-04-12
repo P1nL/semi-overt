@@ -3,7 +3,7 @@ import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { useMotions, type Variant } from '@vueuse/motion'
 import { useMediaQuery } from '@vueuse/core'
 
-import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm } from '@/entities/article'
 
 import HomeShowcaseCard from './HomeShowcaseCard.vue'
 

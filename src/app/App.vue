@@ -54,7 +54,7 @@ function snapshotRoute(
   targetRoute: RouteLocationNormalizedLoaded | null | undefined,
 ): RouteLocationNormalizedLoaded | null {
   if (!targetRoute) return null
-  return router.resolve(targetRoute.fullPath)
+  return router.resolve(targetRoute.fullPath) as RouteLocationNormalizedLoaded
 }
 
 function getRouteViewKey(targetRoute: RouteLocationNormalizedLoaded): string {

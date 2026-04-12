@@ -1,5 +1,5 @@
 import type { UpdateProfileReqDto } from '@/shared/types/api'
-import type { UserProfileVm } from '@/entities/user/model/user.types'
+import type { UserProfileVm } from '@/entities/user'
 
 export interface ProfileEditFormValues {
     nickname: string

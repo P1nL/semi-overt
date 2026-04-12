@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { ARTICLE_STATUS } from '@/entities/article/model/article.constants'
+import { ARTICLE_STATUS } from '@/entities/article'
 import { ArticleStatusBadge } from '@/entities/article/ui'
 import type { DraftBoxItem } from '@/features/draft-box/model'
 import { Icon, IconButton } from '@/shared/components/base'

@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import {
   ARTICLE_STATUS_BADGE_VARIANT_MAP,
   ARTICLE_STATUS_LABEL_MAP,
-} from '@/entities/article/model/article.constants'
+} from '@/entities/article'
 import {
   canReviewArticle,
   submitReviewActionByArticleId,

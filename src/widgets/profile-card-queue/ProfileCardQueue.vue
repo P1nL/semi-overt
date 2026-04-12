@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import gsap from 'gsap'
 
-import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm } from '@/entities/article'
 import { ArticleCard } from '@/entities/article/ui'
 import { EmptyState } from '@/shared/components/base'
 

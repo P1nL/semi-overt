@@ -1,15 +1,15 @@
-import { mapUserProfileDtoToVm } from '@/entities/user/model/user.mapper'
-import type { UserProfileVm } from '@/entities/user/model/user.types'
+import { mapUserProfileDtoToVm } from '@/entities/user'
+import type { UserProfileVm } from '@/entities/user'
+import { queryKeys } from '@/shared/api/queryKeys'
+import { queryClient } from '@/shared/lib/queryClient'
 import type { ProfileDto } from '@/shared/types/api'
 import type { useAuthStore } from '@/stores/auth'
-import type { useProfileStore } from '@/stores/profile'
 import type {
     ProfileEditFormValues,
     ProfileEditPayload,
     ProfileEditValidationResult,
 } from './profile-edit.types'
 
-type ProfileStore = ReturnType<typeof useProfileStore>
 type AuthStore = ReturnType<typeof useAuthStore>
 
 const NICKNAME_MIN_LENGTH = 1
@@ -54,22 +54,8 @@ export function validateProfileEditForm(values: ProfileEditFormValues): ProfileE
     }
 }
 
-export function applyProfileUpdateToStores(
-    dto: ProfileDto,
-    profileStore: ProfileStore,
-    authStore: AuthStore,
-): UserProfileVm {
+export function applyProfileUpdate(dto: ProfileDto, authStore: AuthStore): void {
     const next = mapUserProfileDtoToVm(dto)
-    const prev = profileStore.profile
-
-    profileStore.profile = {
-        ...next,
-        stats: prev?.stats || next.stats,
-        total: prev?.total ?? next.total,
-        page: prev?.page ?? next.page,
-        pageSize: prev?.pageSize ?? next.pageSize,
-        articles: prev?.articles || next.articles,
-    }
 
     authStore.patchUser({
         username: next.username,
@@ -77,7 +63,9 @@ export function applyProfileUpdateToStores(
         avatar: next.avatarUrl,
     })
 
-    return profileStore.profile
+    void queryClient.invalidateQueries({
+        queryKey: [queryKeys.userProfile('', '', 0, 0)[0]],
+    })
 }
 
 export type {

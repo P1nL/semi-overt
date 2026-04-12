@@ -1,22 +1,23 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 
-import type { UserProfileVm } from '@/entities/user/model/user.types'
+import { mapUserProfileDtoToVm, type UserProfileVm } from '@/entities/user'
 import {
-  applyProfileUpdateToStores,
+  applyProfileUpdate,
   createProfileEditFormValues,
   mapProfileEditFormToPayload,
   validateProfileEditForm,
   type ProfileEditFieldErrors,
   type ProfileEditFormValues,
 } from '@/features/profile-edit/model'
+import { queryKeys } from '@/shared/api/queryKeys'
+import { queryClient } from '@/shared/lib/queryClient'
 import { userApi } from '@/shared/api/modules/user'
 import { Button, Icon, IconButton } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
-import { useProfileStore } from '@/stores/profile'
 import ProfileEditForm from './ProfileEditForm.vue'
 
 const props = withDefaults(
@@ -34,7 +35,6 @@ const emit = defineEmits<{
   updated: [UserProfileVm]
 }>()
 
-const profileStore = useProfileStore()
 const authStore = useAuthStore()
 const toast = useToast()
 
@@ -67,7 +67,12 @@ async function handleSubmit() {
 
   try {
     const response = await userApi.updateMyProfile(mapProfileEditFormToPayload(form.value))
-    const profile = applyProfileUpdateToStores(response, profileStore, authStore)
+    const profile = mapUserProfileDtoToVm(response)
+
+    applyProfileUpdate(response, authStore)
+    await queryClient.invalidateQueries({
+      queryKey: [queryKeys.userProfile('', '', 0, 0)[0]],
+    })
 
     toast.success('资料更新成功')
     emit('updated', profile)

@@ -8,7 +8,7 @@ import {
     calcWordCount,
     resolveDurationCategory,
 } from '@/shared/utils/article'
-import type { ArticleDetailVm } from '@/entities/article/model/article.types'
+import type { ArticleDetailVm } from '@/entities/article'
 import type {
     EditorDraftPayload,
     EditorFormValues,

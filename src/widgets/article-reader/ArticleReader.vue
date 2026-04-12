@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, watch } from 'vue'
 
-import type { ArticleDetailVm } from '@/entities/article/model/article.types'
-import { useArticleDetailQuery } from '@/shared/api/queries'
+import type { ArticleDetailVm } from '@/entities/article'
+import { useArticleDetailQuery } from '@/entities/queries'
 import { Skeleton } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { getErrorMessage } from '@/shared/utils/error'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import gsap from 'gsap'
 
 const props = defineProps<{
@@ -28,6 +28,9 @@ let busy = false
 
 // ---- blink ----
 function scheduleBlink() {
+  const lidUpper = lidUpperEl.value
+  if (!lidUpper) return
+
   const delay  = gsap.utils.random(2, 8)
   const repeat = Math.random() > 0.5 ? 3 : 1
 
@@ -37,7 +40,7 @@ function scheduleBlink() {
     yoyo: true,
     onComplete: scheduleBlink,
   })
-    .to(lidUpperEl.value!, {
+    .to(lidUpper, {
       duration: BLINK_SPEED,
       attr: { d: UPPER_CLOSE },
       ease: 'power1.inOut',
@@ -48,14 +51,16 @@ function scheduleBlink() {
 let resetEyeCall: gsap.core.Tween | null = null
 
 function onPointerMove(e: PointerEvent) {
-  if (!eyeEl.value) return
+  const eye = eyeEl.value
+  if (!eye) return
   if (resetEyeCall) resetEyeCall.kill()
 
   resetEyeCall = gsap.delayedCall(2, () => {
-    gsap.to(eyeEl.value!, { xPercent: 0, yPercent: 0, duration: 0.2 })
+    if (!eyeEl.value) return
+    gsap.to(eyeEl.value, { xPercent: 0, yPercent: 0, duration: 0.2 })
   })
 
-  const bounds = eyeEl.value.getBoundingClientRect()
+  const bounds = eye.getBoundingClientRect()
   const cx = bounds.left + bounds.width / 2
   const cy = bounds.top  + bounds.height / 2
   const dx = e.clientX - cx
@@ -63,7 +68,7 @@ function onPointerMove(e: PointerEvent) {
 
   const mapRange = gsap.utils.mapRange(-120, 120, -30, 30)
 
-  gsap.set(eyeEl.value, {
+  gsap.set(eye, {
     xPercent: gsap.utils.clamp(-30, 30, mapRange(dx)),
     yPercent: gsap.utils.clamp(-30, 30, mapRange(dy)),
   })
@@ -74,9 +79,6 @@ function handleClick() {
   if (busy) return
   emit('toggle')
 }
-
-// Watch visible prop changes and run the animation
-import { watch } from 'vue'
 
 watch(() => props.visible, (nowVisible) => {
   if (!lidUpperEl.value || !lidLowerEl.value) return

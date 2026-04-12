@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm } from '@/entities/article'
 import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
 
 const props = withDefaults(

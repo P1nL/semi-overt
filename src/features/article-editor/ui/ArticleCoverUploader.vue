@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 
 import { FormField } from '@/shared/components/form'
-import { ImageUploadButton, ImageUploadPreview } from '@/features/image-upload'
-import type { ImageUploadResult } from '@/features/image-upload/model'
+import { ImageUploadButton, ImageUploadPreview } from '@/shared/image-upload'
+import type { ImageUploadResult } from '@/shared/image-upload/model'
 
 const props = withDefaults(
     defineProps<{

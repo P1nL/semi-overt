@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { EmptyState } from '@/shared/components/base'
-import type { PendingReviewItemVm } from '@/entities/review/model/review.types'
+import type { PendingReviewItemVm } from '@/entities/review'
 import ReviewQueueItem from './ReviewQueueItem.vue'
 
 withDefaults(

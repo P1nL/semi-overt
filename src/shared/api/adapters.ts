@@ -14,7 +14,7 @@ import type {
 } from '@/shared/types/api'
 import { resolveAssetUrl } from '@/shared/utils/asset'
 
-interface BackendAuthResp {
+export interface BackendAuthResp {
     token: string
     userId: number
     username: string
@@ -42,7 +42,7 @@ interface BackendArticleCardResp {
     rejectReason?: string | null
 }
 
-interface BackendArticleDetailResp {
+export interface BackendArticleDetailResp {
     id: number
     title?: string | null
     content: string
@@ -64,7 +64,7 @@ interface BackendArticleDetailResp {
     publishedAt?: string | null
 }
 
-interface BackendUserInfoResp {
+export interface BackendUserInfoResp {
     userId: number
     username: string
     nickname?: string | null
@@ -76,7 +76,7 @@ interface BackendUserInfoResp {
     createdAt?: string | null
 }
 
-interface BackendUserProfileResp {
+export interface BackendUserProfileResp {
     profile: {
         id: number
         username: string
@@ -101,7 +101,7 @@ interface BackendUserProfileResp {
     pages?: number
 }
 
-interface BackendHomeResp {
+export interface BackendHomeResp {
     hero: {
         primary: BackendArticleCardResp | null
         secondary: BackendArticleCardResp[]
@@ -112,7 +112,7 @@ interface BackendHomeResp {
     }>
 }
 
-interface BackendCategoryResp {
+export interface BackendCategoryResp {
     category: string
     list: BackendArticleCardResp[]
     total?: number
@@ -121,7 +121,7 @@ interface BackendCategoryResp {
     pages?: number
 }
 
-interface BackendSearchResp {
+export interface BackendSearchResp {
     keyword: string
     list: BackendArticleCardResp[]
     total?: number
@@ -146,7 +146,7 @@ interface BackendReviewPendingPageResp {
     records?: BackendReviewPendingItemResp[]
 }
 
-interface BackendReviewLogResp {
+export interface BackendReviewLogResp {
     action: string
     fromStatus: string
     toStatus: string

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { UserProfileVm } from '@/entities/user/model/user.types'
+import type { UserProfileVm } from '@/entities/user'
 import { UserRoleBadge } from '@/entities/user/ui'
 import { ProfileEditButton } from '@/features/profile-edit'
 import { Avatar } from '@/shared/components'

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import { Button, EmptyState } from '@/shared/components/base'
-import { usePendingReviewsQuery } from '@/shared/api/queries'
+import { usePendingReviewsQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
 import { AppHeader } from '@/widgets/app-header'

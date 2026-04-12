@@ -1,11 +1,14 @@
 import {
+  ARTICLE_STATUS,
+  ARTICLE_STATUS_BADGE_VARIANT_MAP,
+  ARTICLE_STATUS_LABEL_MAP,
   mapArticleCardDtoToVm,
   mapArticleDraftDtoToVm,
-} from '@/entities/article/model/article.mapper'
+} from '@/entities/article'
 import type {
   ArticleCardEntityDto,
   ArticleCardVm,
-} from '@/entities/article/model/article.types'
+} from '@/entities/article'
 import { articleApi } from '@/shared/api/modules/article'
 import { userApi } from '@/shared/api/modules/user'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -41,7 +44,11 @@ function mapPendingItemToDraftBoxItem(item: ArticleCardEntityDto): DraftBoxItem 
   return {
     id: vm.id,
     title: vm.title,
-    status: vm.status!,
+    status: vm.status ?? {
+      value: ARTICLE_STATUS.PENDING,
+      label: ARTICLE_STATUS_LABEL_MAP[ARTICLE_STATUS.PENDING],
+      variant: ARTICLE_STATUS_BADGE_VARIANT_MAP[ARTICLE_STATUS.PENDING],
+    },
     wordCount: vm.meta.wordCount ?? 0,
     wordCountText: vm.meta.wordCountText ?? '0 字',
     updatedAt: vm.meta.updatedAt ?? vm.meta.publishedAt ?? '',

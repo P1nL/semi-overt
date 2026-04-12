@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 
-import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
-import { useSearchArticlesQuery } from '@/shared/api/queries'
+import { mapArticleCardDtoToVm } from '@/entities/article'
+import { useSearchArticlesQuery } from '@/entities/queries'
 import { EmptyState, Pagination } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'

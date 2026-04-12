@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm } from '@/entities/article'
 
 import ArticleParallaxGalleryCard from './ArticleParallaxGalleryCard.vue'
 

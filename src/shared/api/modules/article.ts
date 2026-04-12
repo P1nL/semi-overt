@@ -1,5 +1,5 @@
 import request from '../request'
-import { normalizeArticleDetailDto } from '../adapters'
+import { normalizeArticleDetailDto, type BackendArticleDetailResp } from '../adapters'
 import type {
     AdminDeleteArticleRespDto,
     ArticleDetailRespDto,
@@ -27,7 +27,7 @@ export function getDraftList(): Promise<DraftItemRespDto[]> {
 }
 
 export function getArticleDetail(articleId: number | string): Promise<ArticleDetailRespDto> {
-    return request.get<any>(`${ARTICLE_BASE}/${articleId}`).then(normalizeArticleDetailDto)
+    return request.get<BackendArticleDetailResp>(`${ARTICLE_BASE}/${articleId}`).then(normalizeArticleDetailDto)
 }
 
 export function submitArticle(articleId: number | string): Promise<SubmitArticleRespDto> {

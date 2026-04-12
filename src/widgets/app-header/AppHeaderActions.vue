@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
@@ -9,16 +9,16 @@ import { authApi } from '@/shared/api/modules/auth'
 import { Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
+import { queryClient } from '@/shared/lib/queryClient'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
-import { useReviewStore } from '@/stores/review'
 import { useUiStore } from '@/stores/ui'
 import { AuthDialog } from '@/widgets/auth-dialog'
 
 const authStore = useAuthStore()
-const reviewStore = useReviewStore()
 const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
@@ -42,7 +42,7 @@ function getVisibleUserMenuItems() {
   return userMenuItemRefs.value.filter((item) => Boolean(item) && item.offsetParent !== null)
 }
 
-function setUserMenuItemRef(element: Element | null | any, index: number) {
+function setUserMenuItemRef(element: Element | ComponentPublicInstance | null, index: number) {
   if (element instanceof HTMLButtonElement) {
     userMenuItemRefs.value[index] = element
   }
@@ -252,7 +252,9 @@ async function handleLogout() {
     toast.warning(getErrorMessage(error, '退出失败，但本地登录状态已清除。'))
   } finally {
     authStore.clearAuth()
-    reviewStore.resetReviewState()
+    queryClient.removeQueries({
+      queryKey: queryKeys.reviewPendingRoot,
+    })
     userMenuOpen.value = false
     loggingOut.value = false
     toast.success('已退出登录')

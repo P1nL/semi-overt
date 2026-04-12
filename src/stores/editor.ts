@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
-import type { ArticleDetailVm } from '@/entities/article/model/article.types'
+import { mapArticleDetailDtoToVm } from '@/entities/article'
+import type { ArticleDetailVm } from '@/entities/article'
 import { articleApi } from '@/shared/api/modules/article'
 import { canCancelReview, canSubmitArticle } from '@/shared/utils/article'
 

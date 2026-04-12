@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { queryClient } from '@/app/providers/query'
 import { queryKeys } from '@/shared/api/queryKeys'
+import { queryClient } from '@/shared/lib/queryClient'
 import { userApi } from '@/shared/api/modules/user'
 import { AUTH_BIZ_CODE } from '@/shared/constants/auth'
 import { getErrorMessage } from '@/shared/utils/error'

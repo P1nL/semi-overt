@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { ArticleCardVm } from '@/entities/article'
 import { ArticleAuthorMeta, ArticleMetaLine } from '@/entities/article/ui'
 
 defineProps<{

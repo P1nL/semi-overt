@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import { Avatar, Input, Textarea } from '@/shared/components/base'
 import { FormField } from '@/shared/components/form'
-import { ImageUploadButton, ImageUploadPreview } from '@/features/image-upload'
+import { ImageUploadButton, ImageUploadPreview } from '@/shared/image-upload'
 import type {
   ProfileEditFieldErrors,
   ProfileEditFormValues,
