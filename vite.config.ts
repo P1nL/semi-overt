@@ -4,7 +4,16 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag === 'lord-icon',
+        },
+      },
+    }),
+    tailwindcss(),
+  ],
   optimizeDeps: {
     include: ['gsap', 'gsap/dist/Flip'],
   },
