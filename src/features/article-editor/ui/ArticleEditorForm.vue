@@ -41,6 +41,7 @@ import {
   type EditorFormValues,
 } from '@/features/article-editor/model'
 import { ImageUploadButton, ImageUploadPreview, uploadImageFile } from '@/features/image-upload'
+import AnimatedUploadFileIcon from '@/shared/components/base/AnimatedUploadFileIcon.vue'
 import { articleApi } from '@/shared/api/modules/article'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
@@ -923,7 +924,7 @@ defineExpose({
 
           <button
             type="button"
-            class="editor-insert-item"
+            class="editor-insert-item editor-insert-item--upload"
             :disabled="disabledState || bodyImageUploading"
             @click="triggerBodyImagePicker"
           >
@@ -983,7 +984,7 @@ defineExpose({
 
             <button
               type="button"
-              class="editor-insert-item"
+              class="editor-insert-item editor-insert-item--upload"
               :disabled="disabledState || bodyImageUploading"
               @click="triggerBodyImagePicker"
             >
@@ -1620,6 +1621,10 @@ defineExpose({
     box-shadow 160ms ease,
     transform 160ms ease,
     opacity 160ms ease;
+}
+
+.editor-insert-item--upload {
+  border-radius: var(--radius-lg);
 }
 
 .editor-insert-item:hover:not(:disabled) {
