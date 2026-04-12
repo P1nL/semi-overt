@@ -51,7 +51,7 @@ function onToggle() {
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
           viewBox="0 0 24 24"
-          class="theme-switch-icon"
+          class="theme-switch-icon theme-switch-icon--sun"
         >
           <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="1.9" />
           <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.9">
@@ -138,8 +138,17 @@ function onToggle() {
 }
 
 .theme-switch-icon {
-  height: 1.15rem;
-  width: 1.15rem;
+  height: 1.3rem;
+  width: 1.3rem;
+}
+
+.theme-switch-icon--sun {
+  transition: transform 560ms cubic-bezier(0.22, 0.8, 0.3, 1);
+  transform-origin: 50% 50%;
+}
+
+.theme-switch-root:hover .theme-switch-icon--sun {
+  transform: rotate(120deg);
 }
 
 .theme-switch-icon-enter-active,
