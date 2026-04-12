@@ -42,16 +42,10 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const THEME_TRANSITION_DURATION = 540
 const DARK_TRAVEL_SCALE = 0.72
 const DARK_PULSE_SCALE = 0.78
-const LIGHT_GRID_DRIFT_SCALE = 0.8
 const DARK_GLOBAL_DRIFT_SCALE = 0.82
 
-const GRID_SIZE = 42
-const GRID_SEGMENT = 8
 const GRID_RADIUS = 150
-const GRID_STRENGTH = 15
 
-const LIGHT_POINTER_STRENGTH = GRID_STRENGTH * 0.78
-const LIGHT_WAKE_RADIUS = GRID_RADIUS * 0.92
 const LIGHT_WAKE_MAX_DISTANCE = 74
 const LIGHT_ARTBOARD_RATIO = 420 / 250
 const LIGHT_ARTBOARD_MARGIN_X = 0
@@ -232,63 +226,6 @@ function resolveLightArtboard(width: number, height: number): LightArtboard {
     width: artboardWidth,
     height: artboardHeight,
   }
-}
-
-function resolveGridOffset(
-  centerX: number,
-  centerY: number,
-  pointX: number,
-  pointY: number,
-  axis: 'x' | 'y',
-  radius: number,
-  strength: number,
-) {
-  const deltaX = pointX - centerX
-  const deltaY = pointY - centerY
-  const distance = Math.hypot(deltaX, deltaY)
-
-  if (distance >= radius) {
-    return 0
-  }
-
-  const influence = 1 - distance / radius
-  const easedInfluence = influence * influence * (3 - 2 * influence)
-  const coreRadius = radius * 0.18
-  const softenedDistance = Math.hypot(deltaX, deltaY, coreRadius)
-  const centerSoftening = Math.min(distance / coreRadius, 1)
-  const force = easedInfluence ** 1.08 * strength * centerSoftening
-  const axisDelta = axis === 'x' ? deltaX : deltaY
-  const offset = (axisDelta / softenedDistance) * force
-  const maxOffset = strength * 0.82
-
-  return Math.max(-maxOffset, Math.min(maxOffset, offset))
-}
-
-function drawSmoothGridPath(ctx: CanvasRenderingContext2D, points: GridVertex[]) {
-  if (points.length === 0) {
-    return
-  }
-
-  ctx.beginPath()
-  ctx.moveTo(points[0].x, points[0].y)
-
-  if (points.length === 1) {
-    ctx.stroke()
-    return
-  }
-
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const current = points[index]
-    const next = points[index + 1]
-    const midX = (current.x + next.x) * 0.5
-    const midY = (current.y + next.y) * 0.5
-
-    ctx.quadraticCurveTo(current.x, current.y, midX, midY)
-  }
-
-  const lastPoint = points[points.length - 1]
-  ctx.lineTo(lastPoint.x, lastPoint.y)
-  ctx.stroke()
 }
 
 function drawInteractiveGrid(

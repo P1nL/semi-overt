@@ -11,7 +11,6 @@ const emit = defineEmits<{
 }>()
 
 // --- refs ---
-const btnEl = ref<HTMLButtonElement | null>(null)
 const eyeEl = ref<SVGGElement | null>(null)
 const lidUpperEl = ref<SVGPathElement | null>(null)
 const lidLowerEl = ref<SVGPathElement | null>(null)
@@ -23,7 +22,6 @@ const LOWER_PATH  = 'M1 12C1 12 5 20 12 20C19 20 23 12 23 12'
 
 const TOGGLE_SPEED  = 0.125
 const BLINK_SPEED   = 0.075
-const SCRAMBLE_TIME = 0.6
 
 let blinkTl: gsap.core.Timeline | null = null
 let busy = false

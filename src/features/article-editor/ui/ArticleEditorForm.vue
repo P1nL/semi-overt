@@ -41,7 +41,6 @@ import {
   type EditorFormValues,
 } from '@/features/article-editor/model'
 import { ImageUploadButton, ImageUploadPreview, uploadImageFile } from '@/features/image-upload'
-import AnimatedUploadFileIcon from '@/shared/components/base/AnimatedUploadFileIcon.vue'
 import { articleApi } from '@/shared/api/modules/article'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
@@ -651,12 +650,6 @@ function insertCodeBlock() {
 
 function insertDivider() {
   runEditorCommand((editor) => editor.chain().focus().setHorizontalRule().run())
-}
-
-function insertTable() {
-  runEditorCommand((editor) =>
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-  )
 }
 
 function undo() {

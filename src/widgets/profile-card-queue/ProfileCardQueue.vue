@@ -63,11 +63,6 @@ const desktopMode = computed(() => hasArticles.value && !isCompactViewport.value
 
 /** 当前视觉顶层卡片的原始索引 */
 const topIndex = computed(() => visualOrder.value[visualOrder.value.length - 1] ?? 0)
-const currentArticle = computed(() => displayedArticles.value[topIndex.value] ?? null)
-const progressLabel = computed(() => {
-  if (!count.value) return ''
-  return `${topIndex.value + 1} / ${count.value}`
-})
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

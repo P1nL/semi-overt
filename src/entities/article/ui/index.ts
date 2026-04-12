@@ -1,7 +1,6 @@
 // src/entities/article/ui/index.ts
 export { default as ArticleAuthorMeta } from './ArticleAuthorMeta.vue'
 export { default as ArticleCard } from './ArticleCard.vue'
-export { default as ArticleCardSkeleton } from './ArticleCardSkeleton.vue'
 export { default as ArticleCover } from './ArticleCover.vue'
 export { default as ArticleMetaLine } from './ArticleMetaLine.vue'
 export { default as ArticleStatusBadge } from './ArticleStatusBadge.vue'

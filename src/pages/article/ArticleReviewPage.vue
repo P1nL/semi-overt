@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import {
   ARTICLE_STATUS_BADGE_VARIANT_MAP,
@@ -17,7 +17,6 @@ import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
 
 const route = useRoute()
-const router = useRouter()
 
 const articleId = computed(() => String(route.params.id || ''))
 const readerKey = ref(0)

@@ -143,7 +143,6 @@ export function writeStoredUser<TUser>(user: TUser | null, persistence?: AuthPer
     }
 
     const targetPersistence = persistence ?? getActivePersistence() ?? 'local'
-    const targetStorage = getStorage(targetPersistence)
     const otherStorage = getStorage(targetPersistence === 'local' ? 'session' : 'local')
 
     writeUser(targetPersistence, user)

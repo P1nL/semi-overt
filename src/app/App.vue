@@ -165,7 +165,7 @@ watch(
 
 watch(
   () => [uiStore.drawerOpen, uiStore.isDrawerClosing, uiStore.pendingRoute] as const,
-  ([drawerOpen, isDrawerClosing, pendingRoute]) => {
+  ([drawerOpen, isDrawerClosing, _pendingRoute]) => {
     if (drawerNavigationTimer !== null) {
       window.clearTimeout(drawerNavigationTimer)
       drawerNavigationTimer = null

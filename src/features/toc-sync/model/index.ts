@@ -22,7 +22,7 @@ function createUniqueHeadingId(base: string, used: Map<string, number>): string 
     return count === 0 ? safeBase : `${safeBase}-${count + 1}`
 }
 
-export function extractHeadingsFromDom(
+function extractHeadingsFromDom(
     selector = 'h2, h3, h4',
     options: TocParseOptions = {},
 ): TocHeading[] {

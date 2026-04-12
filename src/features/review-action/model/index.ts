@@ -1,5 +1,5 @@
 import { ARTICLE_STATUS } from '@/shared/constants/article'
-import { REVIEW_ACTION, REVIEW_REASON_MAX_LENGTH } from '@/shared/constants/review'
+import { REVIEW_REASON_MAX_LENGTH } from '@/shared/constants/review'
 import { reviewApi } from '@/shared/api/modules/review'
 import { requiresReviewReason } from '@/shared/utils/review'
 import type {

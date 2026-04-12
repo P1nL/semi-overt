@@ -1,5 +1,4 @@
 import type {
-    NavigationGuardNext,
     RouteLocationNormalized,
     RouteLocationRaw,
     Router,
@@ -7,10 +6,7 @@ import type {
 
 import { pinia } from '@/app/providers/pinia'
 import { ENV } from '@/shared/config/env'
-import {
-    ROUTE_NAME,
-    ROUTE_PATH,
-} from '@/shared/constants/routes'
+import { ROUTE_PATH } from '@/shared/constants/routes'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
