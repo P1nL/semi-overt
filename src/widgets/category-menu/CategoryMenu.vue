@@ -5,6 +5,7 @@ import { onClickOutside } from '@vueuse/core'
 
 import { mapCategoryValueToVm } from '@/entities/category/model/category.mapper'
 import { CATEGORY_ORDER } from '@/entities/category/model/category.constants'
+import AnimatedFolderIcon from '@/shared/components/base/AnimatedFolderIcon.vue'
 import Icon from '@/shared/components/base/Icon.vue'
 
 const props = withDefaults(
@@ -165,19 +166,12 @@ watch(open, async (isOpen) => {
         @click="toggleMenu"
         @keydown="onTriggerKeydown"
     >
-      <svg
+      <AnimatedFolderIcon
           class="category-menu-trigger__icon"
-          viewBox="0 0 1024 1024"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          focusable="false"
-      >
-        <path d="M0 0m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571429l0 182.857142q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-182.857142q0-36.571429 36.571429-36.571429Z" fill="#BFCBD9" />
-        <path d="M0 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
-        <path d="M768 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
-        <path d="M384 438.857143m36.571429 0l182.857142 0q36.571429 0 36.571429 36.571428l0 512q0 36.571429-36.571429 36.571429l-182.857142 0q-36.571429 0-36.571429-36.571429l0-512q0-36.571429 36.571429-36.571428Z" fill="#BFCBD9" />
-        <path d="M384 0m36.571429 0l566.857142 0q36.571429 0 36.571429 36.571429l0 182.857142q0 36.571429-36.571429 36.571429l-566.857142 0q-36.571429 0-36.571429-36.571429l0-182.857142q0-36.571429 36.571429-36.571429Z" fill="#BFCBD9" />
-      </svg>
+          size="1.05rem"
+          title="栏目"
+          :decorative="false"
+      />
       <Icon
           name="chevron-down"
           :size="16"
