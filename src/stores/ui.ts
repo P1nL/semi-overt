@@ -28,16 +28,41 @@ function applyDarkMode(enabled: boolean) {
     document.documentElement.classList.toggle('dark', enabled)
 }
 
-function markThemeSwitching(duration = 620) {
+/**
+ * 主题切换两阶段控制：
+ *
+ * 1. **theme-switching**（0 → switchDuration ms）
+ *    颜色/opacity 平滑过渡；backdrop-filter / filter:blur 全部禁用，
+ *    避免多层合成导致的逐帧重绘闪烁。
+ *
+ * 2. **theme-settling**（switchDuration → switchDuration + settleDuration ms）
+ *    颜色过渡已完成，底层不再变化。
+ *    此阶段让 backdrop-filter / filter:blur 通过 CSS transition 从 none 平滑恢复，
+ *    避免瞬间跳变。
+ */
+function markThemeSwitching(switchDuration = 580, settleDuration = 320) {
     if (typeof document === 'undefined' || typeof window === 'undefined') return
 
     const root = document.documentElement
-    root.classList.add('theme-switching')
+    const timers = root as typeof root & {
+        __themeSwitchTimer?: number
+        __themeSettleTimer?: number
+    }
 
-    window.clearTimeout((root as typeof root & { __themeSwitchTimer?: number }).__themeSwitchTimer)
-    ;(root as typeof root & { __themeSwitchTimer?: number }).__themeSwitchTimer = window.setTimeout(() => {
+    root.classList.add('theme-switching')
+    root.classList.remove('theme-settling')
+
+    window.clearTimeout(timers.__themeSwitchTimer)
+    window.clearTimeout(timers.__themeSettleTimer)
+
+    timers.__themeSwitchTimer = window.setTimeout(() => {
         root.classList.remove('theme-switching')
-    }, duration)
+        root.classList.add('theme-settling')
+
+        timers.__themeSettleTimer = window.setTimeout(() => {
+            root.classList.remove('theme-settling')
+        }, settleDuration)
+    }, switchDuration)
 }
 
 export const useUiStore = defineStore('ui', () => {
@@ -123,8 +148,10 @@ export const useUiStore = defineStore('ui', () => {
         // 不使用 View Transition API：
         // 页面包含 filter:blur、isolation:isolate、复杂合成层的卡片，
         // startViewTransition 截图时部分区域无法正确光栅化，导致闪白/缺失。
-        // 已有的 CSS transition 体系（theme-switching class + 540ms 过渡 +
-        // #app::before/::after 背景交叉淡入）足以提供平滑的主题切换效果。
+        //
+        // 两阶段切换：
+        //   theme-switching (580ms) — 颜色/opacity 过渡；blur 全部禁用
+        //   theme-settling  (320ms) — blur 通过 CSS transition 平滑恢复
         markThemeSwitching()
         commitTheme()
     }
