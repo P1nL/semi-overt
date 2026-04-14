@@ -4,6 +4,8 @@ export interface ImageUploadParams {
     file: File
     bizType: UploadBizType
     articleId?: number | string
+    /** AVATAR/COVER 场景：旧文件访问 URL，上传成功后后端自动删除旧文件 */
+    oldUrl?: string
 }
 
 export interface ImageUploadResult {

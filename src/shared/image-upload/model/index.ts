@@ -53,6 +53,7 @@ export async function uploadImageFile(params: ImageUploadParams): Promise<ImageU
             file: params.file,
             bizType: params.bizType,
             articleId: params.articleId,
+            oldUrl: params.oldUrl,
         })
 
         return {

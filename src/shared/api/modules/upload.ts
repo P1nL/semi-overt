@@ -7,6 +7,8 @@ export interface UploadImagePayload {
     file: File
     bizType: UploadBizType
     articleId?: number | string
+    /** AVATAR/COVER 场景：旧文件访问 URL，上传成功后后端自动删除旧文件 */
+    oldUrl?: string
 }
 
 export function uploadImage(payload: UploadImagePayload): Promise<UploadImageRespDto> {
@@ -16,6 +18,10 @@ export function uploadImage(payload: UploadImagePayload): Promise<UploadImageRes
 
     if (payload.articleId !== undefined && payload.articleId !== null) {
         formData.append('articleId', String(payload.articleId))
+    }
+
+    if (payload.oldUrl) {
+        formData.append('oldUrl', payload.oldUrl)
     }
 
     return request.upload<UploadImageRespDto>(`${UPLOAD_BASE}/images`, formData)

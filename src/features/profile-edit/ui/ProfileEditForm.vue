@@ -50,12 +50,12 @@ function onSubmit() {
             :url="modelValue.avatarUrl || null"
             alt="头像预览"
             empty-text="未上传头像"
-            :removable="Boolean(modelValue.avatarUrl) && !disabled"
-            @remove="patch({ avatarUrl: '' })"
+            :removable="false"
           />
           <ImageUploadButton
             biz-type="AVATAR"
             :disabled="disabled"
+            :old-url="modelValue.avatarUrl || undefined"
             button-text="上传头像"
             @uploaded="patch({ avatarUrl: $event.url })"
           />
@@ -87,12 +87,12 @@ function onSubmit() {
           :url="modelValue.coverUrl || null"
           alt="封面预览"
           empty-text="未上传封面图"
-          :removable="Boolean(modelValue.coverUrl) && !disabled"
-          @remove="patch({ coverUrl: '' })"
+          :removable="false"
         />
         <ImageUploadButton
           biz-type="COVER"
           :disabled="disabled"
+          :old-url="modelValue.coverUrl || undefined"
           button-text="上传封面"
           @uploaded="patch({ coverUrl: $event.url })"
         />

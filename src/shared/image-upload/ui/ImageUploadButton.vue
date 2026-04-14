@@ -15,6 +15,8 @@ const props = withDefaults(
     defineProps<{
       bizType: UploadBizType
       articleId?: number | string
+      /** AVATAR/COVER 场景：当前已上传文件的 URL，新文件上传成功后后端自动删除旧文件 */
+      oldUrl?: string
       disabled?: boolean
       buttonText?: string
       accept?: string
@@ -22,6 +24,7 @@ const props = withDefaults(
     }>(),
     {
       articleId: undefined,
+      oldUrl: undefined,
       disabled: false,
       buttonText: '上传图片',
       accept: ARTICLE_IMAGE_ACCEPTED_EXTENSIONS.join(','),
@@ -58,6 +61,7 @@ async function handleInputChange(event: Event) {
       file,
       bizType: props.bizType,
       articleId: props.articleId,
+      oldUrl: props.oldUrl,
     })
 
     emit('uploaded', uploaded)
