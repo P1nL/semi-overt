@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import { AdminDeleteArticleButton } from '@/features/admin-article-delete'
 import { Icon } from '@/shared/components/base'
 import { ROUTE_NAME } from '@/shared/constants/routes'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
@@ -12,6 +14,7 @@ import { ArticleToc } from '@/widgets/article-toc'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const queryClient = useQueryClient()
 
 const articleId = computed(() => String(route.params.id || ''))
 const tocSyncKey = ref(`${articleId.value}-0`)
@@ -20,6 +23,12 @@ const showBackToTop = ref(false)
 
 function onLoaded() {
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
+}
+
+async function onArticleDeleted() {
+  // 文章被删除后，使首页 query 失效，触发重新请求以补齐卡片数量
+  await queryClient.invalidateQueries({ queryKey: queryKeys.home })
+  await router.push({ name: ROUTE_NAME.HOME })
 }
 
 function handleScroll() {
@@ -65,7 +74,7 @@ watch(
                 text="删除文章"
                 button-variant="ghost"
                 confirm-text="确认删除"
-                @deleted="router.push({ name: ROUTE_NAME.HOME })"
+                @deleted="onArticleDeleted"
               />
             </template>
           </ArticleReader>
