@@ -28,6 +28,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchButtonRef = ref<HTMLButtonElement | null>(null)
 const searchOpen = ref(false)
 const keyword = ref(uiStore.searchQuery)
+const dropdownVisible = ref(false)
 
 const leftSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
 const actionSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
@@ -37,6 +38,9 @@ const searchWrapClass = computed(() =>
     : 'w-[2.85rem]',
 )
 
+const trimmedKeyword = computed(() => keyword.value.trim())
+const showDropdown = computed(() => searchOpen.value && trimmedKeyword.value.length > 0 && dropdownVisible.value)
+
 watch(
   () => uiStore.searchQuery,
   (value) => {
@@ -45,9 +49,16 @@ watch(
 )
 
 watch(searchOpen, async (value) => {
-  if (!value) return
+  if (!value) {
+    dropdownVisible.value = false
+    return
+  }
   await nextTick()
   searchInputRef.value?.focus()
+})
+
+watch(trimmedKeyword, (value) => {
+  dropdownVisible.value = value.length > 0
 })
 
 onClickOutside(searchWrapRef, () => {
@@ -58,6 +69,7 @@ function toggleSearch() {
   if (!searchOpen.value) {
     keyword.value = ''
     uiStore.clearSearchQuery()
+    dropdownVisible.value = false
   }
 
   searchOpen.value = !searchOpen.value
@@ -65,6 +77,7 @@ function toggleSearch() {
 
 function closeSearch(options: { restoreFocus?: boolean } = {}) {
   searchOpen.value = false
+  dropdownVisible.value = false
 
   if (options.restoreFocus) {
     void nextTick(() => {
@@ -73,17 +86,11 @@ function closeSearch(options: { restoreFocus?: boolean } = {}) {
   }
 }
 
-async function submitSearch() {
-  const normalized = keyword.value.trim()
+async function navigateToArticleSearch() {
+  const normalized = trimmedKeyword.value
+  if (!normalized) return
+
   uiStore.setSearchQuery(normalized)
-
-  if (!normalized) {
-    keyword.value = ''
-    uiStore.clearSearchQuery()
-    closeSearch()
-    return
-  }
-
   await router.push({
     name: ROUTE_NAME.SEARCH,
     query: { keyword: normalized },
@@ -92,6 +99,24 @@ async function submitSearch() {
   keyword.value = ''
   uiStore.clearSearchQuery()
   closeSearch()
+}
+
+async function navigateToAuthorSearch() {
+  const normalized = trimmedKeyword.value
+  if (!normalized) return
+
+  await router.push({
+    name: ROUTE_NAME.PROFILE,
+    params: { username: normalized },
+  })
+
+  keyword.value = ''
+  uiStore.clearSearchQuery()
+  closeSearch()
+}
+
+async function submitSearch() {
+  await navigateToArticleSearch()
 }
 </script>
 
@@ -109,8 +134,8 @@ async function submitSearch() {
           <div class="relative flex min-w-0 flex-1 items-center justify-end">
             <div
               ref="searchWrapRef"
-              class="absolute right-0 top-1/2 -translate-y-1/2 overflow-hidden transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              :class="searchWrapClass"
+              class="absolute right-0 top-1/2 -translate-y-1/2 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              :class="[searchWrapClass, showDropdown ? 'overflow-visible' : 'overflow-hidden']"
             >
               <form
                 class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
@@ -136,12 +161,61 @@ async function submitSearch() {
                   ref="searchInputRef"
                   v-model="keyword"
                   type="search"
-                  placeholder="搜索文章"
-                  aria-label="搜索文章"
+                  placeholder="搜索文章或作者"
+                  aria-label="搜索文章或作者"
                   class="min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
                   @keydown.esc.prevent="closeSearch({ restoreFocus: true })"
                 />
               </form>
+
+              <!-- 搜索建议下拉框 -->
+              <Transition
+                enter-active-class="transition duration-150 ease-out"
+                enter-from-class="opacity-0 translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-100 ease-in"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 translate-y-1"
+              >
+                <div
+                  v-if="showDropdown"
+                  class="search-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_97%,transparent)] py-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
+                  role="listbox"
+                  aria-label="搜索建议"
+                >
+                  <button
+                    type="button"
+                    class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
+                    role="option"
+                    @click="navigateToArticleSearch"
+                  >
+                    <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]">
+                      <Icon name="search" size="0.85rem" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-xs text-[var(--color-text-muted)]">文章</span>
+                      <span class="block truncate text-sm font-medium text-[var(--color-text)]">具有「{{ trimmedKeyword }}」的文章</span>
+                    </span>
+                  </button>
+
+                  <div class="mx-4 h-px bg-[var(--color-border)]" />
+
+                  <button
+                    type="button"
+                    class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
+                    role="option"
+                    @click="navigateToAuthorSearch"
+                  >
+                    <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-text-muted)_10%,transparent)] text-[var(--color-text-muted)]">
+                      <Icon name="user" size="0.85rem" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-xs text-[var(--color-text-muted)]">作者</span>
+                      <span class="block truncate text-sm font-medium text-[var(--color-text)]">包含「{{ trimmedKeyword }}」的作者</span>
+                    </span>
+                  </button>
+                </div>
+              </Transition>
             </div>
           </div>
 
