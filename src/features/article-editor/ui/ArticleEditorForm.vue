@@ -103,6 +103,9 @@ const tableMenuOpen = ref(false)
 const tableMenuRef = ref<HTMLElement | null>(null)
 const tableMenuTriggerRef = ref<HTMLButtonElement | null>(null)
 const toolbarSentinelRef = ref<HTMLElement | null>(null)
+// 表格自定义行列输入
+const tableCustomRows = ref(3)
+const tableCustomCols = ref(3)
 
 const errors = reactive<{
   title: string
@@ -549,6 +552,12 @@ function insertTablePreset(rows: number, cols: number, withHeaderRow: boolean) {
     editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run()
   )
   closeTableMenu()
+}
+
+function insertCustomTable(withHeaderRow: boolean) {
+  const rows = Math.max(1, Math.min(20, tableCustomRows.value || 3))
+  const cols = Math.max(1, Math.min(10, tableCustomCols.value || 3))
+  insertTablePreset(rows, cols, withHeaderRow)
 }
 
 function applyHeadingLevel(level: HeadingLevel) {
@@ -1140,12 +1149,74 @@ defineExpose({
                     <div
                       v-if="tableMenuOpen"
                       ref="tableMenuRef"
-                      class="editor-toolbar-dropdown-menu editor-table-dropdown-menu"
+                      class="editor-toolbar-dropdown-menu editor-table-dropdown-menu editor-table-custom-menu"
                       role="menu"
                       aria-label="插入表格"
                     >
-                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(3, 3, true)">
+                      <!-- 行列尺寸选择器 -->
+                      <div class="editor-table-size-selector px-3 pt-2.5 pb-2">
+                        <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-faint)]">表格大小</p>
+                        <div class="flex items-center gap-2">
+                          <label class="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                            行
+                            <input
+                              v-model.number="tableCustomRows"
+                              type="number"
+                              min="1"
+                              max="20"
+                              class="editor-table-size-input"
+                              :disabled="disabledState"
+                            />
+                          </label>
+                          <span class="text-xs text-[var(--color-text-faint)]">×</span>
+                          <label class="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                            列
+                            <input
+                              v-model.number="tableCustomCols"
+                              type="number"
+                              min="1"
+                              max="10"
+                              class="editor-table-size-input"
+                              :disabled="disabledState"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="mx-3 h-px bg-[var(--color-border)]" />
+
+                      <!-- 含表头 -->
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState"
+                        role="menuitem"
+                        @click="insertCustomTable(true)"
+                      >
                         <span class="editor-table-dropdown-item__icon">
+                          <!-- 含表头占位图标：顶行加深 -->
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="3" />
+                            <rect x="3" y="3" width="18" height="6" rx="2" fill="currentColor" opacity="0.15" stroke="none" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="3" y1="15" x2="21" y2="15" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                            <line x1="15" y1="3" x2="15" y2="21" />
+                          </svg>
+                        </span>
+                        <span>自定义含表头</span>
+                      </button>
+
+                      <!-- 无表头 -->
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState"
+                        role="menuitem"
+                        @click="insertCustomTable(false)"
+                      >
+                        <span class="editor-table-dropdown-item__icon">
+                          <!-- 无表头占位图标：均匀网格 -->
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <rect x="3" y="3" width="18" height="18" rx="3" />
                             <line x1="3" y1="9" x2="21" y2="9" />
@@ -1154,31 +1225,7 @@ defineExpose({
                             <line x1="15" y1="3" x2="15" y2="21" />
                           </svg>
                         </span>
-                        <span>3×3 含表头</span>
-                      </button>
-                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(4, 4, true)">
-                        <span class="editor-table-dropdown-item__icon">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="7.5" x2="21" y2="7.5"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16.5" x2="21" y2="16.5"/><line x1="7.5" y1="3" x2="7.5" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16.5" y1="3" x2="16.5" y2="21"/></svg>
-                        </span>
-                        <span>4×4 含表头</span>
-                      </button>
-                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(3, 2, true)">
-                        <span class="editor-table-dropdown-item__icon">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
-                        </span>
-                        <span>2 列对比表</span>
-                      </button>
-                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(4, 3, false)">
-                        <span class="editor-table-dropdown-item__icon">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="7.5" y1="3" x2="7.5" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="16.5" y1="3" x2="16.5" y2="21"/></svg>
-                        </span>
-                        <span>4×3 无表头</span>
-                      </button>
-                      <button type="button" class="editor-toolbar-dropdown-item editor-table-dropdown-item" :disabled="disabledState" role="menuitem" @click="insertTablePreset(2, 5, true)">
-                        <span class="editor-table-dropdown-item__icon">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="8" x2="21" y2="8"/><line x1="6.6" y1="8" x2="6.6" y2="21"/><line x1="10.2" y1="8" x2="10.2" y2="21"/><line x1="13.8" y1="8" x2="13.8" y2="21"/><line x1="17.4" y1="8" x2="17.4" y2="21"/></svg>
-                        </span>
-                        <span>5 列宽表</span>
+                        <span>自定义无表头</span>
                       </button>
                     </div>
                   </Transition>
@@ -2680,6 +2727,10 @@ defineExpose({
   min-width: 9rem;
 }
 
+.editor-table-custom-menu {
+  min-width: 11rem;
+}
+
 .editor-table-dropdown-item {
   justify-content: flex-start !important;
   gap: 0.6rem;
@@ -2706,5 +2757,34 @@ defineExpose({
 
 .editor-table-dropdown-item:hover:not(:disabled) .editor-table-dropdown-item__icon {
   color: var(--color-text);
+}
+
+.editor-table-size-input {
+  width: 3rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.editor-table-size-input::-webkit-inner-spin-button,
+.editor-table-size-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.editor-table-size-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+.editor-table-size-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
