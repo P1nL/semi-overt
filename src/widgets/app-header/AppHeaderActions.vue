@@ -9,10 +9,8 @@ import { authApi } from '@/shared/api/modules/auth'
 import { Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
-import { queryKeys } from '@/shared/api/queryKeys'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
-import { queryClient } from '@/shared/lib/queryClient'
 import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -252,9 +250,6 @@ async function handleLogout() {
     toast.warning(getErrorMessage(error, '退出失败，但本地登录状态已清除。'))
   } finally {
     authStore.clearAuth()
-    queryClient.removeQueries({
-      queryKey: queryKeys.reviewPendingRoot,
-    })
     userMenuOpen.value = false
     loggingOut.value = false
     toast.success('已退出登录')
