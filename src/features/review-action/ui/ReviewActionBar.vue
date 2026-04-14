@@ -245,7 +245,10 @@ async function submitAction(action: ReviewActionValue) {
     })
     const nextStatus = result.status?.toUpperCase?.() || result.status
 
-    queryClient.setQueryData(queryKeys.articleDetail(props.articleId), (current) => {
+    // 使用 String() 确保 key 类型与 useArticleDetailQuery 中的 String(toValue(articleId)) 一致
+    const articleIdStr = String(props.articleId)
+
+    queryClient.setQueryData(queryKeys.articleDetail(articleIdStr), (current) => {
       if (!current || typeof current !== 'object') {
         return current
       }
@@ -270,10 +273,10 @@ async function submitAction(action: ReviewActionValue) {
         queryKey: queryKeys.reviewPendingRoot,
       }),
       queryClient.invalidateQueries({
-        queryKey: queryKeys.articleDetail(props.articleId),
+        queryKey: queryKeys.articleDetail(articleIdStr),
       }),
       queryClient.invalidateQueries({
-        queryKey: queryKeys.reviewLogs(props.articleId),
+        queryKey: queryKeys.reviewLogs(articleIdStr),
       }),
     ])
 

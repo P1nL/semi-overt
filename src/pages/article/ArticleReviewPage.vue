@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -22,6 +22,11 @@ const articleId = computed(() => String(route.params.id || ''))
 const readerKey = ref(0)
 const article = ref<ArticleDetailVm | null>(null)
 const tocSyncKey = ref(`${articleId.value}-0`)
+
+// articleId 变化时重置 article，避免切换文章时短暂显示上一篇的状态
+watch(articleId, () => {
+  article.value = null
+})
 
 const reviewLogsQuery = useReviewLogsQuery(articleId)
 const reviewLogs = computed(() => reviewLogsQuery.data.value ?? [])
