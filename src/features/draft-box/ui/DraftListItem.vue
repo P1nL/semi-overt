@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { ARTICLE_STATUS } from '@/entities/article'
 import { ArticleStatusBadge } from '@/entities/article/ui'
 import type { DraftBoxItem } from '@/features/draft-box/model'
-import { Icon, IconButton } from '@/shared/components/base'
+import { AnimatedTrashIcon, Icon, IconButton } from '@/shared/components/base'
 
 const props = withDefaults(
   defineProps<{
@@ -84,7 +84,7 @@ const titleText = computed(() => props.item.title?.trim() || '未命名文章')
           :disabled="deleting"
           @click="emit('delete', item)"
         >
-          <Icon name="trash" :size="16" class="draft-delete-icon" />
+          <AnimatedTrashIcon size="1rem" class="draft-delete-icon" />
         </IconButton>
       </div>
     </div>

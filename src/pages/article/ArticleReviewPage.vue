@@ -111,6 +111,7 @@ function onLoaded(value: ArticleDetailVm) {
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <ReviewActionBar
             :article-id="articleId"
+            :author-username="article?.author?.username"
             :status="article?.status?.value"
             @acted="onActed"
           />

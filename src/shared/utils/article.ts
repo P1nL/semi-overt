@@ -8,7 +8,17 @@ import {
 export function calcWordCount(content?: string | null): number {
     if (!content) return 0
 
-    const plainText = content
+    const plainText = toPlainArticleText(content)
+
+    if (!plainText) return 0
+
+    return Array.from(plainText.replace(/\s+/g, '')).length
+}
+
+export function toPlainArticleText(content?: string | null): string {
+    if (!content) return ''
+
+    return content
         .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/<\/?(?:img|hr)[^>]*>/gi, ' ')
@@ -25,10 +35,6 @@ export function calcWordCount(content?: string | null): number {
         .replace(/&quot;/gi, '"')
         .replace(/\s+/g, ' ')
         .trim()
-
-    if (!plainText) return 0
-
-    return Array.from(plainText.replace(/\s+/g, '')).length
 }
 
 export function calcReadMinutes(wordCount: number): number {

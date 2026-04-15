@@ -2,7 +2,7 @@
 import { onClickOutside } from '@vueuse/core'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import { Button } from '@/shared/components/base'
+import { AnimatedTrashIcon, Button } from '@/shared/components/base'
 import { useToast } from '@/shared/composables/useToast'
 import { getErrorMessage } from '@/shared/utils/error'
 import {
@@ -119,16 +119,14 @@ onClickOutside(rootRef, () => {
       :loading="loading"
       :disabled="disabled"
       class="admin-delete-button"
+      :class="{ 'admin-delete-button--confirming': confirming }"
+      :aria-label="confirming ? confirmText : text"
+      icon-only
       @click="handleDelete"
     >
-      <Transition name="admin-delete-label" mode="out-in">
-        <span
-          :key="confirming ? 'confirm' : 'default'"
-          class="admin-delete-button__label"
-        >
-          {{ confirming ? confirmText : text }}
-        </span>
-      </Transition>
+      <span class="admin-delete-button__label">
+        <AnimatedTrashIcon size="1.2rem" :decorative="true" />
+      </span>
     </Button>
   </div>
 </template>
@@ -152,38 +150,17 @@ onClickOutside(rootRef, () => {
   transform: none;
 }
 
+.admin-delete-button--confirming {
+  background: var(--color-danger);
+  box-shadow: 0 14px 28px rgb(220 38 38 / 0.2);
+}
+
 .admin-delete-button__label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 1.25rem;
+  min-width: 1.5rem;
   white-space: nowrap;
-}
-
-.admin-delete-label-enter-active,
-.admin-delete-label-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 180ms ease;
-}
-
-.admin-delete-label-enter-from {
-  opacity: 0;
-  transform: translateY(7px) scale(0.94);
-  filter: blur(4px);
-}
-
-.admin-delete-label-leave-to {
-  opacity: 0;
-  transform: translateY(-7px) scale(1.04);
-  filter: blur(4px);
-}
-
-.admin-delete-label-enter-to,
-.admin-delete-label-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  filter: blur(0);
 }
 </style>

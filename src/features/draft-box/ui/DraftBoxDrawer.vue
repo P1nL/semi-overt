@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 
 import {
   deleteDraftById,
@@ -8,6 +9,7 @@ import {
   syncDraftStore,
   type DraftBoxItem,
 } from '@/features/draft-box/model'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -32,6 +34,7 @@ const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 const draftStore = useDraftStore()
+const queryClient = useQueryClient()
 const attrs = useAttrs()
 
 const items = ref<DraftBoxItem[]>([])
@@ -99,6 +102,9 @@ async function removeDraft(item: DraftBoxItem) {
     const next = items.value.filter((draft) => draft.id !== item.id)
     items.value = next
     syncDraftStore(draftStore, next)
+
+    // 使用户个人页文章列表缓存失效，确保个人页数据同步更新
+    void queryClient.invalidateQueries({ queryKey: queryKeys.userProfileRoot })
 
     toast.success('文章已删除')
   } catch (error) {

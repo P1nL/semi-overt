@@ -105,9 +105,13 @@ async function navigateToAuthorSearch() {
   const normalized = trimmedKeyword.value
   if (!normalized) return
 
+  uiStore.setSearchQuery(normalized)
   await router.push({
-    name: ROUTE_NAME.PROFILE,
-    params: { username: normalized },
+    name: ROUTE_NAME.SEARCH,
+    query: {
+      keyword: normalized,
+      type: 'users',
+    },
   })
 
   keyword.value = ''
@@ -163,7 +167,7 @@ async function submitSearch() {
                   type="search"
                   placeholder="搜索文章或作者"
                   aria-label="搜索文章或作者"
-                  class="min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
+                  class="header-search-input min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
                   @keydown.esc.prevent="closeSearch({ restoreFocus: true })"
                 />
               </form>
@@ -250,6 +254,11 @@ async function submitSearch() {
   clip-path: inset(0 round 999px);
 }
 
+.header-search-shell-open:has(.header-search-input:-webkit-autofill),
+.header-search-shell-open:has(.header-search-input:autofill) {
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
+}
+
 .tool-icon-button {
   border-radius: 999px;
   transition:
@@ -289,6 +298,26 @@ input[type="search"]:focus-visible {
   background: transparent;
   -webkit-appearance: none;
   appearance: none;
+}
+
+.header-search-input:-webkit-autofill,
+.header-search-input:-webkit-autofill:hover,
+.header-search-input:-webkit-autofill:focus,
+.header-search-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--color-text) !important;
+  caret-color: var(--color-text);
+  background-color: transparent !important;
+  border: 0;
+  -webkit-box-shadow: inset 0 0 0 1000px transparent !important;
+  box-shadow: inset 0 0 0 1000px transparent !important;
+  -webkit-background-clip: text;
+  transition:
+    background-color 99999s ease-out 0s,
+    color 99999s ease-out 0s;
+}
+
+.header-search-input:-webkit-autofill::first-line {
+  font: inherit;
 }
 
 input[type="search"]::selection {

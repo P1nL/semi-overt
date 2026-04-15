@@ -4,7 +4,10 @@ export const queryKeys = {
         ['category', category, page, pageSize] as const,
     search: (keyword: string, page: number, pageSize: number) =>
         ['search', keyword, page, pageSize] as const,
+    userSearch: (keyword: string, limit: number) =>
+        ['user-search', keyword, limit] as const,
     articleDetail: (articleId: number | string) => ['article', articleId] as const,
+    userProfileRoot: ['user-profile'] as const,
     userProfile: (username: string, tab: string, page: number, pageSize: number) =>
         ['user-profile', username, tab, page, pageSize] as const,
     reviewPending: (page: number, pageSize: number) =>

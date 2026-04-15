@@ -23,6 +23,7 @@ import {
     ARTICLE_STATUS_LABEL_MAP,
     ARTICLE_WORDS_PER_MINUTE,
 } from './article.constants'
+import { toPlainArticleText } from '@/shared/utils/article'
 
 function toDisplayDate(value?: string | null): string | null {
     if (!value) return null
@@ -113,7 +114,9 @@ function createArticleCoverVm(title?: string | null, coverUrl?: string | null, c
 
 function createArticleSummaryVm(summary?: string | null, previewText?: string | null): ArticleSummaryVm {
     const rawText = summary?.trim() || null
-    const preview = previewText?.trim() || null
+    const previewRaw = previewText?.trim() || null
+    const preview = toPlainArticleText(previewRaw)
+    const previewDisplayText = preview || previewRaw
 
     if (rawText) {
         return {
@@ -123,9 +126,9 @@ function createArticleSummaryVm(summary?: string | null, previewText?: string | 
         }
     }
 
-    if (preview) {
+    if (previewDisplayText) {
         return {
-            text: preview,
+            text: previewDisplayText,
             rawText: null,
             isFallback: true,
         }

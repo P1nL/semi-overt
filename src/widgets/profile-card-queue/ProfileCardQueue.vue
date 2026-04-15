@@ -87,6 +87,39 @@ function initVisualOrder() {
   visualOrder.value = Array.from({ length: count.value }, (_, i) => i)
 }
 
+function buildVisualOrderForArticles(
+  previousArticles: ArticleCardVm[],
+  nextArticles: ArticleCardVm[],
+  previousOrder: number[],
+) {
+  const previousIdToIndex = new Map(previousArticles.map((article, index) => [String(article.id), index]))
+  const nextIdToIndex = new Map(nextArticles.map((article, index) => [String(article.id), index]))
+
+  const preservedOrder = previousOrder
+    .map((previousIndex) => previousArticles[previousIndex])
+    .filter((article): article is ArticleCardVm => Boolean(article))
+    .map((article) => nextIdToIndex.get(String(article.id)))
+    .filter((index): index is number => index !== undefined)
+
+  const appendedNewEntries = nextArticles
+    .map((article, index) => ({ article, index }))
+    .filter(({ article }) => !previousIdToIndex.has(String(article.id)))
+    .map(({ index }) => index)
+
+  const merged = [...preservedOrder, ...appendedNewEntries]
+
+  if (merged.length === nextArticles.length) {
+    return merged
+  }
+
+  const seen = new Set(merged)
+  const fallback = nextArticles
+    .map((_, index) => index)
+    .filter((index) => !seen.has(index))
+
+  return [...merged, ...fallback]
+}
+
 function getDesktopVisibleCards() {
   return visualOrder.value
     .slice(0, MAX_VISIBLE_CARDS)
@@ -339,11 +372,11 @@ function handleTouchEnd(e: TouchEvent) {
  * 在 articles 数组变化（tab 切换）时调用，
  * 确保旧动画残留不会污染新卡片布局。
  */
-async function resetDeck() {
+async function resetDeck(order: number[] | null = null) {
   gsap.killTweensOf('.ptm__card')
   isAnimating = false
 
-  initVisualOrder()
+  visualOrder.value = order ? [...order] : Array.from({ length: count.value }, (_, i) => i)
   await nextTick()
 
   if (cardsRef.value) {
@@ -378,12 +411,17 @@ async function fadeInDeck() {
 
 async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
   const token = ++articleTransitionToken
+  const nextVisualOrder = buildVisualOrderForArticles(
+    displayedArticles.value,
+    nextArticles,
+    visualOrder.value,
+  )
 
   if (prefersReducedMotion.value) {
     displayedArticles.value = [...nextArticles]
     await nextTick()
     if (!isGridMode.value) {
-      await resetDeck()
+      await resetDeck(nextVisualOrder)
       for (const el of getFadeTargets()) gsap.set(el, { opacity: 1 })
     }
     return
@@ -416,7 +454,7 @@ async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
   }
 
   // 堆叠模式：正常走 resetDeck + 入场动画
-  await resetDeck()
+  await resetDeck(nextVisualOrder)
 
   if (token !== articleTransitionToken) return
 
@@ -951,6 +989,9 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.65rem;
+  align-items: start;
+  padding-top: 0.35rem;
+  padding-bottom: 1.25rem;
 }
 
 .ptm__grid-item {
@@ -960,6 +1001,10 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
   border-radius: var(--radius-xl);
   transition: transform 220ms ease;
   will-change: transform;
+}
+
+.ptm__grid-item:nth-child(even) {
+  margin-top: 1.15rem;
 }
 
 .ptm__grid-item:hover {

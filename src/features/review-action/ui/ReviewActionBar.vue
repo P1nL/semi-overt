@@ -50,10 +50,12 @@ const props = withDefaults(
   defineProps<{
     articleId: number | string
     status?: string | null
+    authorUsername?: string | null
     disabled?: boolean
   }>(),
   {
     status: null,
+    authorUsername: null,
     disabled: false,
   },
 )
@@ -272,6 +274,17 @@ async function submitAction(action: ReviewActionValue) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.reviewPendingRoot,
       }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.userProfileRoot,
+      }),
+      ...(props.authorUsername?.trim()
+        ? [
+            queryClient.refetchQueries({
+              queryKey: [queryKeys.userProfileRoot[0], props.authorUsername.trim()],
+              type: 'active',
+            }),
+          ]
+        : []),
       queryClient.invalidateQueries({
         queryKey: queryKeys.articleDetail(articleIdStr),
       }),

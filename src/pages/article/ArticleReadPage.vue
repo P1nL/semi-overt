@@ -26,8 +26,11 @@ function onLoaded() {
 }
 
 async function onArticleDeleted() {
-  // 文章被删除后，使首页 query 失效，触发重新请求以补齐卡片数量
-  await queryClient.invalidateQueries({ queryKey: queryKeys.home })
+  // 文章被删除后，使首页和用户个人页 query 失效，触发重新请求
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.userProfileRoot }),
+  ])
   await router.push({ name: ROUTE_NAME.HOME })
 }
 

@@ -106,6 +106,7 @@ const currentRouteArticle = computed(() => {
   return String(currentArticle.value.id) === articleId.value ? currentArticle.value : null
 })
 const currentStatus = computed(() => currentRouteArticle.value?.status.value ?? '')
+const currentAuthorUsername = computed(() => currentRouteArticle.value?.author?.username?.trim() ?? '')
 const currentStatusLabel = computed(() => currentRouteArticle.value?.status.label ?? '')
 const isPending = computed(() => currentStatus.value === ARTICLE_STATUS.PENDING)
 const isEditable = computed(() => !currentStatus.value || canEditArticle(currentStatus.value))
@@ -521,6 +522,23 @@ function onDraftSaved(payload: EditorDraftSavedPayload) {
   pageError.value = ''
   submitError.value = ''
   editorStore.setLastSavedAt(payload.savedAt)
+
+  if (articleId.value) {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.articleDetail(articleId.value),
+    })
+  }
+
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.userProfileRoot,
+  })
+
+  if (currentAuthorUsername.value) {
+    void queryClient.refetchQueries({
+      queryKey: [queryKeys.userProfileRoot[0], currentAuthorUsername.value],
+      type: 'active',
+    })
+  }
 }
 
 function onLoaded(values: EditorFormValues) {
@@ -605,6 +623,15 @@ async function submitArticle() {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.reviewPendingRoot,
     })
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.userProfileRoot,
+    })
+    if (currentAuthorUsername.value) {
+      void queryClient.refetchQueries({
+        queryKey: [queryKeys.userProfileRoot[0], currentAuthorUsername.value],
+        type: 'active',
+      })
+    }
 
   } catch (error) {
     const message = getErrorMessage(error, '提交失败，请稍后重试')
@@ -647,6 +674,15 @@ async function cancelReview() {
     void queryClient.invalidateQueries({
       queryKey: queryKeys.reviewPendingRoot,
     })
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.userProfileRoot,
+    })
+    if (nextArticle.author?.username?.trim()) {
+      void queryClient.refetchQueries({
+        queryKey: [queryKeys.userProfileRoot[0], nextArticle.author.username.trim()],
+        type: 'active',
+      })
+    }
 
     await onCanceled()
     toast.success('已取消审核，文章恢复为草稿')

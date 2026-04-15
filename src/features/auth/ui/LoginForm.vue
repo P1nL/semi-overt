@@ -178,6 +178,7 @@ async function handleSubmit() {
 
     <div class="flex justify-center">
       <AuthActionButton
+        class="login-form__submit"
         type="submit"
         :loading="submitting"
         :disabled="submitting || hasErrors"
@@ -200,3 +201,9 @@ async function handleSubmit() {
     </div>
   </form>
 </template>
+
+<style scoped>
+:deep(.login-form__submit.auth-action-button--icon-only) {
+  width: 15rem;
+}
+</style>

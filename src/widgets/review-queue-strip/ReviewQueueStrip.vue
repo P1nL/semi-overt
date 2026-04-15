@@ -39,9 +39,9 @@ withDefaults(
 
     <EmptyState
         v-else
-        title="No pending reviews"
+        title="还没有待审核文章"
         description=""
-        emoji="🙂"
+        emoji="🥱"
         size="sm"
     />
   </section>

@@ -72,6 +72,28 @@ export function useSearchArticlesQuery(
     })
 }
 
+export function useSearchUsersQuery(
+    keyword: MaybeRefOrGetter<string>,
+    limit: MaybeRefOrGetter<number | undefined>,
+    enabled: MaybeRefOrGetter<boolean> = true,
+) {
+    return useQuery({
+        queryKey: computed(() =>
+            queryKeys.userSearch(
+                toValue(keyword),
+                resolvePositiveInt(toValue(limit), 10),
+            ),
+        ),
+        queryFn: () =>
+            searchApi.searchUsers({
+                keyword: toValue(keyword),
+                limit: resolvePositiveInt(toValue(limit), 10),
+            }),
+        enabled: computed(() => Boolean(toValue(enabled)) && Boolean(toValue(keyword).trim())),
+        placeholderData: keepPreviousData,
+    })
+}
+
 export function useArticleDetailQuery(
     articleId: MaybeRefOrGetter<number | string | null | undefined>,
 ) {
