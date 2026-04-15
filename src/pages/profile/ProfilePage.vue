@@ -198,11 +198,45 @@ async function onTabChange(tab: ProfileArticleTab) {
   }
 
   .profile-content-layout__tabs {
+    --profile-tabs-radius: 10px;
     position: sticky;
     top: calc(var(--header-height-md) + 1rem);
     display: block;
-    border-radius: var(--radius-xl);
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--profile-tabs-radius);
     padding: 0.75rem;
+    background: color-mix(in srgb, var(--color-surface-glass) 74%, transparent);
+  }
+
+  .profile-content-layout__tabs::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: calc(var(--profile-tabs-radius) - 1px);
+    background:
+      radial-gradient(
+        circle at 50% 48%,
+        color-mix(in srgb, var(--color-surface-glass-strong) 8%, transparent) 0%,
+        color-mix(in srgb, var(--color-surface-glass) 16%, transparent) 34%,
+        color-mix(in srgb, var(--color-surface-glass-strong) 32%, transparent) 100%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-surface-glass-strong) 24%, transparent),
+        color-mix(in srgb, var(--color-surface-glass) 18%, transparent)
+      );
+    backdrop-filter: blur(24px) saturate(168%);
+    -webkit-backdrop-filter: blur(24px) saturate(168%);
+    mask-image: radial-gradient(circle at 50% 50%, transparent 16%, rgb(0 0 0 / 0.34) 50%, black 100%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 16%, rgb(0 0 0 / 0.34) 50%, black 100%);
+  }
+
+  .profile-content-layout__tabs > * {
+    position: relative;
+    z-index: 1;
   }
 
   .profile-content-layout__main {
@@ -223,5 +257,6 @@ async function onTabChange(tab: ProfileArticleTab) {
   .profile-content-layout__tabs-mobile {
     display: none;
   }
+
 }
 </style>
