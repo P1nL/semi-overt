@@ -29,7 +29,7 @@ const srLabel = computed(() => props.label || 'Loading')
     <span
         :class="
         cn(
-          'inline-block animate-spin rounded-full border-current border-r-transparent text-current',
+          'inline-block animate-[spin_0.8s_linear_infinite] rounded-full border-current border-r-transparent text-current',
           sizeClassMap[size],
         )
       "

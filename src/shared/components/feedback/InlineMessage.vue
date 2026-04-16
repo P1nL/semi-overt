@@ -63,7 +63,7 @@ const toneStyle = computed(() => {
       role="status"
       aria-live="polite"
   >
-    <component :is="toneStyle.icon" class="mt-0.5 h-4 w-4 shrink-0" :style="{ color: toneStyle.color }" />
+    <component :is="toneStyle.icon" class="mt-0.5 h-5 w-5 shrink-0 pt-0.5" :style="{ color: toneStyle.color }" />
 
     <div class="min-w-0 flex-1">
       <p v-if="props.title" class="font-medium tracking-[-0.01em]" :style="{ color: toneStyle.color }">
