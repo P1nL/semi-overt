@@ -75,9 +75,6 @@ const isOwner = computed(
               <h1 class="text-[1.55rem] font-semibold tracking-[-0.04em] text-white drop-shadow-[0_4px_20px_rgb(8_15_34_/_0.35)] sm:text-2xl md:text-3xl">
                 {{ profile.displayName }}
               </h1>
-              <p class="mt-1 text-sm text-white/78 md:text-base">
-                @{{ profile.username }}
-              </p>
             </div>
 
             <div class="flex justify-center">
