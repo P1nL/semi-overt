@@ -30,17 +30,11 @@ const prefersReducedMotion = ref(false)
 const viewportWidth = ref(0)
 const topCycleWidth = ref(0)
 const bottomCycleWidth = ref(0)
-const pointerActive = ref(false)
-const pointerX = ref(0)
-const pointerY = ref(0)
-const hoveredLoopKey = ref<string | null>(null)
 
 let resizeFrame = 0
 let reduceMotionQuery: MediaQueryList | null = null
 let topTrackSetter: ((value: number) => void) | null = null
 let bottomTrackSetter: ((value: number) => void) | null = null
-let topItemWaveSetters: Array<(value: number) => void> = []
-let bottomItemWaveSetters: Array<(value: number) => void> = []
 let offsetTickScheduled = false
 
 function splitTrackItems(items: GalleryBandItem[], takeEven: boolean) {
@@ -137,83 +131,6 @@ function syncTrackSetters() {
     : null
 }
 
-function createWaveSetters(track: HTMLElement | null) {
-  if (!track) return []
-
-  return Array.from(track.children).map((item) => {
-    const element = item as HTMLElement
-    gsap.set(element, { y: 0, force3D: true })
-    return gsap.quickTo(element, 'y', {
-      duration: 0.42,
-      ease: 'power3.out',
-      overwrite: 'auto',
-    }) as (value: number) => void
-  })
-}
-
-function syncWaveSetters() {
-  topItemWaveSetters = createWaveSetters(topTrackRef.value)
-  bottomItemWaveSetters = createWaveSetters(bottomTrackRef.value)
-}
-
-function resetWaveOffsets() {
-  topItemWaveSetters.forEach((setY) => {
-    setY(0)
-  })
-  bottomItemWaveSetters.forEach((setY) => {
-    setY(0)
-  })
-}
-
-function resolveWaveLiftByIndex(indexDistance: number, radius: number, maxLift: number) {
-  if (radius <= 0 || indexDistance >= radius) return 0
-
-  const normalized = 1 - indexDistance / radius
-  const eased = normalized * normalized * (3 - 2 * normalized)
-  return -maxLift * eased
-}
-
-function findHoveredIndex(track: HTMLElement | null, key: string | null): number {
-  if (!track || !key) return -1
-
-  const items = track.children
-  for (let i = 0; i < items.length; i++) {
-    if ((items[i] as HTMLElement).dataset.loopKey === key) return i
-  }
-  return -1
-}
-
-function updateWaveOffsets() {
-  if (!pointerActive.value || prefersReducedMotion.value) {
-    resetWaveOffsets()
-    return
-  }
-
-  const key = hoveredLoopKey.value
-  const maxLift = viewportWidth.value < 768 ? 8 : 10
-  const waveRadius = 3.5
-
-  const applyWave = (track: HTMLElement | null, setters: Array<(value: number) => void>) => {
-    if (!track || !setters.length) return
-
-    const anchorIndex = findHoveredIndex(track, key)
-
-    if (anchorIndex < 0) {
-      setters.forEach((setY) => { setY(0) })
-      return
-    }
-
-    setters.forEach((setY, i) => {
-      const indexDistance = Math.abs(i - anchorIndex)
-      const lift = resolveWaveLiftByIndex(indexDistance, waveRadius, maxLift)
-      setY(lift)
-    })
-  }
-
-  applyWave(topTrackRef.value, topItemWaveSetters)
-  applyWave(bottomTrackRef.value, bottomItemWaveSetters)
-}
-
 function updateOffsets() {
   gsap.ticker.remove(updateOffsets)
   offsetTickScheduled = false
@@ -223,7 +140,6 @@ function updateOffsets() {
   if (prefersReducedMotion.value) {
     topTrackSetter?.(0)
     bottomTrackSetter?.(0)
-    resetWaveOffsets()
     return
   }
 
@@ -247,8 +163,6 @@ function updateOffsets() {
 
   topTrackSetter?.(topOffset)
   bottomTrackSetter?.(bottomOffset)
-  syncHoveredArticleFromPointer()
-  updateWaveOffsets()
 }
 
 function queueOffsets() {
@@ -273,61 +187,8 @@ function queueMeasure() {
     syncViewportWidth()
     await measureTracks()
     syncTrackSetters()
-    syncWaveSetters()
     queueOffsets()
   })
-}
-
-function onPointerEnter(event: PointerEvent) {
-  if (event.pointerType !== 'mouse') return
-
-  pointerActive.value = true
-  pointerX.value = event.clientX
-  pointerY.value = event.clientY
-  queueOffsets()
-}
-
-function onPointerMove(event: PointerEvent) {
-  if (event.pointerType !== 'mouse') return
-
-  pointerActive.value = true
-  pointerX.value = event.clientX
-  pointerY.value = event.clientY
-  queueOffsets()
-}
-
-function onPointerLeave() {
-  pointerActive.value = false
-  hoveredLoopKey.value = null
-  resetWaveOffsets()
-}
-
-function setHoveredLoopKey(loopKey: string | null) {
-  hoveredLoopKey.value = loopKey
-}
-
-function syncHoveredArticleFromPointer() {
-  if (!pointerActive.value || !sectionRef.value) {
-    return
-  }
-
-  const hoveredElement = document.elementFromPoint(pointerX.value, pointerY.value)
-
-  if (!(hoveredElement instanceof HTMLElement)) {
-    return
-  }
-
-  if (!sectionRef.value.contains(hoveredElement)) {
-    return
-  }
-
-  const hoveredItem = hoveredElement.closest<HTMLElement>('.article-parallax-band__item')
-
-  if (!hoveredItem) {
-    return
-  }
-
-  hoveredLoopKey.value = hoveredItem.dataset.loopKey ?? hoveredLoopKey.value
 }
 
 const { wheelPosition, onWheel: onBandWheel } = useGalleryWheelMotion({
@@ -379,9 +240,6 @@ onBeforeUnmount(() => {
     ref="sectionRef"
     class="article-parallax-band"
     @wheel="onBandWheel"
-    @pointerenter="onPointerEnter"
-    @pointermove="onPointerMove"
-    @pointerleave="onPointerLeave"
   >
     <div class="article-parallax-band__row">
         <div class="article-parallax-band__viewport">
@@ -390,13 +248,8 @@ onBeforeUnmount(() => {
             v-for="item in topTrackItems"
             :key="item.loopKey"
             class="article-parallax-band__item"
-            :data-loop-key="item.loopKey"
-            @pointerenter="setHoveredLoopKey(item.loopKey)"
           >
-            <ArticleParallaxGalleryCard
-              :article="item.article"
-              :is-hovered="hoveredLoopKey === item.loopKey"
-            />
+            <ArticleParallaxGalleryCard :article="item.article" />
           </div>
         </div>
       </div>
@@ -409,13 +262,8 @@ onBeforeUnmount(() => {
             v-for="item in bottomTrackItems"
             :key="item.loopKey"
             class="article-parallax-band__item"
-            :data-loop-key="item.loopKey"
-            @pointerenter="setHoveredLoopKey(item.loopKey)"
           >
-            <ArticleParallaxGalleryCard
-              :article="item.article"
-              :is-hovered="hoveredLoopKey === item.loopKey"
-            />
+            <ArticleParallaxGalleryCard :article="item.article" />
           </div>
         </div>
       </div>

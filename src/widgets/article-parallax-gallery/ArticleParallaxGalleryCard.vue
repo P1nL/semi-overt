@@ -66,7 +66,7 @@ defineProps<{
 }
 
 .article-parallax-card:hover {
-  transform: translate3d(0, -8px, 0);
+  transform: translate3d(0, -4px, 0);
   box-shadow: none;
 }
 
