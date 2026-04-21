@@ -221,3 +221,15 @@ export type UploadBizType = 'AVATAR' | 'COVER' | 'ARTICLE_IMAGE'
 export interface SearchArticleRespDto extends PageRespDto<ArticleCardDto> {
     keyword: string
 }
+
+export interface UserSearchItemDto {
+    id: number
+    username: string
+    nickname: string | null
+    avatarUrl: string | null
+    profilePath: string
+}
+
+export interface SearchUserRespDto extends PageRespDto<UserSearchItemDto> {
+    keyword: string
+}

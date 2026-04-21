@@ -51,10 +51,12 @@
 - `GET /home`：首页 Hero + sections
 - `GET /categories/{QUICK|SHORT|DEEP}/articles`：分类列表
 - `GET /search/articles`：搜索（P2 占位）
+- `GET /search/users`：作者搜索（分页 / 无限加载）
 
 关键校验：
 - 分类切换请求参数正确
 - 搜索关键词同步到 URL 与 UI store
+- 搜索文章 / 作者都返回 `list/total/page/pageSize/pages`
 
 ## 5. 审核模块（13.x）
 - `GET /reviews/pending`：管理员待审队列

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { useIntersectionObserver } from '@vueuse/core'
 
 import { CATEGORY_TAB } from '@/entities/category'
 import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category'
-import { useCategoryArticlesQuery } from '@/entities/queries'
+import { mapArticleCardDtoToVm } from '@/entities/article'
+import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
-import ArticleParallaxGallery from '@/widgets/article-parallax-gallery/ArticleParallaxGallery.vue'
+import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
 import { AppHeader } from '@/widgets/app-header'
 
 const props = withDefaults(
@@ -21,6 +23,8 @@ const props = withDefaults(
 )
 
 const route = useRoute()
+const router = useRouter()
+const loadMoreRef = ref<HTMLElement | null>(null)
 const currentRoute = computed(() => props.routeOverride ?? route)
 
 const activeCategory = computed(() => {
@@ -29,26 +33,61 @@ const activeCategory = computed(() => {
   return CATEGORY_TAB.SHORT
 })
 
-const categoryQuery = useCategoryArticlesQuery(activeCategory, 1, 10)
+const resultView = computed(() => {
+  const queryView = currentRoute.value.query.view
+  return isResultViewMode(queryView) ? queryView : RESULT_VIEW_MODE.GALLERY
+})
+const categoryQuery = useInfiniteCategoryArticlesQuery(activeCategory, 10)
 const sectionMeta = computed(() => mapCategoryValueToVm(activeCategory.value, activeCategory.value))
-const loading = computed(() => categoryQuery.isFetching.value)
+const categoryPages = computed(() => categoryQuery.data.value?.pages ?? [])
+const loading = computed(() => categoryQuery.isPending.value && categoryPages.value.length === 0)
 const errorMessage = computed(() =>
   categoryQuery.error.value
     ? getErrorMessage(categoryQuery.error.value, '栏目文章加载失败，请稍后重试。')
     : '',
 )
 const list = computed(() => {
-  if (!categoryQuery.data.value) {
-    return []
-  }
+  const seen = new Set<string>()
 
-  return mapCategoryDtoToSectionVm(categoryQuery.data.value, activeCategory.value).list
+  return categoryPages.value
+    .flatMap((pageData) => pageData.list)
+    .map((item) => mapArticleCardDtoToVm(item))
+    .filter((item) => {
+      const key = String(item.id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 })
 const contentState = computed(() => {
   if (loading.value) return 'loading'
   if (list.value.length) return 'content'
   return 'empty'
 })
+
+async function onViewChange(nextView: string) {
+  if (!isResultViewMode(nextView)) return
+
+  await router.replace({
+    query: {
+      ...currentRoute.value.query,
+      view: nextView === RESULT_VIEW_MODE.GALLERY ? undefined : nextView,
+    },
+  })
+}
+
+useIntersectionObserver(
+  loadMoreRef,
+  ([entry]) => {
+    if (!entry?.isIntersecting) return
+    if (!categoryQuery.hasNextPage.value || categoryQuery.isFetchingNextPage.value) return
+
+    void categoryQuery.fetchNextPage()
+  },
+  {
+    rootMargin: '0px 0px 320px 0px',
+  },
+)
 </script>
 
 <template>
@@ -57,13 +96,19 @@ const contentState = computed(() => {
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="px-1 py-2 md:px-2 md:py-3">
-        <SectionHeader
-          class="category-page-header"
-          :title="`${sectionMeta.label}`"
-          :description="sectionMeta.description"
-          align="center"
-          compact
-        />
+        <div class="category-page-heading">
+          <SectionHeader
+            class="category-page-header"
+            :title="`${sectionMeta.label}`"
+            :description="sectionMeta.description"
+            align="center"
+            compact
+          />
+
+          <div class="category-page-heading__actions">
+            <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
+          </div>
+        </div>
       </section>
 
       <Transition name="content-fade" mode="out-in">
@@ -73,11 +118,30 @@ const contentState = computed(() => {
           class="content-loading-shell"
         />
 
-        <ArticleParallaxGallery
+        <div
           v-else-if="contentState === 'content'"
           key="category-content"
-          :items="list"
-        />
+          class="space-y-5"
+        >
+          <ArticleResultStream :items="list" :view="resultView" />
+
+          <div ref="loadMoreRef" class="category-page-load-sentinel" aria-hidden="true" />
+
+          <section
+            v-if="resultView !== RESULT_VIEW_MODE.GALLERY"
+            class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
+          >
+            <p v-if="categoryQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+              正在续接更多栏目文章…
+            </p>
+            <p v-else-if="categoryQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+              继续下滑，画廊会自动向后展开
+            </p>
+            <p v-else class="text-sm text-[var(--color-text-muted)]">
+              这个栏目已经全部展开完毕
+            </p>
+          </section>
+        </div>
 
         <div v-else key="category-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
           <EmptyState
@@ -101,5 +165,23 @@ const contentState = computed(() => {
 .category-page-header :deep(p) {
   margin-inline: auto;
   text-align: center;
+}
+
+.category-page-heading {
+  position: relative;
+  padding-bottom: 3.25rem;
+}
+
+.category-page-heading__actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.category-page-load-sentinel {
+  width: 100%;
+  height: 1px;
 }
 </style>

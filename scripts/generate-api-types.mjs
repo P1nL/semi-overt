@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import openapiTS from 'openapi-typescript'
+import openapiTS, { astToString } from 'openapi-typescript'
 
 const specEnvMap = {
     auth: 'OPENAPI_AUTH_URL',
@@ -14,7 +14,7 @@ const outputPath = path.resolve('src/shared/api/generated/openapi.ts')
 
 async function renderNamespace(name, sourceUrl) {
     const schema = await openapiTS(new URL(sourceUrl))
-    return `export namespace ${name} {\n${schema}\n}\n`
+    return `export namespace ${name} {\n${astToString(schema)}\n}\n`
 }
 
 async function main() {

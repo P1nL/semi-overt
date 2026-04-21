@@ -10,7 +10,9 @@ import type {
     ProfileDto,
     ReviewLogRespDto,
     SearchArticleRespDto,
+    SearchUserRespDto,
     UserProfileRespDto,
+    UserSearchItemDto,
 } from '@/shared/types/api'
 import { resolveAssetUrl } from '@/shared/utils/asset'
 
@@ -124,6 +126,23 @@ export interface BackendCategoryResp {
 export interface BackendSearchResp {
     keyword: string
     list: BackendArticleCardResp[]
+    total?: number
+    page?: number
+    pageSize?: number
+    pages?: number
+}
+
+export interface BackendUserSearchItemResp {
+    id: number
+    username: string
+    nickname?: string | null
+    avatarUrl?: string | null
+    profilePath?: string | null
+}
+
+export interface BackendUserSearchResp {
+    keyword: string
+    list: BackendUserSearchItemResp[]
     total?: number
     page?: number
     pageSize?: number
@@ -318,6 +337,25 @@ export function normalizeSearchResp(raw: BackendSearchResp): SearchArticleRespDt
         page: raw.page ?? 1,
         pageSize: raw.pageSize ?? raw.list.length,
         pages: raw.pages ?? 1,
+    }
+}
+
+export function normalizeUserSearchResp(raw: BackendUserSearchResp): SearchUserRespDto {
+    const list: UserSearchItemDto[] = (raw.list ?? []).map((item) => ({
+        id: item.id,
+        username: item.username,
+        nickname: item.nickname?.trim() || null,
+        avatarUrl: resolveAssetUrl(item.avatarUrl),
+        profilePath: item.profilePath?.trim() || `/u/${encodeURIComponent(item.username)}`,
+    }))
+
+    return {
+        keyword: raw.keyword,
+        list,
+        total: Number(raw.total ?? list.length),
+        page: Number(raw.page ?? 1),
+        pageSize: Number(raw.pageSize ?? (list.length || 10)),
+        pages: Number(raw.pages ?? (list.length > 0 ? 1 : 0)),
     }
 }
 

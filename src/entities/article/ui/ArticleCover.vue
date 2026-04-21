@@ -31,7 +31,7 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
         compact
           ? 'h-24 w-32 shrink-0'
           : fillHeight
-            ? 'min-h-[18rem] w-full flex-1'
+            ? 'h-[clamp(13.6rem,29vw,15rem)] w-full shrink-0'
             : 'aspect-[16/9] w-full'
       "
       :style="{ backgroundColor: cover.color }"
@@ -43,7 +43,7 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
         :loading="imageLoading"
         :decoding="imageDecoding"
         :fetchpriority="imageFetchPriority"
-        class="h-full w-full object-cover"
+        class="absolute inset-0 block h-full w-full object-cover object-center"
     />
     <div
         v-else

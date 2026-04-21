@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { useIntersectionObserver } from '@vueuse/core'
 
 import { mapArticleCardDtoToVm } from '@/entities/article'
-import { useSearchArticlesQuery, useSearchUsersQuery } from '@/entities/queries'
-import { Avatar, EmptyState, Pagination } from '@/shared/components/base'
+import { useInfiniteSearchArticlesQuery, useInfiniteSearchUsersQuery } from '@/entities/queries'
+import { Avatar, EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
-import ArticleParallaxGallery from '@/widgets/article-parallax-gallery/ArticleParallaxGallery.vue'
+import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
 import { AppHeader } from '@/widgets/app-header'
 
 const props = withDefaults(
@@ -24,18 +25,38 @@ const route = useRoute()
 const router = useRouter()
 const pageSize = 10
 const userSearchLimit = 10
+const loadMoreRef = ref<HTMLElement | null>(null)
 const currentRoute = computed(() => props.routeOverride ?? route)
 
 const routeType = computed(() => String(currentRoute.value.query.type || '').trim().toLowerCase())
 const isUserSearch = computed(() => routeType.value === 'users')
 const routeKeyword = computed(() => String(currentRoute.value.query.keyword || currentRoute.value.query.q || '').trim())
-const page = computed(() => Number(currentRoute.value.query.page || 1) || 1)
-const articleSearchQuery = useSearchArticlesQuery(routeKeyword, page, pageSize)
-const userSearchQuery = useSearchUsersQuery(routeKeyword, userSearchLimit, isUserSearch)
+const resultView = computed(() => {
+  const queryView = currentRoute.value.query.view
+  return isResultViewMode(queryView) ? queryView : RESULT_VIEW_MODE.GALLERY
+})
+const articleSearchQuery = useInfiniteSearchArticlesQuery(routeKeyword, pageSize, computed(() => !isUserSearch.value))
+const userSearchQuery = useInfiniteSearchUsersQuery(routeKeyword, userSearchLimit, isUserSearch)
 
-const loading = computed(() =>
-  isUserSearch.value ? userSearchQuery.isFetching.value : articleSearchQuery.isFetching.value,
-)
+const articlePages = computed(() => articleSearchQuery.data.value?.pages ?? [])
+const userPages = computed(() => userSearchQuery.data.value?.pages ?? [])
+const articleList = computed(() => {
+  const seen = new Set<string>()
+
+  return articlePages.value
+    .flatMap((pageData) => pageData.list)
+    .map((item) => mapArticleCardDtoToVm(item))
+    .filter((item) => {
+      const key = String(item.id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+})
+const loading = computed(() => {
+  if (isUserSearch.value) return userSearchQuery.isPending.value && userList.value.length === 0
+  return articleSearchQuery.isPending.value && articleList.value.length === 0
+})
 const errorMessage = computed(() =>
   (isUserSearch.value ? userSearchQuery.error.value : articleSearchQuery.error.value)
     ? getErrorMessage(
@@ -47,14 +68,22 @@ const errorMessage = computed(() =>
 const total = computed(() =>
   Number(
     isUserSearch.value
-      ? userSearchQuery.data.value?.total ?? userSearchQuery.data.value?.list.length ?? 0
-      : articleSearchQuery.data.value?.total ?? articleSearchQuery.data.value?.list.length ?? 0,
+      ? userPages.value[0]?.total ?? userList.value.length
+      : articlePages.value[0]?.total ?? articleList.value.length,
   ),
 )
-const articleList = computed(() =>
-  (articleSearchQuery.data.value?.list ?? []).map((item) => mapArticleCardDtoToVm(item)),
-)
-const userList = computed(() => userSearchQuery.data.value?.list ?? [])
+const userList = computed(() => {
+  const seen = new Set<string>()
+
+  return userPages.value
+    .flatMap((pageData) => pageData.list)
+    .filter((item) => {
+      const key = String(item.id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+})
 const contentState = computed(() => {
   if (loading.value) return 'loading'
   if (isUserSearch.value ? userList.value.length : articleList.value.length) return 'content'
@@ -95,24 +124,46 @@ function resolveSearchLocation(keywordValue: string, nextPage = 1) {
     query: {
       ...(keywordValue ? { keyword: keywordValue } : {}),
       ...(isUserSearch.value ? { type: 'users' } : {}),
-      page: nextPage > 1 ? String(nextPage) : undefined,
+      view: !isUserSearch.value && resultView.value !== RESULT_VIEW_MODE.GALLERY ? resultView.value : undefined,
     },
   }
 }
 
-async function onPageChange(nextPage: number) {
-  if (isUserSearch.value) return
+async function onViewChange(nextView: string) {
+  if (isUserSearch.value || !isResultViewMode(nextView)) return
 
-  const target = resolveSearchLocation(routeKeyword.value, nextPage)
+  const target = {
+    name: ROUTE_NAME.SEARCH,
+    query: {
+      ...(routeKeyword.value ? { keyword: routeKeyword.value } : {}),
+      ...(isUserSearch.value ? { type: 'users' } : {}),
+      view: nextView === RESULT_VIEW_MODE.GALLERY ? undefined : nextView,
+    },
+  }
+
   if (router.resolve(target).fullPath !== currentRoute.value.fullPath) {
     await router.replace(target)
-    return
-  }
-
-  if (routeKeyword.value) {
-    await articleSearchQuery.refetch()
   }
 }
+
+useIntersectionObserver(
+  loadMoreRef,
+  ([entry]) => {
+    if (!entry?.isIntersecting) return
+
+    if (isUserSearch.value) {
+      if (!userSearchQuery.hasNextPage.value || userSearchQuery.isFetchingNextPage.value) return
+      void userSearchQuery.fetchNextPage()
+      return
+    }
+
+    if (!articleSearchQuery.hasNextPage.value || articleSearchQuery.isFetchingNextPage.value) return
+    void articleSearchQuery.fetchNextPage()
+  },
+  {
+    rootMargin: '0px 0px 320px 0px',
+  },
+)
 </script>
 
 <template>
@@ -121,13 +172,19 @@ async function onPageChange(nextPage: number) {
 
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="px-1 py-2 md:px-2 md:py-3">
-        <SectionHeader
-          class="search-page-header"
-          :title="searchTitle"
-          :description="resultSummary"
-          align="center"
-          compact
-        />
+        <div class="search-page-heading">
+          <SectionHeader
+            class="search-page-header"
+            :title="searchTitle"
+            :description="resultSummary"
+            align="center"
+            compact
+          />
+
+          <div v-if="!isUserSearch" class="search-page-heading__actions">
+            <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
+          </div>
+        </div>
       </section>
 
       <section class="space-y-5">
@@ -149,7 +206,7 @@ async function onPageChange(nextPage: number) {
                   v-for="user in userList"
                   :key="user.id"
                   :to="user.profilePath"
-                  class="surface-1 rounded-[var(--radius-xl)] p-4 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
+                  class="surface-1 rounded-[var(--radius-xl)] p-4 transition-transform duration-200 hover:-translate-y-0.5"
                 >
                   <div class="flex items-center gap-3">
                     <Avatar
@@ -167,21 +224,40 @@ async function onPageChange(nextPage: number) {
                   </div>
                 </router-link>
               </section>
+
+              <section class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5">
+                <div ref="loadMoreRef" class="search-page-load-sentinel" aria-hidden="true" />
+
+                <p v-if="userSearchQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+                  正在续接更多作者…
+                </p>
+                <p v-else-if="userSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+                  向下继续滚动，自动载入后续作者
+                </p>
+                <p v-else class="text-sm text-[var(--color-text-muted)]">
+                  已经看到这一轮搜索的全部作者
+                </p>
+              </section>
             </template>
 
             <template v-else>
-              <ArticleParallaxGallery :items="articleList" />
+              <ArticleResultStream :items="articleList" :view="resultView" />
 
               <section
-                class="surface-1 content-rise-in rounded-[var(--radius-xl)] p-4 md:p-5"
-                :style="{ '--content-rise-delay': `${articleList.length * 55 + 90}ms` }"
+                class="surface-1 content-rise-in rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
+                :style="{ '--content-rise-delay': `${articleList.length * 35 + 110}ms` }"
               >
-                <Pagination
-                  :page="page"
-                  :page-size="pageSize"
-                  :total="Math.max(total, articleList.length)"
-                  @change="onPageChange"
-                />
+                <div ref="loadMoreRef" class="search-page-load-sentinel" aria-hidden="true" />
+
+                <p v-if="articleSearchQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+                  正在续接更多文章…
+                </p>
+                <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
+                  向下继续滚动，自动载入后续结果
+                </p>
+                <p v-else class="text-sm text-[var(--color-text-muted)]">
+                  已经看到这一轮搜索的全部结果
+                </p>
               </section>
             </template>
           </div>
@@ -209,5 +285,23 @@ async function onPageChange(nextPage: number) {
 .search-page-header :deep(p) {
   margin-inline: auto;
   text-align: center;
+}
+
+.search-page-heading {
+  position: relative;
+  padding-bottom: 3.25rem;
+}
+
+.search-page-heading__actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.search-page-load-sentinel {
+  width: 100%;
+  height: 1px;
 }
 </style>

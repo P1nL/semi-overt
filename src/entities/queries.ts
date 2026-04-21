@@ -1,5 +1,5 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import { keepPreviousData, useQuery } from '@tanstack/vue-query'
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/vue-query'
 import { mapArticleDetailDtoToVm } from '@/entities/article'
 import { mapPendingReviewItemDtoToVm, mapReviewLogListDtoToVm } from '@/entities/review'
 import { mapUserProfilePageDtoToVm } from '@/entities/user'
@@ -48,6 +48,30 @@ export function useCategoryArticlesQuery(
     })
 }
 
+export function useInfiniteCategoryArticlesQuery(
+    category: MaybeRefOrGetter<string>,
+    pageSize: MaybeRefOrGetter<number | undefined>,
+    enabled: MaybeRefOrGetter<boolean> = true,
+) {
+    return useInfiniteQuery({
+        queryKey: computed(() =>
+            queryKeys.categoryInfinite(
+                toValue(category),
+                resolvePositiveInt(toValue(pageSize), 10),
+            ),
+        ),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) =>
+            categoryApi.getCategoryArticles(toValue(category), {
+                page: resolvePositiveInt(Number(pageParam), 1),
+                pageSize: resolvePositiveInt(toValue(pageSize), 10),
+            }),
+        getNextPageParam: (lastPage) =>
+            lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined,
+        enabled: computed(() => Boolean(toValue(enabled))),
+    })
+}
+
 export function useSearchArticlesQuery(
     keyword: MaybeRefOrGetter<string>,
     page: MaybeRefOrGetter<number | undefined>,
@@ -72,25 +96,53 @@ export function useSearchArticlesQuery(
     })
 }
 
-export function useSearchUsersQuery(
+export function useInfiniteSearchArticlesQuery(
     keyword: MaybeRefOrGetter<string>,
-    limit: MaybeRefOrGetter<number | undefined>,
+    pageSize: MaybeRefOrGetter<number | undefined>,
     enabled: MaybeRefOrGetter<boolean> = true,
 ) {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: computed(() =>
-            queryKeys.userSearch(
+            queryKeys.searchInfinite(
                 toValue(keyword),
-                resolvePositiveInt(toValue(limit), 10),
+                resolvePositiveInt(toValue(pageSize), 10),
             ),
         ),
-        queryFn: () =>
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) =>
+            searchApi.searchArticles({
+                keyword: toValue(keyword),
+                page: resolvePositiveInt(Number(pageParam), 1),
+                pageSize: resolvePositiveInt(toValue(pageSize), 10),
+            }),
+        getNextPageParam: (lastPage) =>
+            lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined,
+        enabled: computed(() => Boolean(toValue(enabled)) && Boolean(toValue(keyword).trim())),
+    })
+}
+
+export function useInfiniteSearchUsersQuery(
+    keyword: MaybeRefOrGetter<string>,
+    pageSize: MaybeRefOrGetter<number | undefined>,
+    enabled: MaybeRefOrGetter<boolean> = true,
+) {
+    return useInfiniteQuery({
+        queryKey: computed(() =>
+            queryKeys.userSearchInfinite(
+                toValue(keyword),
+                resolvePositiveInt(toValue(pageSize), 10),
+            ),
+        ),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) =>
             searchApi.searchUsers({
                 keyword: toValue(keyword),
-                limit: resolvePositiveInt(toValue(limit), 10),
+                page: resolvePositiveInt(Number(pageParam), 1),
+                pageSize: resolvePositiveInt(toValue(pageSize), 10),
             }),
+        getNextPageParam: (lastPage) =>
+            lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined,
         enabled: computed(() => Boolean(toValue(enabled)) && Boolean(toValue(keyword).trim())),
-        placeholderData: keepPreviousData,
     })
 }
 
