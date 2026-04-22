@@ -98,7 +98,7 @@ async function handleSubmit() {
     })
 
     // 让转圈动效多转一会儿再跳转
-    await delay(900)
+    await delay(600)
 
     toast.success('登录成功')
 
