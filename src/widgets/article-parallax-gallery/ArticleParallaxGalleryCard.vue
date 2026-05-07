@@ -83,12 +83,16 @@ defineProps<{
 
 .article-parallax-card__cover-image,
 .article-parallax-card__cover-placeholder {
+  display: block;
+  min-width: 100%;
+  min-height: 100%;
   width: 100%;
   height: 100%;
 }
 
 .article-parallax-card__cover-image {
   object-fit: cover;
+  object-position: center;
 }
 
 .article-parallax-card__cover-placeholder {

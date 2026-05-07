@@ -14,15 +14,18 @@ export interface ArticleCardEntityDto extends ArticleCardDto {
     status?: ArticleStatus | string
     durationCategory?: ArticleDurationCategory | string
     rejectReason?: string | null
+    draftVisible?: boolean
 }
 
 export interface ArticleDetailEntityDto extends ArticleDetailRespDto {
     status: ArticleStatus | string
     durationCategory: ArticleDurationCategory | string
+    draftVisible?: boolean
 }
 
 export interface ArticleDraftEntityDto extends DraftItemRespDto {
-    status: Extract<ArticleStatus, 'DRAFT' | 'RETURNED'> | string
+    status: Extract<ArticleStatus, 'DRAFT' | 'PENDING' | 'RETURNED' | 'REJECTED'> | string
+    draftVisible?: boolean
 }
 
 export interface ArticleAuthorVm {
@@ -76,6 +79,7 @@ export interface ArticleCardVm {
     status: ArticleStatusVm | null
     author: ArticleAuthorVm | null
     latestReason: string | null
+    draftVisible: boolean
     articlePath: string
     editPath: string
     reviewPath: string
@@ -96,6 +100,7 @@ export interface ArticleDetailVm {
     submitCountText: string
     lastSubmittedAt: string | null
     lastSubmittedAtRaw: string | null
+    draftVisible: boolean
     articlePath: string
     editPath: string
     reviewPath: string
@@ -109,5 +114,6 @@ export interface ArticleDraftVm {
     wordCountText: string
     updatedAt: string
     latestReason: string | null
+    draftVisible: boolean
     editPath: string
 }

@@ -52,6 +52,7 @@ export interface ArticleCardDto {
     wordCount?: number
     status?: 'DRAFT' | 'PENDING' | 'APPROVED' | 'RETURNED' | 'REJECTED' | string
     author?: ArticleAuthorDto
+    draftVisible?: boolean
     publishedAt?: string | null
     updatedAt?: string | null
     rejectReason?: string | null
@@ -75,7 +76,8 @@ export interface ForgotPasswordReqDto {
 }
 
 export interface ResetPasswordReqDto {
-    token: string
+    email: string
+    code: string
     newPassword: string
 }
 
@@ -113,6 +115,7 @@ export interface SaveDraftReqDto {
     coverUrl?: string | null
     coverColor?: string | null
     clientWordCount?: number
+    draftVisible?: boolean
 }
 
 export interface SaveDraftRespDto {
@@ -121,6 +124,7 @@ export interface SaveDraftRespDto {
     readMinutes: number
     durationCategory: 'QUICK' | 'SHORT' | 'DEEP' | string
     status: 'DRAFT' | 'RETURNED' | string
+    draftVisible: boolean
 }
 
 export interface DraftItemRespDto {
@@ -130,6 +134,7 @@ export interface DraftItemRespDto {
     wordCount: number
     updatedAt: string
     latestReason: string | null
+    draftVisible?: boolean
 }
 
 export interface ArticleDetailRespDto {
@@ -147,6 +152,7 @@ export interface ArticleDetailRespDto {
     latestReviewReason?: string | null
     submitCount?: number
     lastSubmittedAt?: string | null
+    draftVisible?: boolean
     publishedAt?: string | null
     updatedAt?: string | null
 }

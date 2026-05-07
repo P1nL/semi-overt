@@ -1,17 +1,10 @@
 import {
-  ARTICLE_STATUS,
-  ARTICLE_STATUS_BADGE_VARIANT_MAP,
-  ARTICLE_STATUS_LABEL_MAP,
-  mapArticleCardDtoToVm,
   mapArticleDraftDtoToVm,
-} from '@/entities/article'
-import type {
-  ArticleCardEntityDto,
-  ArticleCardVm,
-} from '@/entities/article'
+  mapArticleCardDtoToVm,
+} from '@/entities/article/model/article.mapper'
+import type { ArticleCardEntityDto } from '@/entities/article/model/article.types'
+import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { articleApi } from '@/shared/api/modules/article'
-import { userApi } from '@/shared/api/modules/user'
-import { getErrorMessage } from '@/shared/utils/error'
 import { calcReadMinutes, resolveDurationCategory } from '@/shared/utils/article'
 import type { DraftItemRespDto } from '@/shared/types/api'
 import type {
@@ -27,35 +20,51 @@ function toSortTimestamp(value?: string | null): number {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
+const DRAFT_STATUS_PRIORITY: Record<string, number> = {
+  [ARTICLE_STATUS.DRAFT]: 1,
+  [ARTICLE_STATUS.REJECTED]: 2,
+  [ARTICLE_STATUS.RETURNED]: 3,
+  [ARTICLE_STATUS.PENDING]: 4,
+}
+
+function getDraftStatusPriority(status?: string | null): number {
+  return DRAFT_STATUS_PRIORITY[status?.toUpperCase?.() ?? ''] ?? 0
+}
+
+function shouldUseNextDraftItem(current: DraftBoxItem, next: DraftBoxItem): boolean {
+  const currentSortAt = toSortTimestamp(current.sortAtRaw || current.updatedAt)
+  const nextSortAt = toSortTimestamp(next.sortAtRaw || next.updatedAt)
+
+  if (nextSortAt !== currentSortAt) {
+    return nextSortAt > currentSortAt
+  }
+
+  return getDraftStatusPriority(next.status.value) > getDraftStatusPriority(current.status.value)
+}
+
+function dedupeDraftBoxItems(items: DraftBoxItem[]): DraftBoxItem[] {
+  const itemById = new Map<number, DraftBoxItem>()
+
+  for (const item of items) {
+    const current = itemById.get(item.id)
+    if (!current || shouldUseNextDraftItem(current, item)) {
+      itemById.set(item.id, item)
+    }
+  }
+
+  return Array.from(itemById.values()).sort(
+    (left, right) =>
+      toSortTimestamp(right.sortAtRaw || right.updatedAt) - toSortTimestamp(left.sortAtRaw || left.updatedAt),
+  )
+}
+
 function mapDraftItemToDraftBoxItem(item: DraftItemRespDto): DraftBoxItem {
   const vm = mapArticleDraftDtoToVm(item)
 
   return {
     ...vm,
     sortAtRaw: item.updatedAt,
-    canDelete: true,
-  }
-}
-
-function mapPendingItemToDraftBoxItem(item: ArticleCardEntityDto): DraftBoxItem {
-  const vm: ArticleCardVm = mapArticleCardDtoToVm(item)
-  const sortAtRaw = item.updatedAt ?? item.publishedAt ?? ''
-
-  return {
-    id: vm.id,
-    title: vm.title,
-    status: vm.status ?? {
-      value: ARTICLE_STATUS.PENDING,
-      label: ARTICLE_STATUS_LABEL_MAP[ARTICLE_STATUS.PENDING],
-      variant: ARTICLE_STATUS_BADGE_VARIANT_MAP[ARTICLE_STATUS.PENDING],
-    },
-    wordCount: vm.meta.wordCount ?? 0,
-    wordCountText: vm.meta.wordCountText ?? '0 字',
-    updatedAt: vm.meta.updatedAt ?? vm.meta.publishedAt ?? '',
-    latestReason: vm.latestReason,
-    editPath: vm.editPath,
-    sortAtRaw,
-    canDelete: false,
+    canDelete: item.status?.toUpperCase?.() !== ARTICLE_STATUS.PENDING,
   }
 }
 
@@ -82,38 +91,23 @@ function mapDraftDtoToCardDto(dto: {
   }
 }
 
-export async function loadDraftBoxItems(username: string): Promise<DraftBoxLoadResult> {
-  const [draftList, pendingResult] = await Promise.all([
-    articleApi.getDraftList(),
-    userApi
-      .getUserProfile(username, { tab: 'pending', page: 1, pageSize: 20 })
-      .then((response) => ({
-        items: response.list as ArticleCardEntityDto[],
-        warning: '',
-      }))
-      .catch((error: unknown) => ({
-        items: [] as ArticleCardEntityDto[],
-        warning: getErrorMessage(error, '审核中列表加载失败'),
-      })),
-  ])
+export async function loadDraftBoxItems(_username: string): Promise<DraftBoxLoadResult> {
+  const draftList = await articleApi.getDraftList()
 
-  const items = [
-    ...draftList.map(mapDraftItemToDraftBoxItem),
-    ...pendingResult.items
-      .filter((item) => item.status?.toUpperCase?.() === 'PENDING')
-      .map(mapPendingItemToDraftBoxItem),
-  ].sort((left, right) => toSortTimestamp(right.sortAtRaw) - toSortTimestamp(left.sortAtRaw))
+  const items = dedupeDraftBoxItems(draftList.map(mapDraftItemToDraftBoxItem))
 
   return {
     items,
     badgeCount: items.length,
-    pendingWarning: pendingResult.warning,
+    pendingWarning: '',
   }
 }
 
 export function syncDraftStore(store: DraftStoreLike, drafts: DraftBoxItem[]) {
-  store.badgeCount = drafts.length
-  store.items = drafts.map((item) =>
+  const dedupedDrafts = dedupeDraftBoxItems(drafts)
+
+  store.badgeCount = dedupedDrafts.length
+  store.items = dedupedDrafts.map((item) =>
     mapArticleCardDtoToVm(
       mapDraftDtoToCardDto({
         id: item.id,

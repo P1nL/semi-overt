@@ -1,6 +1,6 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/vue-query'
-import { mapArticleDetailDtoToVm } from '@/entities/article'
+import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import { mapPendingReviewItemDtoToVm, mapReviewLogListDtoToVm } from '@/entities/review'
 import { mapUserProfilePageDtoToVm } from '@/entities/user'
 import { articleApi } from '@/shared/api/modules/article'
@@ -23,6 +23,8 @@ export function useHomeQuery() {
     return useQuery({
         queryKey: queryKeys.home,
         queryFn: () => homeApi.getHomeContent(),
+        staleTime: 5 * 60_000,
+        gcTime: 30 * 60_000,
     })
 }
 

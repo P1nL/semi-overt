@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 const REDIRECT_QUERY_KEY = 'redirect'
+let currentUserRefreshPromise: Promise<void> | null = null
 
 function resolveAuthState() {
     const authStore = useAuthStore(pinia)
@@ -30,6 +31,25 @@ function resolveAuthState() {
         isAuthenticated,
         role: role as 'USER' | 'ADMIN' | undefined,
     }
+}
+
+function resolveAuthRole(authStore: ReturnType<typeof useAuthStore>) {
+    const role =
+        typeof authStore.role === 'string'
+            ? authStore.role
+            : authStore.user?.role
+
+    return role as 'USER' | 'ADMIN' | undefined
+}
+
+async function refreshCurrentUser(authStore: ReturnType<typeof useAuthStore>) {
+    if (!currentUserRefreshPromise) {
+        currentUserRefreshPromise = authStore.fetchCurrentUser().finally(() => {
+            currentUserRefreshPromise = null
+        })
+    }
+
+    await currentUserRefreshPromise
 }
 
 function shouldHandleDrawerNavigation(
@@ -75,8 +95,9 @@ function handleDrawerGuard(
     return false
 }
 
-function handleAuthGuard(to: RouteLocationNormalized) {
-    const { isAuthenticated, role } = resolveAuthState()
+async function handleAuthGuard(to: RouteLocationNormalized) {
+    const { authStore, isAuthenticated } = resolveAuthState()
+    let role = resolveAuthRole(authStore)
 
     if (to.meta.publicOnly && isAuthenticated) {
         const redirect =
@@ -103,6 +124,22 @@ function handleAuthGuard(to: RouteLocationNormalized) {
                 query: {
                     [REDIRECT_QUERY_KEY]: to.fullPath,
                 },
+            }
+        }
+
+        if (!role || !to.meta.roles.includes(role)) {
+            try {
+                await refreshCurrentUser(authStore)
+                role = resolveAuthRole(authStore)
+            } catch {
+                if (!authStore.isAuthenticated) {
+                    return {
+                        path: ROUTE_PATH.LOGIN,
+                        query: {
+                            [REDIRECT_QUERY_KEY]: to.fullPath,
+                        },
+                    }
+                }
             }
         }
 

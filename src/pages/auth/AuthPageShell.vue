@@ -39,7 +39,7 @@ const authPageMeta = computed(() => {
       return {
         eyebrow: '找回密码',
         title: '重置密码',
-        description: '输入注册邮箱，如果账号存在，我们会向你发送重置链接。',
+        description: '输入注册邮箱，如果账号存在，我们会向你发送 6 位验证码。',
         glowClass:
           'pointer-events-none absolute right-[-5rem] top-28 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
       }

@@ -22,6 +22,15 @@ const markdown = new MarkdownIt({
 
 const articleRef = ref<HTMLElement | null>(null)
 const previewImage = ref<{ src: string; alt: string } | null>(null)
+const previewScale = ref(1)
+
+const MIN_PREVIEW_SCALE = 1
+const MAX_PREVIEW_SCALE = 4
+const PREVIEW_SCALE_STEP = 0.16
+
+const previewImageStyle = computed(() => ({
+  transform: `scale(${previewScale.value})`,
+}))
 
 const renderedHtml = computed(() => {
   if (!props.content?.trim()) return ''
@@ -33,6 +42,7 @@ const renderedHtml = computed(() => {
 
 function closePreview() {
   previewImage.value = null
+  previewScale.value = 1
 }
 
 function openPreview(source: HTMLImageElement) {
@@ -43,6 +53,20 @@ function openPreview(source: HTMLImageElement) {
     src,
     alt: source.alt || '文章图片预览',
   }
+  previewScale.value = 1
+}
+
+function setPreviewScale(value: number) {
+  previewScale.value = Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, value))
+}
+
+function resetPreviewScale() {
+  previewScale.value = 1
+}
+
+function handlePreviewWheel(event: WheelEvent) {
+  event.preventDefault()
+  setPreviewScale(previewScale.value + (event.deltaY > 0 ? -PREVIEW_SCALE_STEP : PREVIEW_SCALE_STEP))
 }
 
 function enhanceImages() {
@@ -139,20 +163,50 @@ onBeforeUnmount(() => {
           class="fixed inset-0 z-[70] flex items-center justify-center bg-[color-mix(in_srgb,var(--color-overlay)_92%,black)] px-4 py-6 backdrop-blur-sm"
           @click.self="closePreview"
           @keydown.window="handleWindowKeydown"
+          @wheel="handlePreviewWheel"
         >
-          <button
-            type="button"
-            class="article-image-preview__close"
-            aria-label="关闭图片预览"
-            @click="closePreview"
-          >
-            关闭
-          </button>
+          <div class="article-image-preview__toolbar" role="toolbar" aria-label="图片预览工具">
+            <button
+              type="button"
+              class="article-image-preview__action"
+              :disabled="previewScale <= MIN_PREVIEW_SCALE"
+              aria-label="缩小图片"
+              @click="setPreviewScale(previewScale - PREVIEW_SCALE_STEP)"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              class="article-image-preview__action article-image-preview__action--wide"
+              aria-label="重置图片缩放"
+              @click="resetPreviewScale"
+            >
+              {{ Math.round(previewScale * 100) }}%
+            </button>
+            <button
+              type="button"
+              class="article-image-preview__action"
+              :disabled="previewScale >= MAX_PREVIEW_SCALE"
+              aria-label="放大图片"
+              @click="setPreviewScale(previewScale + PREVIEW_SCALE_STEP)"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              class="article-image-preview__action article-image-preview__action--wide"
+              aria-label="关闭图片预览"
+              @click="closePreview"
+            >
+              关闭
+            </button>
+          </div>
 
           <img
             :src="previewImage.src"
             :alt="previewImage.alt"
             class="article-image-preview__image"
+            :style="previewImageStyle"
           >
         </div>
       </Transition>
@@ -190,18 +244,47 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
-.article-image-preview__close {
+.article-image-preview__toolbar {
   position: absolute;
   top: 1.5rem;
   right: 1.5rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in srgb, white 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, black 34%, transparent);
+  padding: 0.35rem;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.article-image-preview__action {
   border: 1px solid color-mix(in srgb, white 24%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, black 30%, transparent);
-  padding: 0.55rem 0.9rem;
+  background: color-mix(in srgb, black 18%, transparent);
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.65rem;
   color: white;
   font-size: 0.9rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.article-image-preview__action:hover {
+  background: color-mix(in srgb, white 14%, transparent);
+}
+
+.article-image-preview__action:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.article-image-preview__action--wide {
+  min-width: 3.6rem;
 }
 
 .article-image-preview__image {
@@ -211,12 +294,17 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-xl);
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
   object-fit: contain;
+  transform-origin: center;
+  transition: transform 120ms ease-out;
+  will-change: transform;
 }
 
 @media (max-width: 640px) {
-  .article-image-preview__close {
+  .article-image-preview__toolbar {
     top: 1rem;
     right: 1rem;
+    left: 1rem;
+    justify-content: center;
   }
 
   .article-image-preview__image {

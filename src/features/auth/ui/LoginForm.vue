@@ -7,8 +7,9 @@ import AnimatedDisabledIcon from '@/shared/components/base/AnimatedDisabledIcon.
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
-import { ROUTE_NAME } from '@/shared/constants/routes'
+import { ROUTE_NAME, ROUTE_PATH } from '@/shared/constants/routes'
 import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 
 import { authApi } from '@/features/auth/api'
 import { mapAuthRespToSession, mapLoginFormToDto } from '@/features/auth/model'
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const sessionStore = useSessionStore()
 const toast = useToast()
 
 const form = reactive<LoginFormValues>({
@@ -102,10 +104,21 @@ async function handleSubmit() {
 
     toast.success('登录成功')
 
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    const queryRedirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    const redirect = queryRedirect || sessionStore.consumeAuthRedirect(ROUTE_PATH.HOME)
+    if (queryRedirect) {
+      sessionStore.setAuthRedirect('')
+    }
+
     if (redirect) {
+      const targetRoute = router.resolve(redirect)
+      if (targetRoute.meta.presentation !== 'sheet') {
+        sessionStore.setAuthSheetBackground('')
+      }
+
       await router.push(redirect)
     } else {
+      sessionStore.setAuthSheetBackground('')
       await router.push({ name: ROUTE_NAME.HOME })
     }
 

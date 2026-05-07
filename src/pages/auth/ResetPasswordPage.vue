@@ -6,11 +6,13 @@ import { ROUTE_NAME } from '@/shared/constants/routes'
 
 const router = useRouter()
 
-async function handleSwitch() {
-  await router.push({
-    name: ROUTE_NAME.HOME,
-    query: { auth: 'login' },
-  })
+async function handleSwitch(mode: 'login' | 'forgot-password') {
+  if (mode === 'forgot-password') {
+    await router.push({ name: ROUTE_NAME.FORGOT_PASSWORD })
+    return
+  }
+
+  await router.push({ name: ROUTE_NAME.LOGIN })
 }
 </script>
 

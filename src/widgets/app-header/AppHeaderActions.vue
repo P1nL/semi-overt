@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
+import { mapPendingReviewItemDtoToVm } from '@/entities/review'
+import { mapUserProfilePageDtoToVm } from '@/entities/user/model/user.mapper'
 import { DraftBoxDrawer } from '@/features/draft-box'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { authApi } from '@/shared/api/modules/auth'
+import { reviewApi } from '@/shared/api/modules/review'
+import { userApi } from '@/shared/api/modules/user'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
+import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { AuthDialog } from '@/widgets/auth-dialog'
@@ -21,6 +28,7 @@ const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const queryClient = useQueryClient()
 
 const authDialogOpen = ref(false)
 const draftMenuOpen = ref(false)
@@ -35,6 +43,15 @@ const showThemeMenuItem = useMediaQuery('(max-width: 767px)')
 
 const draftMenuId = 'header-draft-box'
 const userMenuId = 'header-user-menu'
+const PROFILE_PREFETCH_PARAMS = {
+  tab: 'all',
+  page: 1,
+  pageSize: 10,
+} as const
+
+let currentUserProfilePromise: Promise<void> | null = null
+let warmUserSurfacesTimer: number | null = null
+let warmUserSurfacesIdleHandle: number | null = null
 
 function getVisibleUserMenuItems() {
   return userMenuItemRefs.value.filter((item) => Boolean(item) && item.offsetParent !== null)
@@ -107,8 +124,101 @@ const profileRoute = computed(() => {
   }
 })
 
+async function refreshCurrentUserProfile() {
+  if (!authStore.isAuthenticated || !authStore.user?.username || authStore.hasCurrentUserProfile) return
+
+  if (!currentUserProfilePromise) {
+    currentUserProfilePromise = authStore.fetchCurrentUser()
+      .catch(() => undefined)
+      .finally(() => {
+        currentUserProfilePromise = null
+      })
+  }
+
+  await currentUserProfilePromise
+}
+
+function prefetchOwnerProfile(username = authStore.user?.username) {
+  if (!authStore.isAuthenticated || !username) return
+
+  void queryClient.prefetchQuery({
+    queryKey: queryKeys.userProfile(
+      username,
+      PROFILE_PREFETCH_PARAMS.tab,
+      PROFILE_PREFETCH_PARAMS.page,
+      PROFILE_PREFETCH_PARAMS.pageSize,
+    ),
+    queryFn: async () => {
+      const profile = mapUserProfilePageDtoToVm(
+        await userApi.getUserProfile(username, PROFILE_PREFETCH_PARAMS),
+      )
+      void preloadImages([profile.coverUrl, profile.avatarUrl], 'high')
+      return profile
+    },
+    staleTime: 30_000,
+  })
+}
+
+function prefetchAdminReviewQueue() {
+  if (!authStore.isAuthenticated || !authStore.isAdmin) return
+
+  void queryClient.prefetchQuery({
+    queryKey: queryKeys.reviewPending(1, 10),
+    queryFn: async () => {
+      const response = await reviewApi.getPendingReviews({ page: 1, pageSize: 10 })
+      return {
+        ...response,
+        list: response.list.map(mapPendingReviewItemDtoToVm),
+      }
+    },
+    staleTime: 30_000,
+  })
+}
+
+function warmUserSurfaces() {
+  if (!authStore.isAuthenticated || !authStore.user?.username) return
+
+  void refreshCurrentUserProfile()
+  prefetchOwnerProfile()
+  prefetchAdminReviewQueue()
+}
+
+function clearScheduledWarmUserSurfaces() {
+  if (warmUserSurfacesTimer !== null) {
+    window.clearTimeout(warmUserSurfacesTimer)
+    warmUserSurfacesTimer = null
+  }
+
+  if (warmUserSurfacesIdleHandle !== null && window.cancelIdleCallback) {
+    window.cancelIdleCallback(warmUserSurfacesIdleHandle)
+    warmUserSurfacesIdleHandle = null
+  }
+}
+
+function scheduleWarmUserSurfaces() {
+  if (!authStore.isAuthenticated || !authStore.user?.username) {
+    clearScheduledWarmUserSurfaces()
+    return
+  }
+
+  if (warmUserSurfacesTimer !== null || warmUserSurfacesIdleHandle !== null) return
+
+  warmUserSurfacesTimer = window.setTimeout(() => {
+    warmUserSurfacesTimer = null
+
+    if (window.requestIdleCallback) {
+      warmUserSurfacesIdleHandle = window.requestIdleCallback(() => {
+        warmUserSurfacesIdleHandle = null
+        warmUserSurfaces()
+      }, { timeout: 1800 })
+      return
+    }
+
+    warmUserSurfaces()
+  }, 900)
+}
+
 async function openDraftEditor(item: { id: number }) {
-  closeDraftMenu()
   await router.push({
     name: ROUTE_NAME.ARTICLE_EDITOR,
     params: { id: String(item.id) },
@@ -236,7 +346,25 @@ watch(userMenuOpen, async (open) => {
   }
 
   await nextTick()
+  scheduleWarmUserSurfaces()
   userMenuItemRefs.value = userMenuItemRefs.value.filter(Boolean)
+})
+
+watch(
+  () => [
+    authStore.token,
+    authStore.user?.username,
+    authStore.hasCurrentUserProfile,
+    authStore.isAdmin,
+  ] as const,
+  () => {
+    scheduleWarmUserSurfaces()
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  clearScheduledWarmUserSurfaces()
 })
 
 async function handleLogout() {
@@ -310,6 +438,8 @@ async function handleLogout() {
             :name="userLabel"
             :fallback="avatarFallback"
             size="md"
+            loading="eager"
+            fetchpriority="high"
             class="user-avatar"
           />
         </button>

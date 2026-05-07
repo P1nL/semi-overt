@@ -11,12 +11,14 @@ const props = withDefaults(
     title?: string
     description?: string
     revealed?: boolean
+    animateReveal?: boolean
   }>(),
   {
     secondary: () => [],
     title: '一切存在于半公开•空间🪨',
     description: '',
     revealed: false,
+    animateReveal: true,
   },
 )
 
@@ -53,6 +55,7 @@ const hasCards = computed(() => heroItems.value.length > 0)
         category-label="day"
         featured
         :revealed="revealed"
+        :animate-reveal="animateReveal"
         :delay-base="40"
         :max-visible="11"
       />

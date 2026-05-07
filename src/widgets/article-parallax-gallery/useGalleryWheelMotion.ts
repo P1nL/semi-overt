@@ -2,7 +2,6 @@ import { onBeforeUnmount, ref, type Ref } from 'vue'
 import gsap from 'gsap'
 
 interface UseGalleryWheelMotionOptions {
-  prefersReducedMotion: Ref<boolean>
   topCycleWidth: Ref<number>
   bottomCycleWidth: Ref<number>
   onUpdate: () => void
@@ -59,8 +58,6 @@ export function useGalleryWheelMotion(options: UseGalleryWheelMotionOptions) {
   }
 
   function onWheel(event: WheelEvent) {
-    if (options.prefersReducedMotion.value) return
-
     const dominantDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
     if (!dominantDelta) return
 

@@ -13,7 +13,7 @@ type AuthAwareRequestConfig = InternalAxiosRequestConfig & {
 }
 
 function getApiBaseURL(): string {
-    return ENV.apiBaseUrl || '/api/v1'
+    return ENV.apiBaseUrl || '/api'
 }
 
 function getStoredToken(): string | null {

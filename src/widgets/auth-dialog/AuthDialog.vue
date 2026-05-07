@@ -99,7 +99,7 @@ const dialogTitle = computed(() => {
 
 const dialogSubtitle = computed(() => {
   if (mode.value === 'register') return '创建账号后即可开始发布与管理文章。'
-  if (mode.value === 'forgot') return '输入注册邮箱，我们会向你发送重置密码邮件。'
+  if (mode.value === 'forgot') return '输入注册邮箱，我们会向你发送密码重置验证码。'
   return '登录后即可访问草稿箱、发布入口和个人页面。'
 })
 

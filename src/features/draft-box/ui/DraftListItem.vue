@@ -21,7 +21,10 @@ const emit = defineEmits<{
   delete: [DraftBoxItem]
 }>()
 
-const isReturned = computed(() => props.item.status.value === ARTICLE_STATUS.RETURNED)
+const hasReviewFeedback = computed(() => {
+  const status = props.item.status.value
+  return status === ARTICLE_STATUS.RETURNED || status === ARTICLE_STATUS.REJECTED
+})
 const canDelete = computed(() => props.item.canDelete)
 const titleText = computed(() => props.item.title?.trim() || '未命名文章')
 </script>
@@ -29,7 +32,7 @@ const titleText = computed(() => props.item.title?.trim() || '未命名文章')
 <template>
   <article
     class="draft-item group rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_82%,transparent)] p-4 transition-colors duration-200"
-    :class="isReturned ? 'draft-item--returned border-[color-mix(in_srgb,var(--color-warning)_72%,var(--color-border))]' : ''"
+    :class="hasReviewFeedback ? 'draft-item--returned border-[color-mix(in_srgb,var(--color-warning)_72%,var(--color-border))]' : ''"
   >
     <div class="flex items-start gap-3">
       <button
@@ -49,7 +52,7 @@ const titleText = computed(() => props.item.title?.trim() || '未命名文章')
         </div>
 
         <div
-          v-if="isReturned && item.latestReason"
+          v-if="hasReviewFeedback && item.latestReason"
           class="draft-feedback-callout mt-3 flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--color-warning)]"
         >
           <Icon name="warning" :size="16" />

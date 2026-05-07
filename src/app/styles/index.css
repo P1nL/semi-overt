@@ -293,35 +293,4 @@
         transition: backdrop-filter 320ms ease-out, -webkit-backdrop-filter 320ms ease-out;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-        html {
-            scroll-behavior: auto;
-        }
-
-        html.theme-switching *,
-        html.theme-switching *::before,
-        html.theme-switching *::after,
-        .page-fade-enter-active,
-        .page-fade-leave-active,
-        .content-fade-enter-active,
-        .content-fade-leave-active,
-        .content-rise-in,
-        .content-card-shell--regular,
-        .content-card-shell--compact {
-            animation: none !important;
-            transition: none !important;
-        }
-
-        .content-fade-enter-from,
-        .content-fade-leave-to,
-        .content-rise-in {
-            opacity: 1;
-            transform: none;
-        }
-
-        .content-card-shell--regular:hover,
-        .content-card-shell--compact:hover {
-            transform: none;
-        }
-    }
 }

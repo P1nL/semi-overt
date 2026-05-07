@@ -5,13 +5,12 @@ import { useIntersectionObserver } from '@vueuse/core'
 
 import { CATEGORY_TAB } from '@/entities/category'
 import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category'
-import { mapArticleCardDtoToVm } from '@/entities/article'
+import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
-import { AppHeader } from '@/widgets/app-header'
 
 const props = withDefaults(
   defineProps<{
@@ -91,9 +90,7 @@ useIntersectionObserver(
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader :active-category="activeCategory" />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="px-1 py-2 md:px-2 md:py-3">
         <div class="category-page-heading">

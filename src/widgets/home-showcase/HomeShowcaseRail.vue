@@ -13,29 +13,32 @@ const props = withDefaults(
       categoryLabel: string
       featured?: boolean
       revealed?: boolean
+      animateReveal?: boolean
       delayBase?: number
       maxVisible?: number
     }>(),
     {
       featured: false,
       revealed: false,
+      animateReveal: true,
       delayBase: 0,
       maxVisible: 6,
     },
 )
 
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
+const visibleItemSignature = computed(() => visibleItems.value.map((item) => item.id).join('|'))
+const layoutVersion = ref(0)
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
 const isDesktopRail = useMediaQuery('(min-width: 1024px)')
-const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
 const regularRotatePattern = ['-1.8deg', '1.2deg', '-0.9deg', '2.4deg', '-1.4deg', '0.8deg'] as const
 const featuredRotatePattern = ['-2.2deg', '1.4deg', '-1deg', '2.6deg', '-1.5deg', '0.9deg'] as const
 
 const getStaticRotate = (index: number) => {
-  if (!isDesktopRail.value || prefersReducedMotion.value) {
+  if (!isDesktopRail.value) {
     return '0deg'
   }
 
@@ -55,7 +58,7 @@ const getItemStyle = (index: number) => ({
 // --- 🌟 动画核心逻辑开始 ---
 const hoveredIndex = ref<number | null>(null)
 
-const getMotionKey = (index: number) => `${motionIdPrefix}-${index}`
+const getMotionKey = (index: number) => `${motionIdPrefix}-${layoutVersion.value}-${index}`
 
 const getMotionState = (index: number): Variant => {
   const staticRotate = parseFloat(getStaticRotate(index))
@@ -148,9 +151,15 @@ async function syncMotionState() {
   })
 }
 
-watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
+watch([hoveredIndex, visibleItems, isDesktopRail], () => {
   void syncMotionState()
 }, { immediate: true, flush: 'post' })
+
+watch(visibleItemSignature, () => {
+  hoveredIndex.value = null
+  layoutVersion.value += 1
+  void syncMotionState()
+}, { flush: 'post' })
 // --- 🌟 动画核心逻辑结束 ---
 </script>
 
@@ -164,7 +173,7 @@ watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
       <div class="home-showcase-rail__track">
         <div
             v-for="(item, index) in visibleItems"
-            :key="item.id"
+            :key="`${item.id}-${layoutVersion}`"
             class="home-showcase-rail__item"
             :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
@@ -177,6 +186,7 @@ watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
               :emphasis="featured && index === 0 ? 'hero' : 'regular'"
               :cropped="featured"
               :revealed="revealed"
+              :animate-reveal="animateReveal"
               :delay="delayBase + index * 80"
           />
         </div>
@@ -252,8 +262,10 @@ watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
     flex: 0 0 auto;
     scroll-snap-align: start;
     margin-block-end: var(--showcase-item-lift, 0rem);
+  }
 
-    /* 开启硬件加速，匹配 JS 需要操作的属性 */
+  .home-showcase-rail:hover .home-showcase-rail__item,
+  .home-showcase-rail__item:focus-within {
     will-change: transform, opacity;
   }
 
@@ -262,18 +274,4 @@ watch([hoveredIndex, visibleItems, isDesktopRail, prefersReducedMotion], () => {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .home-showcase-rail__viewport {
-    scroll-behavior: auto;
-  }
-
-  .home-showcase-rail__item {
-    --showcase-item-rotate: 0deg;
-  }
-
-  /* 禁用动画偏好时，直接覆盖内联样式 */
-  .home-showcase-rail__item {
-    transform: none !important;
-  }
-}
 </style>

@@ -2,8 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article'
-import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article'
+import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article/model/article.constants'
+import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import { cancelReviewByArticleId } from '@/features/article-cancel-review'
 import {
   ArticleEditorForm,
@@ -24,11 +24,13 @@ import { queryClient } from '@/shared/lib/queryClient'
 import { getErrorMessage } from '@/shared/utils/error'
 import { localStore } from '@/shared/utils/storage'
 import { calcWordCount, canCancelReview, canEditArticle, canSubmitArticle } from '@/shared/utils/article'
+import { useDraftStore } from '@/stores/draft'
 import { useEditorStore } from '@/stores/editor'
 
 const route = useRoute()
 const router = useRouter()
 const editorStore = useEditorStore()
+const draftStore = useDraftStore()
 const toast = useToast()
 const PUBLISH_COOLDOWN_MS = 30 * 60 * 1000
 const MIN_SUBMIT_CONTENT_LENGTH = 50
@@ -117,7 +119,6 @@ const showSaveAction = computed(() => isEditable.value)
 const showPublishAction = computed(
   () =>
     !isReadOnly.value &&
-    hasEnoughContentToSubmit.value &&
     (!currentStatus.value || canSubmitArticle(currentStatus.value)),
 )
 const showCancelAction = computed(
@@ -194,17 +195,22 @@ const publishCooldownText = computed(() => {
   return `${remainingMinutes} 分钟后可发布`
 })
 const publishButtonDisabled = computed(
-  () => editorStore.submitting,
+  () => editorStore.submitting || (publishConfirming.value && !hasEnoughContentToSubmit.value),
 )
 const publishButtonTitle = computed(() => {
   if (isPublishCooldownActive.value && publishCooldownRevealed.value) {
     return `同一篇文章 30 分钟内只能发布一次，${publishCooldownText.value}`
   }
 
+  if (publishConfirming.value && !hasEnoughContentToSubmit.value) {
+    return `正文至少需要 ${MIN_SUBMIT_CONTENT_LENGTH} 字，当前 ${contentWordCount.value} 字`
+  }
+
   return publishConfirming.value ? '再次点击确认发布' : '发布'
 })
 const publishButtonStateKey = computed(() => {
   if (isPublishCooldownActive.value && publishCooldownRevealed.value) return 'cooldown'
+  if (publishConfirming.value && !hasEnoughContentToSubmit.value) return 'too-short'
   if (publishConfirming.value) return 'confirm'
   return 'default'
 })
@@ -213,10 +219,14 @@ const publishButtonLabel = computed(() => {
     return publishCooldownText.value
   }
 
+  if (publishConfirming.value && !hasEnoughContentToSubmit.value) {
+    return `正文不足 ${MIN_SUBMIT_CONTENT_LENGTH} 字`
+  }
+
   return publishConfirming.value ? '确认发布' : '发布'
 })
 const mainActionSlotStyle = computed(() => {
-  if (showPublishAction.value && publishButtonStateKey.value === 'cooldown') {
+  if (showPublishAction.value && (publishButtonStateKey.value === 'cooldown' || publishButtonStateKey.value === 'too-short')) {
     return { width: 'var(--editor-publish-cooldown-width)' }
   }
 
@@ -234,6 +244,10 @@ const mainActionLabel = computed(() => {
   if (showPublishAction.value) {
     if (isPublishCooldownActive.value && publishCooldownRevealed.value) {
       return publishCooldownText.value
+    }
+
+    if (publishConfirming.value && !hasEnoughContentToSubmit.value) {
+      return `正文不足 ${MIN_SUBMIT_CONTENT_LENGTH} 字`
     }
 
     return publishConfirming.value ? '确认发布' : '发布'
@@ -478,13 +492,17 @@ function syncPublishConfirmListeners(active: boolean) {
 }
 
 function handlePublishAction() {
-  if (!showPublishAction.value || publishButtonDisabled.value) return
+  if (!showPublishAction.value || editorStore.submitting) return
 
   if (isPublishCooldownActive.value) {
     resetCancelConfirm()
     resetPublishConfirm()
     publishCooldownRevealed.value = true
     armPublishCooldownRevealTimeout()
+    return
+  }
+
+  if (publishConfirming.value && !hasEnoughContentToSubmit.value) {
     return
   }
 
@@ -522,6 +540,7 @@ function onDraftSaved(payload: EditorDraftSavedPayload) {
   pageError.value = ''
   submitError.value = ''
   editorStore.setLastSavedAt(payload.savedAt)
+  draftStore.reset()
 
   if (articleId.value) {
     void queryClient.invalidateQueries({
@@ -568,6 +587,7 @@ async function onCreated(id: number | string) {
 
 async function submitArticle() {
   if (currentStatus.value && !canSubmitArticle(currentStatus.value)) return
+  if (!hasEnoughContentToSubmit.value) return
 
   const saved = await editorFormRef.value?.saveDraft(false)
   if (!saved) {
@@ -612,6 +632,14 @@ async function submitArticle() {
 
     editorStore.setCurrentArticle(nextArticle)
     queryClient.setQueryData(queryKeys.articleDetail(article.id), nextArticle)
+    const draftStoreSynced = draftStore.updateStatusById(
+      article.id,
+      ARTICLE_STATUS.PENDING,
+      result.lastSubmittedAt,
+    )
+    if (!draftStoreSynced) {
+      void draftStore.loadDrafts(true)
+    }
     void queryClient.invalidateQueries({
       queryKey: queryKeys.articleDetail(article.id),
     })
@@ -767,12 +795,6 @@ watch(isPending, (value) => {
 watch(showCancelAction, (value) => {
   if (!value) {
     resetCancelConfirm()
-  }
-})
-
-watch(hasEnoughContentToSubmit, (value) => {
-  if (!value) {
-    resetPublishConfirm()
   }
 })
 
@@ -995,8 +1017,10 @@ onBeforeUnmount(() => {
               type="button"
               class="editor-btn"
               :class="[
-                publishCooldownRevealed ? 'editor-btn--warning' : publishConfirming ? 'editor-btn--confirm' : 'editor-btn--primary',
-                publishButtonStateKey === 'cooldown' ? 'editor-btn--cooldown-fixed' : '',
+                publishButtonStateKey === 'cooldown' || publishButtonStateKey === 'too-short'
+                  ? 'editor-btn--warning'
+                  : publishConfirming ? 'editor-btn--confirm' : 'editor-btn--primary',
+                publishButtonStateKey === 'cooldown' || publishButtonStateKey === 'too-short' ? 'editor-btn--cooldown-fixed' : '',
               ]"
               :disabled="publishButtonDisabled"
               :title="publishButtonTitle"

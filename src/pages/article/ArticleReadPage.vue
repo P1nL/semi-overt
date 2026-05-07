@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 
 import { AdminDeleteArticleButton } from '@/features/admin-article-delete'
+import { syncDeletedArticleCache } from '@/features/admin-article-delete/model'
 import { Icon } from '@/shared/components/base'
+import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { queryKeys } from '@/shared/api/queryKeys'
 import { useAuthStore } from '@/stores/auth'
@@ -25,11 +27,21 @@ function onLoaded() {
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
 }
 
+function canDeleteOwnApprovedArticle(article: { author?: { id?: number | string } | null; status?: { value?: string } | null }) {
+  return article.status?.value === ARTICLE_STATUS.APPROVED
+    && String(article.author?.id ?? '') === String(authStore.user?.id ?? '')
+}
+
 async function onArticleDeleted() {
-  // 文章被删除后，使首页和用户个人页 query 失效，触发重新请求
+  syncDeletedArticleCache(queryClient, articleId.value)
+
+  // 文章被删除后，使相关 query 后台重新请求，校准服务端状态
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.home }),
+    queryClient.invalidateQueries({ queryKey: ['category'] }),
+    queryClient.invalidateQueries({ queryKey: ['search'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.userProfileRoot }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.reviewPendingRoot }),
   ])
   await router.push({ name: ROUTE_NAME.HOME })
 }
@@ -70,13 +82,15 @@ watch(
             :show-status="false"
             @loaded="onLoaded"
           >
-            <template #header-actions>
+            <template #header-actions="{ article }">
               <AdminDeleteArticleButton
-                v-if="authStore.isAdmin"
+                v-if="authStore.isAdmin || canDeleteOwnApprovedArticle(article)"
                 :article-id="articleId"
                 text="删除文章"
                 button-variant="ghost"
                 confirm-text="确认删除"
+                :mode="authStore.isAdmin ? 'admin' : 'owner'"
+                :success-message="authStore.isAdmin ? '文章已由管理员删除' : '文章已删除'"
                 @deleted="onArticleDeleted"
               />
             </template>

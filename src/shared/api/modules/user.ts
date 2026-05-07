@@ -23,7 +23,7 @@ export function getCurrentUser(): Promise<ProfileDto & { email?: string | null; 
 }
 
 export function updateMyProfile(payload: UpdateProfileReqDto): Promise<ProfileDto> {
-    return request.put<BackendUserInfoResp>(`${USER_BASE}/me/profile`, payload).then(normalizeProfileDto)
+    return request.put<BackendUserInfoResp>(`${USER_BASE}/me`, payload).then(normalizeProfileDto)
 }
 
 export function getUserProfile(

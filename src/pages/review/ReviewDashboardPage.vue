@@ -5,14 +5,13 @@ import { Button, EmptyState } from '@/shared/components/base'
 import { usePendingReviewsQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { getErrorMessage } from '@/shared/utils/error'
-import { AppHeader } from '@/widgets/app-header'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
 const pendingReviewsQuery = usePendingReviewsQuery(1, 10)
 const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
 const pageError = computed(() =>
   pendingReviewsQuery.error.value
-    ? getErrorMessage(pendingReviewsQuery.error.value, 'Failed to load the review queue.')
+    ? getErrorMessage(pendingReviewsQuery.error.value, '待审核列表加载失败，请稍后重试。')
     : '',
 )
 
@@ -22,9 +21,7 @@ function refreshPending() {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="surface-1 rounded-[var(--radius-xl)] p-5 sm:p-6 md:p-8">
         <SectionHeader title="Review queue" description="">

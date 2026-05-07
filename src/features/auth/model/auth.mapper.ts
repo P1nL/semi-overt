@@ -20,6 +20,7 @@ export function mapRegisterFormToDto(values: RegisterFormValues, cfTurnstileToke
         email: values.email.trim(),
         username: values.username.trim(),
         password: values.password,
+        emailCode: values.emailCode.trim(),
         cfTurnstileToken,
     }
 }
@@ -32,7 +33,8 @@ export function mapForgotPasswordFormToDto(values: ForgotPasswordFormValues) {
 
 export function mapResetPasswordFormToDto(values: ResetPasswordFormValues) {
     return {
-        token: values.token.trim(),
+        email: values.email.trim(),
+        code: values.code.trim(),
         newPassword: values.newPassword,
     }
 }
@@ -46,6 +48,7 @@ export function mapAuthRespToSession(dto: AuthRespDto): AuthSessionVm {
             nickname: dto.user.nickname ?? dto.user.username,
             avatar: dto.user.avatarUrl ?? null,
             role: dto.user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+            profileLoaded: false,
         },
     }
 }

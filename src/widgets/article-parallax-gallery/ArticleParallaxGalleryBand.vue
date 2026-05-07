@@ -26,13 +26,11 @@ const props = withDefaults(
 const sectionRef = ref<HTMLElement | null>(null)
 const topTrackRef = ref<HTMLElement | null>(null)
 const bottomTrackRef = ref<HTMLElement | null>(null)
-const prefersReducedMotion = ref(false)
 const viewportWidth = ref(0)
 const topCycleWidth = ref(0)
 const bottomCycleWidth = ref(0)
 
 let resizeFrame = 0
-let reduceMotionQuery: MediaQueryList | null = null
 let topTrackSetter: ((value: number) => void) | null = null
 let bottomTrackSetter: ((value: number) => void) | null = null
 let offsetTickScheduled = false
@@ -96,10 +94,6 @@ const bottomCycleItems = computed(() => buildCycleItems(bottomBaseItems.value, b
 const topTrackItems = computed(() => buildLoopItems(topCycleItems.value))
 const bottomTrackItems = computed(() => buildLoopItems(bottomCycleItems.value))
 
-function syncReducedMotion() {
-  prefersReducedMotion.value = Boolean(reduceMotionQuery?.matches)
-}
-
 function syncViewportWidth() {
   viewportWidth.value = window.innerWidth
 }
@@ -136,12 +130,6 @@ function updateOffsets() {
   offsetTickScheduled = false
 
   if (!sectionRef.value || typeof window === 'undefined') return
-
-  if (prefersReducedMotion.value) {
-    topTrackSetter?.(0)
-    bottomTrackSetter?.(0)
-    return
-  }
 
   const rect = sectionRef.value.getBoundingClientRect()
   const viewportHeight = window.innerHeight || 1
@@ -192,7 +180,6 @@ function queueMeasure() {
 }
 
 const { wheelPosition, onWheel: onBandWheel } = useGalleryWheelMotion({
-  prefersReducedMotion,
   topCycleWidth,
   bottomCycleWidth,
   onUpdate: queueOffsets,
@@ -206,10 +193,7 @@ const { wheelPosition, onWheel: onBandWheel } = useGalleryWheelMotion({
 onMounted(() => {
   if (typeof window === 'undefined') return
 
-  reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   syncViewportWidth()
-  syncReducedMotion()
-  reduceMotionQuery.addEventListener('change', syncReducedMotion)
   window.addEventListener('scroll', queueOffsets, { passive: true })
   window.addEventListener('resize', queueMeasure, { passive: true })
   queueMeasure()
@@ -231,7 +215,6 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('scroll', queueOffsets)
   window.removeEventListener('resize', queueMeasure)
-  reduceMotionQuery?.removeEventListener('change', syncReducedMotion)
 })
 </script>
 
@@ -327,9 +310,4 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .article-parallax-band__track {
-    transition: none;
-  }
-}
 </style>

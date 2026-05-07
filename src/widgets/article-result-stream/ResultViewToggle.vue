@@ -141,10 +141,4 @@ function updateValue(value: ResultViewMode) {
   transform: scale(0.97);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .result-view-toggle__thumb,
-  .result-view-toggle__button {
-    transition: none;
-  }
-}
 </style>

@@ -15,7 +15,7 @@ export function getCategoryArticles(
     params?: PaginationParams,
 ): Promise<CategoryRespDto> {
     return request
-        .get<BackendCategoryResp>(`/categories/${category}/articles`, params)
+        .get<BackendCategoryResp>(`/categories/${encodeURIComponent(String(category))}/articles`, params)
         .then(normalizeCategoryResp)
 }
 

@@ -272,6 +272,9 @@ async function submitAction(action: ReviewActionValue) {
 
     await Promise.all([
       queryClient.invalidateQueries({
+        queryKey: queryKeys.home,
+      }),
+      queryClient.invalidateQueries({
         queryKey: queryKeys.reviewPendingRoot,
       }),
       queryClient.invalidateQueries({

@@ -195,6 +195,7 @@ export function mapArticleCardDtoToVm(dto: ArticleCardEntityDto): ArticleCardVm 
         status: dto.status ? createArticleStatusVm(dto.status) : null,
         author: createArticleAuthorVm(dto.author),
         latestReason: dto.rejectReason ?? null,
+        draftVisible: dto.draftVisible === true,
         articlePath: `/articles/${dto.id}`,
         editPath: `/editor/${dto.id}`,
         reviewPath: `/review/articles/${dto.id}`,
@@ -233,6 +234,7 @@ export function mapArticleDetailDtoToVm(dto: ArticleDetailEntityDto): ArticleDet
         submitCountText: `已提交 ${dto.submitCount ?? 0} 次`,
         lastSubmittedAt: toDisplayDate(dto.lastSubmittedAt),
         lastSubmittedAtRaw: dto.lastSubmittedAt ?? null,
+        draftVisible: dto.draftVisible === true,
         articlePath: `/articles/${dto.id}`,
         editPath: `/editor/${dto.id}`,
         reviewPath: `/review/articles/${dto.id}`,
@@ -250,6 +252,7 @@ export function mapArticleDraftDtoToVm(dto: ArticleDraftEntityDto): ArticleDraft
         wordCountText: formatWordCount(dto.wordCount) ?? '0 字',
         updatedAt: toDisplayDate(dto.updatedAt) ?? dto.updatedAt,
         latestReason: dto.latestReason ?? null,
+        draftVisible: dto.draftVisible === true,
         editPath: `/editor/${dto.id}`,
     }
 }

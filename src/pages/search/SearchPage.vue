@@ -3,14 +3,13 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { useIntersectionObserver } from '@vueuse/core'
 
-import { mapArticleCardDtoToVm } from '@/entities/article'
+import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteSearchArticlesQuery, useInfiniteSearchUsersQuery } from '@/entities/queries'
 import { Avatar, EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
-import { AppHeader } from '@/widgets/app-header'
 
 const props = withDefaults(
   defineProps<{
@@ -167,9 +166,7 @@ useIntersectionObserver(
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <section class="px-1 py-2 md:px-2 md:py-3">
         <div class="search-page-heading">
@@ -232,10 +229,10 @@ useIntersectionObserver(
                   正在续接更多作者…
                 </p>
                 <p v-else-if="userSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
-                  向下继续滚动，自动载入后续作者
+                  继续滚动，自动载入
                 </p>
                 <p v-else class="text-sm text-[var(--color-text-muted)]">
-                  已经看到这一轮搜索的全部作者
+                  END
                 </p>
               </section>
             </template>
@@ -253,10 +250,10 @@ useIntersectionObserver(
                   正在续接更多文章…
                 </p>
                 <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
-                  向下继续滚动，自动载入后续结果
+                  继续滚动，自动载入
                 </p>
                 <p v-else class="text-sm text-[var(--color-text-muted)]">
-                  已经看到这一轮搜索的全部结果
+                  END
                 </p>
               </section>
             </template>

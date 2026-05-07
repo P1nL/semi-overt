@@ -6,21 +6,24 @@ import gsap from 'gsap'
 import type { ArticleCardVm } from '@/entities/article'
 import { ArticleCard } from '@/entities/article/ui'
 import { EmptyState } from '@/shared/components/base'
+import { ARTICLE_STATUS } from '@/shared/constants/article'
+import { isPublishedArticle } from '@/shared/utils/article'
 
 const router = useRouter()
 
 const props = withDefaults(
   defineProps<{
     articles?: ArticleCardVm[]
+    publicReaderMode?: boolean
   }>(),
   {
     articles: () => [],
+    publicReaderMode: false,
   },
 )
 
 const cardsRef = ref<HTMLElement | null>(null)
 const isCompactViewport = ref(false)
-const prefersReducedMotion = ref(false)
 const displayedArticles = ref<ArticleCardVm[]>([...props.articles])
 
 const STACK_X_STEP = 100
@@ -43,7 +46,6 @@ const GRID_THRESHOLD = 5
 const visualOrder = ref<number[]>([])
 
 let compactViewportQuery: MediaQueryList | null = null
-let reduceMotionQuery: MediaQueryList | null = null
 let isAnimating = false
 let articleTransitionToken = 0
 
@@ -68,7 +70,6 @@ const topIndex = computed(() => visualOrder.value[visualOrder.value.length - 1] 
 
 function syncMediaState() {
   isCompactViewport.value = Boolean(compactViewportQuery?.matches)
-  prefersReducedMotion.value = Boolean(reduceMotionQuery?.matches)
 }
 
 function bindCardInteractions(el: HTMLElement | null) {
@@ -157,6 +158,19 @@ function getCardEl(originalIndex: number): HTMLElement | null {
   ) ?? null
 }
 
+function getArticleTargetPath(article: ArticleCardVm): string {
+  const status = article.status?.value
+  if (isPublishedArticle(status)) {
+    return article.articlePath
+  }
+
+  if (props.publicReaderMode && status === ARTICLE_STATUS.DRAFT && article.draftVisible) {
+    return article.articlePath
+  }
+
+  return article.editPath
+}
+
 /**
  * 根据 visualOrder，用 gsap.set 立即设置每张卡片的堆叠位置。
  * 不移动 DOM，只改 CSS transform / zIndex / opacity。
@@ -224,13 +238,6 @@ function advanceDeck() {
   if (isAnimating || !desktopMode.value || count.value < 2 || !cardsRef.value || isGridMode.value) return
 
   isAnimating = true
-
-  if (prefersReducedMotion.value) {
-    rotateVisualOrder()
-    applyStackPositions(false)
-    isAnimating = false
-    return
-  }
 
   const leavingIndex = topIndex.value
   const leavingCard = getCardEl(leavingIndex)
@@ -392,10 +399,6 @@ async function resetDeck(order: number[] | null = null) {
 
 async function fadeInDeck() {
   await resetDeck()
-  if (prefersReducedMotion.value) {
-    for (const el of getFadeTargets()) gsap.set(el, { opacity: 1 })
-    return
-  }
   const targets = getFadeTargets()
   if (!targets.length) return
   gsap.set(targets, { opacity: 0, y: 16 })
@@ -416,16 +419,6 @@ async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
     nextArticles,
     visualOrder.value,
   )
-
-  if (prefersReducedMotion.value) {
-    displayedArticles.value = [...nextArticles]
-    await nextTick()
-    if (!isGridMode.value) {
-      await resetDeck(nextVisualOrder)
-      for (const el of getFadeTargets()) gsap.set(el, { opacity: 1 })
-    }
-    return
-  }
 
   // 离场：只在有 cardsRef（堆叠模式）或平铺模式有可见卡片时淡出
   const leavingTargets = getFadeTargets()
@@ -490,11 +483,9 @@ watch(
 
 onMounted(async () => {
   compactViewportQuery = window.matchMedia('(max-width: 767px)')
-  reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   syncMediaState()
 
   compactViewportQuery.addEventListener('change', syncMediaState)
-  reduceMotionQuery.addEventListener('change', syncMediaState)
 
   if (hasArticles.value && !isCompactViewport.value) {
     await fadeInDeck()
@@ -507,7 +498,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   compactViewportQuery?.removeEventListener('change', syncMediaState)
-  reduceMotionQuery?.removeEventListener('change', syncMediaState)
   unbindCardInteractions(cardsRef.value)
 })
 </script>
@@ -548,7 +538,7 @@ onBeforeUnmount(() => {
             :key="article.id"
             class="ptm__card"
             :data-original-index="index"
-            @click="index === topIndex && router.push(article.articlePath)"
+            @click="index === topIndex && router.push(getArticleTargetPath(article))"
           >
             <ArticleCard
               :article="article"
@@ -570,7 +560,7 @@ onBeforeUnmount(() => {
           <RouterLink
             v-for="article in displayedArticles"
             :key="article.id"
-            :to="article.articlePath"
+            :to="getArticleTargetPath(article)"
             class="ptm__grid-item"
           >
             <ArticleCard
@@ -591,7 +581,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-for="article in displayedArticles"
           :key="article.id"
-          :to="article.articlePath"
+          :to="getArticleTargetPath(article)"
           class="ptm__mobile-item"
         >
           <ArticleCard :article="article" :clickable="false" :show-status="true" :show-reason="true" :fill-height="true" />
@@ -1095,13 +1085,4 @@ html.dark .ptm__grid-item :deep(.content-card-shell::before) {
     radial-gradient(circle at 10% 10%, rgb(255 255 255 / 0.08), transparent 18%);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ptm__action {
-    transition: none;
-  }
-
-  .ptm__grid-item {
-    transition: none;
-  }
-}
 </style>

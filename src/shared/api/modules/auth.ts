@@ -10,6 +10,17 @@ import type {
 
 const AUTH_BASE = '/auth'
 
+export interface RegisterCodeReqDto {
+    email: string
+    cfTurnstileToken?: string
+}
+
+export function sendRegisterCode(payload: RegisterCodeReqDto): Promise<null> {
+    return request.post<null>(`${AUTH_BASE}/register-code`, payload, {
+        withAuth: false,
+    })
+}
+
 export function register(payload: RegisterReqDto): Promise<AuthRespDto> {
     return request.post<BackendAuthResp>(`${AUTH_BASE}/register`, payload, {
         withAuth: false,
@@ -39,6 +50,7 @@ export function resetPassword(payload: ResetPasswordReqDto): Promise<null> {
 }
 
 export const authApi = {
+    sendRegisterCode,
     register,
     login,
     logout,

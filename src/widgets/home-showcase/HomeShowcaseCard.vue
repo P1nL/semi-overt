@@ -10,18 +10,20 @@ const props = withDefaults(
     emphasis?: 'hero' | 'regular'
     cropped?: boolean
     revealed?: boolean
+    animateReveal?: boolean
     delay?: number
   }>(),
   {
     emphasis: 'regular',
     cropped: false,
     revealed: false,
+    animateReveal: true,
     delay: 0,
   },
 )
 
 const imageLoading = computed<'eager' | 'lazy'>(() => (props.emphasis === 'hero' ? 'eager' : 'lazy'))
-const imageDecoding = computed<'sync' | 'async'>(() => (props.emphasis === 'hero' ? 'sync' : 'async'))
+const imageDecoding = computed<'async'>(() => 'async')
 const imageFetchPriority = computed<'high' | 'auto'>(() => (props.emphasis === 'hero' ? 'high' : 'auto'))
 
 const cardStyle = computed(() => ({
@@ -36,7 +38,8 @@ const cardStyle = computed(() => ({
     class="home-showcase-card"
     :class="{
       'home-showcase-card--cropped': cropped,
-      'home-showcase-card--revealed': revealed,
+      'home-showcase-card--revealed': revealed && animateReveal,
+      'home-showcase-card--settled': revealed && !animateReveal,
     }"
     :style="cardStyle"
     :aria-label="`${categoryLabel}：${article.titleText}`"
@@ -120,6 +123,11 @@ const cardStyle = computed(() => ({
 .home-showcase-card--revealed {
   animation: home-showcase-card-rise 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--card-delay, 0ms);
+}
+
+.home-showcase-card--settled {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .home-showcase-card__header {
@@ -333,16 +341,6 @@ html.dark .home-showcase-card__chip {
 :global(html.theme-settling) .home-showcase-card::after,
 :global(html.theme-settling) .home-showcase-card * {
   transition: none !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home-showcase-card,
-  .home-showcase-card--revealed {
-    opacity: 1;
-    transform: none;
-    animation: none;
-    transition: none;
-  }
 }
 
 @keyframes home-showcase-card-rise {

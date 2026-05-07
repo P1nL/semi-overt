@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePendingReviewsQuery, useUserProfileQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import type { ProfileArticleTab } from '@/shared/types/profile'
 import { getErrorMessage } from '@/shared/utils/error'
+import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
-import { AppHeader } from '@/widgets/app-header'
 import { ProfileHeader } from '@/widgets/profile-header'
 import { ProfileCardQueue } from '@/widgets/profile-card-queue'
 import { ProfileTabs } from '@/widgets/profile-tabs'
@@ -37,6 +37,15 @@ const profileQuery = useUserProfileQuery(username, computed(() => ({
 
 const profile = computed(() => profileQuery.data.value ?? null)
 const articles = computed(() => profile.value?.articles ?? [])
+
+watch(
+  () => [profile.value?.coverUrl, profile.value?.avatarUrl] as const,
+  ([coverUrl, avatarUrl]) => {
+    void preloadImages([coverUrl, avatarUrl], 'high')
+  },
+  { immediate: true },
+)
+
 const tabCounts = computed(() => {
   const stats = profile.value?.stats || []
   const statusTotal = stats.reduce((sum, item) => {
@@ -107,9 +116,7 @@ async function onTabChange(tab: ProfileArticleTab) {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
       <ProfileHeader
         v-if="profile"
@@ -166,7 +173,10 @@ async function onTabChange(tab: ProfileArticleTab) {
             />
 
             <div v-else key="profile-content">
-              <ProfileCardQueue :articles="articles" />
+              <ProfileCardQueue
+                :articles="articles"
+                :public-reader-mode="!isOwnerProfile"
+              />
             </div>
           </Transition>
         </div>

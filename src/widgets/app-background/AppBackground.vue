@@ -40,6 +40,9 @@ type LightArtboard = {
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const THEME_TRANSITION_DURATION = 540
+const INITIAL_ANIMATION_DELAY_MS = 900
+const BACKGROUND_FRAME_INTERVAL_MS = 1000 / 45
+const MAX_DEVICE_PIXEL_RATIO = 1.35
 const DARK_TRAVEL_SCALE = 0.72
 const DARK_PULSE_SCALE = 0.78
 const DARK_GLOBAL_DRIFT_SCALE = 0.82
@@ -92,15 +95,16 @@ let targetTheme: MeshTheme = 'light'
 let transitionFromTheme: MeshTheme | null = null
 let themeTransitionStart = 0
 let themeObserver: MutationObserver | null = null
-let reducedMotionQuery: MediaQueryList | null = null
-let prefersReducedMotion = false
+let lastRenderedAt = 0
+let animationLoopEnabled = false
+let animationStartTimer: number | null = null
 
 function easeOutQuart(value: number) {
   return 1 - (1 - value) ** 4
 }
 
 function queueFrame() {
-  if (frameId !== 0 || prefersReducedMotion || document.hidden) {
+  if (!animationLoopEnabled || frameId !== 0 || document.hidden) {
     return
   }
 
@@ -117,12 +121,8 @@ function stopAnimation() {
 }
 
 function syncAnimationLoop(forceRender = false) {
-  if (prefersReducedMotion || document.hidden) {
+  if (document.hidden) {
     stopAnimation()
-
-    if (forceRender) {
-      renderFrame(performance.now())
-    }
     return
   }
 
@@ -131,6 +131,29 @@ function syncAnimationLoop(forceRender = false) {
   }
 
   queueFrame()
+}
+
+function startAnimationLoop(forceRender = true) {
+  animationLoopEnabled = true
+  syncAnimationLoop(forceRender)
+}
+
+function scheduleAnimationLoopStart() {
+  if (animationStartTimer !== null) {
+    return
+  }
+
+  animationStartTimer = window.setTimeout(() => {
+    animationStartTimer = null
+
+    const schedule = window.requestIdleCallback
+    if (schedule) {
+      schedule(() => startAnimationLoop(), { timeout: 1200 })
+      return
+    }
+
+    startAnimationLoop()
+  }, INITIAL_ANIMATION_DELAY_MS)
 }
 
 function handlePointerMove(event: MouseEvent) {
@@ -162,14 +185,6 @@ function beginThemeTransition(nextTheme: MeshTheme, now = performance.now()) {
     return
   }
 
-  if (prefersReducedMotion) {
-    transitionFromTheme = null
-    currentTheme = nextTheme
-    targetTheme = nextTheme
-    renderFrame(now)
-    return
-  }
-
   transitionFromTheme = targetTheme
   currentTheme = nextTheme
   targetTheme = nextTheme
@@ -184,7 +199,7 @@ function resizeCanvas() {
     return
   }
 
-  dpr = Math.min(window.devicePixelRatio || 1, 2)
+  dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
   canvas.width = Math.floor(window.innerWidth * dpr)
   canvas.height = Math.floor(window.innerHeight * dpr)
   canvas.style.width = `${window.innerWidth}px`
@@ -632,7 +647,7 @@ function renderFrame(now: number) {
 
   const width = window.innerWidth
   const height = window.innerHeight
-  const time = prefersReducedMotion ? 0 : now * 0.00136
+  const time = now * 0.00136
 
   const prevX = pointer.x
   const prevY = pointer.y
@@ -678,6 +693,12 @@ function renderFrame(now: number) {
 
 function render(now: number) {
   frameId = 0
+  if (now - lastRenderedAt < BACKGROUND_FRAME_INTERVAL_MS) {
+    queueFrame()
+    return
+  }
+
+  lastRenderedAt = now
   renderFrame(now)
   queueFrame()
 }
@@ -686,17 +707,10 @@ function handleVisibilityChange() {
   syncAnimationLoop(true)
 }
 
-function handleReducedMotionChange(event: MediaQueryListEvent) {
-  prefersReducedMotion = event.matches
-  syncAnimationLoop(true)
-}
-
 onMounted(() => {
   currentTheme = resolveTheme()
   targetTheme = currentTheme
   resizeCanvas()
-  reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-  prefersReducedMotion = reducedMotionQuery.matches
 
   themeObserver = new MutationObserver(() => {
     beginThemeTransition(resolveTheme())
@@ -711,20 +725,22 @@ onMounted(() => {
   window.addEventListener('mousemove', handlePointerMove)
   window.addEventListener('mouseleave', handlePointerLeave)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  reducedMotionQuery.addEventListener('change', handleReducedMotionChange)
-  syncAnimationLoop(true)
+  renderFrame(performance.now())
+  scheduleAnimationLoopStart()
 })
 
 onBeforeUnmount(() => {
   stopAnimation()
+  if (animationStartTimer !== null) {
+    window.clearTimeout(animationStartTimer)
+    animationStartTimer = null
+  }
   window.removeEventListener('resize', resizeCanvas)
   window.removeEventListener('mousemove', handlePointerMove)
   window.removeEventListener('mouseleave', handlePointerLeave)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  reducedMotionQuery?.removeEventListener('change', handleReducedMotionChange)
   themeObserver?.disconnect()
   themeObserver = null
-  reducedMotionQuery = null
 })
 </script>
 

@@ -23,11 +23,23 @@ const emit = defineEmits<{
   change: [ProfileArticleTab]
 }>()
 
+type TabItem = {
+  label: string
+  value: ProfileArticleTab
+  badge: number
+}
+
 const tabItems = computed(() => {
   if (props.publicOnly) {
-    return [
+    const publicTabs: TabItem[] = [
       { label: '已发布', value: 'approved' as const, badge: props.counts.approved ?? 0 },
     ]
+
+    if ((props.counts.draft ?? 0) > 0 || props.modelValue === 'draft') {
+      publicTabs.push({ label: '草稿', value: 'draft' as const, badge: props.counts.draft ?? 0 })
+    }
+
+    return publicTabs
   }
 
   return [

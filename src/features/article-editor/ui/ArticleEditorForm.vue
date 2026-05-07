@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Mark, mergeAttributes, type JSONContent } from '@tiptap/core'
 import Highlight from '@tiptap/extension-highlight'
 import Heading from '@tiptap/extension-heading'
 import Link from '@tiptap/extension-link'
@@ -19,16 +20,18 @@ import {
   Italic,
   List,
   ListOrdered,
+  Strikethrough,
   Redo2,
   Text,
   Undo2,
   Link2,
+  Underline,
 } from 'lucide-vue-next'
 import { TextSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, type Editor as TiptapEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
-import { mapArticleDetailDtoToVm } from '@/entities/article'
+import { Switch } from '@/shared/components/base'
 import {
   buildEditorStats,
   createEmptyEditorFormValues,
@@ -135,6 +138,26 @@ const headingOptions = [
 const headingLevels = headingOptions.map((option) => option.level) as ReadonlyArray<2 | 3 | 4>
 type HeadingLevel = (typeof headingOptions)[number]['level']
 
+const UnderlineMark = Mark.create({
+  name: 'underline',
+
+  parseHTML() {
+    return [
+      { tag: 'u' },
+      {
+        style: 'text-decoration',
+        getAttrs: (value) => {
+          return typeof value === 'string' && value.includes('underline') ? {} : false
+        },
+      },
+    ]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['u', mergeAttributes(HTMLAttributes), 0]
+  },
+})
+
 const currentHeadingLevel = computed<HeadingLevel | null>(() => {
   const editor = contentEditor.value
   if (!editor) return null
@@ -173,8 +196,9 @@ const contentEditor = useEditor({
     Highlight.configure({
       multicolor: false,
     }),
+    UnderlineMark,
     TextAlign.configure({
-      types: ['heading', 'paragraph'],
+      types: ['heading', 'paragraph', 'listItem'],
       alignments: ['left', 'center', 'right'],
       defaultAlignment: 'left',
     }),
@@ -182,7 +206,11 @@ const contentEditor = useEditor({
       inline: false,
       allowBase64: false,
     }),
-    Table.configure({ resizable: false }),
+    Table.configure({
+      resizable: true,
+      lastColumnResizable: true,
+      cellMinWidth: 56,
+    }),
     TableRow,
     TableHeader,
     TableCell,
@@ -195,6 +223,16 @@ const contentEditor = useEditor({
   editorProps: {
     attributes: {
       class: 'editor-content-surface',
+    },
+    handlePaste: (_view, event) => {
+      const text = event.clipboardData?.getData('text/plain')
+      if (!text) return false
+
+      const editor = contentEditor.value
+      if (!editor) return false
+
+      event.preventDefault()
+      return editor.chain().focus().insertContent(createPlainTextPasteContent(text)).run()
     },
     handleKeyDown: (_view, event) => {
       if (
@@ -273,6 +311,7 @@ function snapshotFormValues(): EditorFormValues {
     content: form.content,
     coverUrl: form.coverUrl,
     coverColor: form.coverColor,
+    draftVisible: form.draftVisible,
     wordCount: form.wordCount,
     readMinutes: form.readMinutes,
     durationCategory: form.durationCategory,
@@ -285,6 +324,7 @@ function patchFormValues(values: EditorFormValues) {
   form.content = values.content
   form.coverUrl = values.coverUrl
   form.coverColor = values.coverColor
+  form.draftVisible = values.draftVisible
   form.wordCount = values.wordCount
   form.readMinutes = values.readMinutes
   form.durationCategory = values.durationCategory
@@ -297,6 +337,7 @@ function hasFormDifferences(values: EditorFormValues): boolean {
     form.content !== values.content ||
     form.coverUrl !== values.coverUrl ||
     form.coverColor !== values.coverColor ||
+    form.draftVisible !== values.draftVisible ||
     form.wordCount !== values.wordCount ||
     form.readMinutes !== values.readMinutes ||
     form.durationCategory !== values.durationCategory
@@ -385,10 +426,7 @@ async function loadArticleDetail() {
   saveError.value = ''
 
   try {
-    const detail = await articleApi.getArticleDetail(workingArticleId.value)
-    const vm = mapArticleDetailDtoToVm(detail)
-    editorStore.setCurrentArticle(vm)
-    editorStore.setLastSavedAt(detail.updatedAt ?? '')
+    const vm = await editorStore.loadArticleDetail(workingArticleId.value)
 
     const nextValues = applySummaryGuard(
       mapArticleDetailVmToEditorFormValues(vm),
@@ -452,8 +490,14 @@ async function saveDraft(showToast = false): Promise<boolean> {
       readMinutes: localStats.readMinutes,
       durationCategory: localStats.durationCategory,
       status: response.status,
+      draftVisible: response.draftVisible,
     }
 
+    editorStore.patchCachedArticleDetail(
+      articleId,
+      { draftVisible: response.draftVisible },
+      response.savedAt,
+    )
     emit('draft-saved', payload)
 
     if (
@@ -560,6 +604,42 @@ function insertCustomTable(withHeaderRow: boolean) {
   insertTablePreset(rows, cols, withHeaderRow)
 }
 
+function createPlainTextPasteContent(text: string): JSONContent | JSONContent[] {
+  const normalized = text.replace(/\r\n?/g, '\n')
+
+  if (!normalized.includes('\n')) {
+    return {
+      type: 'text',
+      text: normalized,
+    }
+  }
+
+  return normalized.split(/\n{2,}/).map((block) => {
+    const lines = block.split('\n')
+    const content = lines.flatMap<JSONContent>((line, index) => {
+      const nodes: JSONContent[] = []
+
+      if (line) {
+        nodes.push({
+          type: 'text',
+          text: line,
+        })
+      }
+
+      if (index < lines.length - 1) {
+        nodes.push({ type: 'hardBreak' })
+      }
+
+      return nodes
+    })
+
+    return {
+      type: 'paragraph',
+      content,
+    }
+  })
+}
+
 function applyHeadingLevel(level: HeadingLevel) {
   setHeadingLevel(level)
   closeHeadingMenu()
@@ -577,8 +657,48 @@ function toggleItalic() {
   runEditorCommand((editor) => editor.chain().focus().toggleItalic().run())
 }
 
+function toggleUnderline() {
+  runEditorCommand((editor) => editor.chain().focus().toggleMark('underline').run())
+}
+
+function toggleStrike() {
+  runEditorCommand((editor) => editor.chain().focus().toggleStrike().run())
+}
+
 function toggleHighlight() {
   runEditorCommand((editor) => editor.chain().focus().toggleHighlight().run())
+}
+
+function addTableRowBefore() {
+  runEditorCommand((editor) => editor.chain().focus().addRowBefore().run())
+}
+
+function addTableRowAfter() {
+  runEditorCommand((editor) => editor.chain().focus().addRowAfter().run())
+}
+
+function deleteTableRow() {
+  runEditorCommand((editor) => editor.chain().focus().deleteRow().run())
+}
+
+function addTableColumnBefore() {
+  runEditorCommand((editor) => editor.chain().focus().addColumnBefore().run())
+}
+
+function addTableColumnAfter() {
+  runEditorCommand((editor) => editor.chain().focus().addColumnAfter().run())
+}
+
+function deleteTableColumn() {
+  runEditorCommand((editor) => editor.chain().focus().deleteColumn().run())
+}
+
+function mergeTableCells() {
+  runEditorCommand((editor) => editor.chain().focus().mergeCells().run())
+}
+
+function splitTableCell() {
+  runEditorCommand((editor) => editor.chain().focus().splitCell().run())
 }
 
 function setTextAlignment(alignment: 'left' | 'center' | 'right') {
@@ -677,8 +797,55 @@ function canToggleItalic() {
   return contentEditor.value?.can().chain().focus().toggleItalic().run() ?? false
 }
 
+function canToggleUnderline() {
+  return contentEditor.value?.can().chain().focus().toggleMark('underline').run() ?? false
+}
+
+function canToggleStrike() {
+  return contentEditor.value?.can().chain().focus().toggleStrike().run() ?? false
+}
+
 function canToggleHighlight() {
   return contentEditor.value?.can().chain().focus().toggleHighlight().run() ?? false
+}
+
+function canRunTableCommand(command: (editor: TiptapEditor) => boolean) {
+  const editor = contentEditor.value
+  if (!editor || disabledState.value || !editor.isActive('table')) return false
+
+  return command(editor)
+}
+
+function canAddTableRowBefore() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().addRowBefore().run())
+}
+
+function canAddTableRowAfter() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().addRowAfter().run())
+}
+
+function canDeleteTableRow() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().deleteRow().run())
+}
+
+function canAddTableColumnBefore() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().addColumnBefore().run())
+}
+
+function canAddTableColumnAfter() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().addColumnAfter().run())
+}
+
+function canDeleteTableColumn() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().deleteColumn().run())
+}
+
+function canMergeTableCells() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().mergeCells().run())
+}
+
+function canSplitTableCell() {
+  return canRunTableCommand((editor) => editor.can().chain().focus().splitCell().run())
 }
 
 function canSetHeadingLevel(level: 2 | 3 | 4) {
@@ -750,6 +917,17 @@ function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
   closeHeadingMenu()
   closeTableMenu()
+}
+
+function handleToolbarPointerDown(event: PointerEvent) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  if (target.closest('.editor-table-size-selector')) return
+
+  const button = target.closest('button')
+  if (!button) return
+
+  event.preventDefault()
 }
 
 async function handleBodyImageChange(event: Event) {
@@ -1066,7 +1244,11 @@ defineExpose({
               <!-- 哨兵：工具栏上方 1px，离开视口即表示工具栏已吸顶 -->
               <div ref="toolbarSentinelRef" class="editor-toolbar-sentinel" aria-hidden="true" />
 
-              <div ref="formatToolbarRef" class="editor-format-toolbar editor-format-toolbar--icons">
+              <div
+                ref="formatToolbarRef"
+                class="editor-format-toolbar editor-format-toolbar--icons"
+                @pointerdown="handleToolbarPointerDown"
+              >
                 <button
                   type="button"
                   class="editor-tool-button"
@@ -1225,6 +1407,94 @@ defineExpose({
                         </span>
                         <span>自定义无表头</span>
                       </button>
+
+                      <div class="mx-3 h-px bg-[var(--color-border)]" />
+
+                      <p class="px-3 pt-2 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-faint)]">行列</p>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canAddTableRowBefore()"
+                        role="menuitem"
+                        @click="addTableRowBefore"
+                      >
+                        <span class="editor-table-dropdown-item__icon">↑</span>
+                        <span>上方插入行</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canAddTableRowAfter()"
+                        role="menuitem"
+                        @click="addTableRowAfter"
+                      >
+                        <span class="editor-table-dropdown-item__icon">↓</span>
+                        <span>下方插入行</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canDeleteTableRow()"
+                        role="menuitem"
+                        @click="deleteTableRow"
+                      >
+                        <span class="editor-table-dropdown-item__icon">−</span>
+                        <span>删除当前行</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canAddTableColumnBefore()"
+                        role="menuitem"
+                        @click="addTableColumnBefore"
+                      >
+                        <span class="editor-table-dropdown-item__icon">←</span>
+                        <span>左侧插入列</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canAddTableColumnAfter()"
+                        role="menuitem"
+                        @click="addTableColumnAfter"
+                      >
+                        <span class="editor-table-dropdown-item__icon">→</span>
+                        <span>右侧插入列</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canDeleteTableColumn()"
+                        role="menuitem"
+                        @click="deleteTableColumn"
+                      >
+                        <span class="editor-table-dropdown-item__icon">×</span>
+                        <span>删除当前列</span>
+                      </button>
+
+                      <div class="mx-3 h-px bg-[var(--color-border)]" />
+
+                      <p class="px-3 pt-2 text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-faint)]">单元格</p>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canMergeTableCells()"
+                        role="menuitem"
+                        @click="mergeTableCells"
+                      >
+                        <span class="editor-table-dropdown-item__icon">⇄</span>
+                        <span>合并单元格</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="editor-toolbar-dropdown-item editor-table-dropdown-item"
+                        :disabled="disabledState || !canSplitTableCell()"
+                        role="menuitem"
+                        @click="splitTableCell"
+                      >
+                        <span class="editor-table-dropdown-item__icon">⇵</span>
+                        <span>拆分单元格</span>
+                      </button>
                     </div>
                   </Transition>
                 </div>
@@ -1234,7 +1504,7 @@ defineExpose({
                   class="editor-tool-button"
                   data-tooltip="加粗"
                   :class="{ 'editor-tool-button--active': isToolbarActive('bold') }"
-                  :disabled="disabledState || !canToggleBold()"
+                  :disabled="disabledState"
                   aria-label="加粗"
                   @click="toggleBold"
                 >
@@ -1246,11 +1516,35 @@ defineExpose({
                   class="editor-tool-button"
                   data-tooltip="斜体"
                   :class="{ 'editor-tool-button--active': isToolbarActive('italic') }"
-                  :disabled="disabledState || !canToggleItalic()"
+                  :disabled="disabledState"
                   aria-label="斜体"
                   @click="toggleItalic"
                 >
                   <Italic :size="16" :stroke-width="1.75" />
+                </button>
+
+                <button
+                  type="button"
+                  class="editor-tool-button"
+                  data-tooltip="下划线"
+                  :class="{ 'editor-tool-button--active': isToolbarActive('underline') }"
+                  :disabled="disabledState || !canToggleUnderline()"
+                  aria-label="下划线"
+                  @click="toggleUnderline"
+                >
+                  <Underline :size="16" :stroke-width="1.75" />
+                </button>
+
+                <button
+                  type="button"
+                  class="editor-tool-button"
+                  data-tooltip="删除线"
+                  :class="{ 'editor-tool-button--active': isToolbarActive('strike') }"
+                  :disabled="disabledState || !canToggleStrike()"
+                  aria-label="删除线"
+                  @click="toggleStrike"
+                >
+                  <Strikethrough :size="16" :stroke-width="1.75" />
                 </button>
 
                 <button
@@ -1364,7 +1658,7 @@ defineExpose({
                 </button>
               </div>
 
-              <div class="editor-format-toolbar">
+              <div class="editor-format-toolbar" @pointerdown="handleToolbarPointerDown">
                 <button
                   type="button"
                   class="editor-tool-button"
@@ -1389,7 +1683,7 @@ defineExpose({
                   type="button"
                   class="editor-tool-button"
                   :class="{ 'editor-tool-button--active': isToolbarActive('bold') }"
-                  :disabled="disabledState || !canToggleBold()"
+                  :disabled="disabledState"
                   @click="toggleBold"
                 >
                   加粗
@@ -1399,10 +1693,30 @@ defineExpose({
                   type="button"
                   class="editor-tool-button"
                   :class="{ 'editor-tool-button--active': isToolbarActive('italic') }"
-                  :disabled="disabledState || !canToggleItalic()"
+                  :disabled="disabledState"
                   @click="toggleItalic"
                 >
                   斜体
+                </button>
+
+                <button
+                  type="button"
+                  class="editor-tool-button"
+                  :class="{ 'editor-tool-button--active': isToolbarActive('underline') }"
+                  :disabled="disabledState || !canToggleUnderline()"
+                  @click="toggleUnderline"
+                >
+                  下划线
+                </button>
+
+                <button
+                  type="button"
+                  class="editor-tool-button"
+                  :class="{ 'editor-tool-button--active': isToolbarActive('strike') }"
+                  :disabled="disabledState || !canToggleStrike()"
+                  @click="toggleStrike"
+                >
+                  删除线
                 </button>
 
                 <button
@@ -1493,6 +1807,17 @@ defineExpose({
               {{ errors.summary }}
             </p>
             <p class="editor-side-counter">{{ summaryCountText }}</p>
+          </section>
+
+          <section class="editor-side-section">
+            <div class="editor-side-label">草稿可见性</div>
+            <Switch
+              v-model="form.draftVisible"
+              :disabled="disabledState"
+              label="在个人页展示"
+              description="开启后，可见草稿会出现在你的个人页；不会进入首页、分类页或搜索结果。"
+              @change="handleFormMutation"
+            />
           </section>
 
           <section class="editor-side-section">
@@ -1805,14 +2130,14 @@ defineExpose({
   top: var(--editor-sticky-gap, 0.32rem);
   z-index: 6;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.35rem;
   margin-bottom: 1rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface-elevated) 75%, transparent);
-  padding: 0.65rem;
+  padding: 0.48rem;
   backdrop-filter: blur(12px);
 }
 
@@ -1828,8 +2153,9 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.05rem;
+  height: 2.05rem;
+  flex: 0 0 auto;
   position: relative;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -1926,9 +2252,9 @@ defineExpose({
 
 .editor-tool-button--heading {
   width: auto;
-  min-width: 3.25rem;
+  min-width: 3rem;
   justify-content: center;
-  padding: 0 1.35rem 0 0.4rem;
+  padding: 0 1.18rem 0 0.34rem;
   font-size: 0.78rem;
   line-height: 1;
 }
@@ -2263,6 +2589,26 @@ defineExpose({
   margin: 0.3rem 0;
 }
 
+.editor-content-editor :deep(.editor-content-surface li[style*="text-align: center"]),
+.editor-content-editor :deep(.editor-content-surface li:has(> p[style*="text-align: center"])) {
+  list-style-position: inside;
+  text-align: center;
+}
+
+.editor-content-editor :deep(.editor-content-surface li[style*="text-align: right"]),
+.editor-content-editor :deep(.editor-content-surface li:has(> p[style*="text-align: right"])) {
+  list-style-position: inside;
+  text-align: right;
+}
+
+.editor-content-editor :deep(.editor-content-surface li[style*="text-align: center"] > p:first-child),
+.editor-content-editor :deep(.editor-content-surface li:has(> p[style*="text-align: center"]) > p:first-child),
+.editor-content-editor :deep(.editor-content-surface li[style*="text-align: right"] > p:first-child),
+.editor-content-editor :deep(.editor-content-surface li:has(> p[style*="text-align: right"]) > p:first-child) {
+  display: inline;
+  margin: 0;
+}
+
 .editor-content-editor :deep(.editor-content-surface li::marker) {
   color: color-mix(in srgb, var(--color-text) 72%, var(--color-text-faint));
 }
@@ -2303,6 +2649,12 @@ defineExpose({
   font-synthesis: style;
 }
 
+.editor-content-editor :deep(.editor-content-surface strong),
+.editor-content-editor :deep(.editor-content-surface b) {
+  font-weight: 700;
+  font-synthesis: weight;
+}
+
 .editor-content-editor :deep(.editor-content-surface a) {
   color: var(--color-primary);
   text-decoration: underline;
@@ -2319,6 +2671,17 @@ defineExpose({
   max-width: 100%;
   height: auto;
   border-radius: var(--radius-lg);
+}
+
+.editor-content-editor :deep(.editor-content-surface u) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+.editor-content-editor :deep(.editor-content-surface s),
+.editor-content-editor :deep(.editor-content-surface strike) {
+  text-decoration-thickness: 1px;
 }
 
 .editor-content-editor :deep(.editor-resizable-image) {
@@ -2390,6 +2753,15 @@ defineExpose({
   overflow: hidden;
 }
 
+.editor-content-editor :deep(.editor-content-surface .tableWrapper) {
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+
+.editor-content-editor :deep(.editor-content-surface .tableWrapper table) {
+  margin-bottom: 0;
+}
+
 .editor-content-editor :deep(.editor-content-surface th),
 .editor-content-editor :deep(.editor-content-surface td) {
   position: relative;
@@ -2420,6 +2792,21 @@ defineExpose({
   pointer-events: none;
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   z-index: 2;
+}
+
+.editor-content-editor :deep(.editor-content-surface .column-resize-handle) {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  z-index: 3;
+  width: 4px;
+  background: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  pointer-events: none;
+}
+
+.editor-content-editor :deep(.editor-content-surface.resize-cursor) {
+  cursor: ew-resize;
 }
 
 .editor-wordcount {

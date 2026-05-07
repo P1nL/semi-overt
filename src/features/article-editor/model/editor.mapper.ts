@@ -35,6 +35,7 @@ export function createEmptyEditorFormValues(): EditorFormValues {
         content: '',
         coverUrl: '',
         coverColor: '',
+        draftVisible: false,
         wordCount: 0,
         readMinutes: 0,
         durationCategory: ARTICLE_DURATION_CATEGORY.QUICK,
@@ -50,6 +51,7 @@ export function mapArticleDetailVmToEditorFormValues(article: ArticleDetailVm): 
         content: article.content || '',
         coverUrl: article.cover.src || '',
         coverColor: article.cover.rawColor || '',
+        draftVisible: article.draftVisible,
         ...stats,
     }
 }
@@ -64,6 +66,7 @@ export function mapEditorFormToDraftPayload(form: EditorFormValues): EditorDraft
         coverUrl: form.coverUrl.trim(),
         coverColor: form.coverColor.trim(),
         clientWordCount: stats.wordCount,
+        draftVisible: form.draftVisible,
     }
 }
 

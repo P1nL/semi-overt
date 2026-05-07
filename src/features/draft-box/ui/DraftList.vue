@@ -31,7 +31,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="space-y-3">
+  <section class="draft-list-shell space-y-3">
     <InlineMessage v-if="error" tone="error" :message="error" />
     <InlineMessage v-else-if="warning" tone="warning" :message="warning" />
 
@@ -43,7 +43,7 @@ const emit = defineEmits<{
       />
     </div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="draft-list-content space-y-3">
       <div
         v-if="items.length"
         class="draft-list"
@@ -81,10 +81,23 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
+.draft-list-shell,
+.draft-list-content {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .draft-list {
   display: flex;
+  max-height: min(24rem, calc(100vh - var(--header-height, 4rem) - 10rem));
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+  scrollbar-gutter: stable;
 }
 
 .draft-list__item {

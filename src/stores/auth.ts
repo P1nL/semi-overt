@@ -22,6 +22,7 @@ export interface AuthUser {
     nickname?: string | null
     avatar?: string | null
     role: UserRole
+    profileLoaded?: boolean
 }
 
 export interface AuthErrorState {
@@ -48,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isAdmin = computed(() => role.value === 'ADMIN')
     const displayName = computed(() => user.value?.nickname || user.value?.username || '')
     const hasAuthError = computed(() => authError.value.code !== null)
+    const hasCurrentUserProfile = computed(() => user.value?.profileLoaded === true)
 
     function setToken(nextToken: string | null, persistence = authPersistence.value) {
         authPersistence.value = persistence
@@ -128,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
                 nickname: response.nickname ?? response.username,
                 avatar: response.avatarUrl ?? null,
                 role: response.role === 'ADMIN' ? 'ADMIN' : 'USER',
+                profileLoaded: true,
             })
             clearAuthError()
         } catch (error) {
@@ -151,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
         isAdmin,
         displayName,
         hasAuthError,
+        hasCurrentUserProfile,
 
         setToken,
         setUser,

@@ -26,7 +26,7 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
 
 <template>
   <div
-      class="relative overflow-hidden rounded-[calc(var(--radius-lg)+2px)] shadow-[var(--shadow-xs)]"
+      class="article-cover relative overflow-hidden rounded-[calc(var(--radius-lg)+2px)] shadow-[var(--shadow-xs)]"
       :class="
         compact
           ? 'h-24 w-32 shrink-0'
@@ -43,7 +43,7 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
         :loading="imageLoading"
         :decoding="imageDecoding"
         :fetchpriority="imageFetchPriority"
-        class="absolute inset-0 block h-full w-full object-cover object-center"
+        class="article-cover__image absolute inset-0 block h-full w-full object-cover object-center"
     />
     <div
         v-else
@@ -53,3 +53,12 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
     </div>
   </div>
 </template>
+
+<style scoped>
+.article-cover__image {
+  min-width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+</style>

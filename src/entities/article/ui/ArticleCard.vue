@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { isPublishedArticle } from '@/shared/utils/article'
+import { ARTICLE_STATUS } from '../model/article.constants'
 import type { ArticleCardVm } from '../model/article.types'
 import ArticleAuthorMeta from './ArticleAuthorMeta.vue'
 import ArticleCover from './ArticleCover.vue'
@@ -44,6 +45,10 @@ const shouldShowStatusBadge = computed(() => {
     const statusValue = props.article.status?.value
     return Boolean(props.showStatus && statusValue && !isPublishedArticle(statusValue))
 })
+
+const latestReasonLabel = computed(() =>
+    props.article.status?.value === ARTICLE_STATUS.REJECTED ? '最近拒绝原因' : '最近退回原因',
+)
 </script>
 
 <template>
@@ -83,7 +88,7 @@ const shouldShowStatusBadge = computed(() => {
             :clickable="!clickable"
         />
         <p v-if="showReason && article.latestReason" class="text-xs text-[var(--color-danger)]">
-          最近退回原因：{{ article.latestReason }}
+          {{ latestReasonLabel }}：{{ article.latestReason }}
         </p>
       </div>
     </div>

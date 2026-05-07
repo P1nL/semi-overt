@@ -11,14 +11,19 @@ export interface RegisterFormValues {
     username: string
     password: string
     confirmPassword: string
+    emailCode: string
 }
 
 export interface ForgotPasswordFormValues {
     email: string
+    code: string
+    newPassword: string
+    confirmPassword: string
 }
 
 export interface ResetPasswordFormValues {
-    token: string
+    email: string
+    code: string
     newPassword: string
     confirmPassword: string
 }

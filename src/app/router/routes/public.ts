@@ -13,8 +13,12 @@ export const publicRoutes: RouteRecordRaw[] = [
     },
   },
   {
-    path: '/',
+    path: '/auth',
     component: () => import('@/pages/auth/AuthPageShell.vue'),
+    meta: {
+      access: 'public',
+      publicOnly: true,
+    },
     children: [
       {
         path: ROUTE_PATH.LOGIN,

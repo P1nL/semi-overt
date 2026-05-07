@@ -5,6 +5,8 @@ import { AUTH_BIZ_CODE } from '@/shared/constants/auth'
 import { STORAGE_KEY } from '@/shared/constants/storage'
 import { sessionStore } from '@/shared/utils/storage'
 
+const AUTH_SHEET_BACKGROUND_STORAGE_KEY = 'now.authSheetBackground'
+
 function readAuthRedirectFromStorage() {
     return sessionStore?.get<string>(STORAGE_KEY.AUTH_REDIRECT, '') ?? ''
 }
@@ -19,12 +21,28 @@ function writeAuthRedirectToStorage(value: string) {
     }
 }
 
+function readAuthSheetBackgroundFromStorage() {
+    return sessionStore?.get<string>(AUTH_SHEET_BACKGROUND_STORAGE_KEY, '') ?? ''
+}
+
+function writeAuthSheetBackgroundToStorage(value: string) {
+    if (!sessionStore) return
+
+    if (value) {
+        sessionStore.set(AUTH_SHEET_BACKGROUND_STORAGE_KEY, value)
+    } else {
+        sessionStore.remove(AUTH_SHEET_BACKGROUND_STORAGE_KEY)
+    }
+}
+
 export const useSessionStore = defineStore('session', () => {
     const authRedirect = ref(readAuthRedirectFromStorage())
+    const authSheetBackground = ref(readAuthSheetBackgroundFromStorage())
     const lastAuthCode = ref<number | null>(null)
     const forbiddenMessage = ref('')
 
     const hasAuthRedirect = computed(() => Boolean(authRedirect.value))
+    const hasAuthSheetBackground = computed(() => Boolean(authSheetBackground.value))
     const isUnauthorized = computed(() => lastAuthCode.value === AUTH_BIZ_CODE.UNAUTHORIZED)
     const isForbidden = computed(() => lastAuthCode.value === AUTH_BIZ_CODE.FORBIDDEN)
 
@@ -33,9 +51,20 @@ export const useSessionStore = defineStore('session', () => {
         writeAuthRedirectToStorage(path)
     }
 
+    function setAuthSheetBackground(path: string) {
+        authSheetBackground.value = path
+        writeAuthSheetBackgroundToStorage(path)
+    }
+
     function consumeAuthRedirect(defaultPath = '/') {
         const target = authRedirect.value || defaultPath
         setAuthRedirect('')
+        return target
+    }
+
+    function consumeAuthSheetBackground(defaultPath = '/') {
+        const target = authSheetBackground.value || defaultPath
+        setAuthSheetBackground('')
         return target
     }
 
@@ -57,21 +86,26 @@ export const useSessionStore = defineStore('session', () => {
 
     function resetSessionState() {
         setAuthRedirect('')
+        setAuthSheetBackground('')
         lastAuthCode.value = null
         forbiddenMessage.value = ''
     }
 
     return {
         authRedirect,
+        authSheetBackground,
         lastAuthCode,
         forbiddenMessage,
 
         hasAuthRedirect,
+        hasAuthSheetBackground,
         isUnauthorized,
         isForbidden,
 
         setAuthRedirect,
+        setAuthSheetBackground,
         consumeAuthRedirect,
+        consumeAuthSheetBackground,
         setAuthCode,
         markForbidden,
         clearForbidden,

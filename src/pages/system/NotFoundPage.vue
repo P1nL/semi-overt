@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { Button } from '@/shared/components/base'
-import { AppHeader } from '@/widgets/app-header'
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container py-16 md:py-24">
       <section class="surface-1 mx-auto max-w-2xl rounded-[var(--radius-xl)] px-8 py-12 text-center">
         <div class="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-primary)]">Not found</div>

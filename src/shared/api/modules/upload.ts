@@ -1,7 +1,7 @@
 import request from '../request'
 import type { UploadBizType, UploadImageRespDto } from '../../types/api'
 
-const UPLOAD_BASE = '/uploads'
+const UPLOAD_BASE = '/upload'
 
 export interface UploadImagePayload {
     file: File
@@ -24,7 +24,19 @@ export function uploadImage(payload: UploadImagePayload): Promise<UploadImageRes
         formData.append('oldUrl', payload.oldUrl)
     }
 
-    return request.upload<UploadImageRespDto>(`${UPLOAD_BASE}/images`, formData)
+    return request.upload<{
+        url: string
+        width?: number | null
+        height?: number | null
+        size: number
+        dominantColor?: string | null
+    }>(UPLOAD_BASE, formData).then((response) => ({
+        url: response.url,
+        width: response.width ?? 0,
+        height: response.height ?? 0,
+        size: response.size,
+        dominantColor: response.dominantColor ?? null,
+    }))
 }
 
 export const uploadApi = {

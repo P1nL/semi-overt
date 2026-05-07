@@ -7,6 +7,7 @@ import { useToast } from '@/shared/composables/useToast'
 import { getErrorMessage } from '@/shared/utils/error'
 import {
   adminDeleteArticleById,
+  deleteOwnArticleById,
   type AdminArticleDeleteResult,
 } from '@/features/admin-article-delete/model'
 
@@ -17,12 +18,16 @@ const props = withDefaults(
     text?: string
     buttonVariant?: 'danger' | 'ghost' | 'secondary'
     confirmText?: string
+    mode?: 'admin' | 'owner'
+    successMessage?: string
   }>(),
   {
     disabled: false,
     text: '管理员删除',
     buttonVariant: 'danger',
     confirmText: '确认删除',
+    mode: 'admin',
+    successMessage: '',
   },
 )
 
@@ -75,9 +80,11 @@ async function handleDelete() {
   loading.value = true
 
   try {
-    const result = await adminDeleteArticleById(props.articleId)
+    const result = props.mode === 'owner'
+      ? await deleteOwnArticleById(props.articleId)
+      : await adminDeleteArticleById(props.articleId)
     emit('deleted', result)
-    toast.success('文章已由管理员删除')
+    toast.success(props.successMessage || (props.mode === 'owner' ? '文章已删除' : '文章已由管理员删除'))
     resetConfirm()
   } catch (error) {
     toast.error(getErrorMessage(error, '删除失败，请稍后重试'))

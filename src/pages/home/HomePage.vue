@@ -1,11 +1,14 @@
-<script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+<script lang="ts">
+let hasPlayedHomeIntro = false
+</script>
 
-import { mapArticleCardDtoToVm } from '@/entities/article'
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { mapCategoryValueToVm } from '@/entities/category'
 import { useHomeQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
-import { AppHeader } from '@/widgets/app-header'
 import { HeroSection } from '@/widgets/hero-section'
 import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
 
@@ -13,6 +16,17 @@ const homeQuery = useHomeQuery()
 
 const hiddenHomeSectionKeys = new Set(['QUICK', 'SHORT', 'DEEP'])
 const contentReady = computed(() => homeQuery.isSuccess.value)
+const animateHomeIntro = ref(!hasPlayedHomeIntro)
+
+watch(
+  contentReady,
+  (ready) => {
+    if (ready && animateHomeIntro.value) {
+      hasPlayedHomeIntro = true
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   document.documentElement.classList.add('home-scroll-locked')
@@ -55,14 +69,13 @@ const home = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen">
-    <AppHeader />
-
+  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="pt-8 pb-0 md:pt-10 md:pb-0">
       <HeroSection
         :primary="home.heroPrimary"
         :secondary="home.heroSecondary"
         :revealed="contentReady"
+        :animate-reveal="animateHomeIntro"
       />
 
       <div v-if="contentReady" class="home-sections space-y-8 pt-8 md:space-y-10 md:pt-10 lg:pt-0">
@@ -72,7 +85,8 @@ const home = computed(() => {
           class="space-y-5"
         >
           <div
-            class="page-container home-section-header-reveal"
+            class="page-container"
+            :class="animateHomeIntro ? 'home-section-header-reveal' : 'home-section-header-settled'"
             :style="{ '--home-section-delay': `${260 + sectionIndex * 120}ms` }"
           >
             <SectionHeader :title="section.title" :description="section.description" compact />
@@ -81,6 +95,7 @@ const home = computed(() => {
             :items="section.list"
             :category-label="section.title"
             :revealed="contentReady"
+            :animate-reveal="animateHomeIntro"
             :delay-base="320 + sectionIndex * 120"
           />
         </section>
@@ -109,9 +124,19 @@ const home = computed(() => {
   z-index: 1;
 }
 
+.home-sections > section {
+  content-visibility: auto;
+  contain-intrinsic-size: 34rem;
+}
+
 .home-section-header-reveal {
   animation: home-rise-in 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--home-section-delay, 0ms);
+}
+
+.home-section-header-settled {
+  opacity: 1;
+  transform: none;
 }
 
 @keyframes home-rise-in {
@@ -140,11 +165,4 @@ const home = computed(() => {
   animation-play-state: paused !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .home-section-header-reveal {
-    opacity: 1;
-    transform: none;
-    animation: none;
-  }
-}
 </style>
