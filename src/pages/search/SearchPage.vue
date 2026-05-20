@@ -235,9 +235,6 @@ useIntersectionObserver(
                 <p v-else-if="userSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
                   继续滚动，自动载入
                 </p>
-                <p v-else class="text-sm text-[var(--color-text-muted)]">
-                  END
-                </p>
               </section>
             </template>
 
@@ -256,7 +253,7 @@ useIntersectionObserver(
                 <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
                   继续滚动，自动载入
                 </p>
-                <p v-else class="text-sm text-[var(--color-text-muted)]">
+                <p v-else-if="resultView !== RESULT_VIEW_MODE.GALLERY" class="text-sm text-[var(--color-text-muted)]">
                   END
                 </p>
               </section>
@@ -266,8 +263,7 @@ useIntersectionObserver(
           <div v-else key="search-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
             <EmptyState
               :title="emptyStateTitle"
-              :description="emptyStateDescription"
-              emoji="S"
+              emoji="🤔"
             />
           </div>
         </Transition>
