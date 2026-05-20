@@ -105,6 +105,12 @@ const resultSummary = computed(() => {
 
   return `共找到 ${Math.max(total.value, articleList.value.length)} 篇与“${activeKeyword.value}”相关的文章`
 })
+const showArticleFooter = computed(
+  () =>
+    resultView.value !== RESULT_VIEW_MODE.GALLERY ||
+    articleSearchQuery.isFetchingNextPage.value ||
+    articleSearchQuery.hasNextPage.value,
+)
 const emptyStateTitle = computed(() => {
   if (errorMessage.value) return '搜索失败'
   if (activeKeyword.value) return isUserSearch.value ? '暂无作者结果' : '暂无搜索结果'
@@ -242,6 +248,7 @@ useIntersectionObserver(
               <ArticleResultStream :items="articleList" :view="resultView" />
 
               <section
+                v-if="showArticleFooter"
                 class="surface-1 content-rise-in rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
                 :style="{ '--content-rise-delay': `${articleList.length * 35 + 110}ms` }"
               >
