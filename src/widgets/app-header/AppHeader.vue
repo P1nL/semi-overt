@@ -30,6 +30,10 @@ const searchOpen = ref(false)
 const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
 
+function normalizeSearchKeyword(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
 const leftSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
 const actionSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
 const searchWrapClass = computed(() =>
@@ -38,7 +42,7 @@ const searchWrapClass = computed(() =>
     : 'w-[2.85rem]',
 )
 
-const trimmedKeyword = computed(() => keyword.value.trim())
+const trimmedKeyword = computed(() => normalizeSearchKeyword(keyword.value))
 const showDropdown = computed(() => searchOpen.value && trimmedKeyword.value.length > 0 && dropdownVisible.value)
 
 watch(

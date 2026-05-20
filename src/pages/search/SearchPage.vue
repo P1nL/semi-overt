@@ -27,9 +27,13 @@ const userSearchLimit = 10
 const loadMoreRef = ref<HTMLElement | null>(null)
 const currentRoute = computed(() => props.routeOverride ?? route)
 
+function normalizeSearchKeyword(value: unknown) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
 const routeType = computed(() => String(currentRoute.value.query.type || '').trim().toLowerCase())
 const isUserSearch = computed(() => routeType.value === 'users')
-const routeKeyword = computed(() => String(currentRoute.value.query.keyword || currentRoute.value.query.q || '').trim())
+const routeKeyword = computed(() => normalizeSearchKeyword(currentRoute.value.query.keyword || currentRoute.value.query.q))
 const resultView = computed(() => {
   const queryView = currentRoute.value.query.view
   return isResultViewMode(queryView) ? queryView : RESULT_VIEW_MODE.GALLERY
