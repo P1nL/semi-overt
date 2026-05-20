@@ -53,6 +53,14 @@ function resolveSheetBackgroundPath(currentPath: string): string {
     return ROUTE_PATH.HOME
 }
 
+function routeRequiresAuth(router: Router): boolean {
+    const currentRoute = router.currentRoute.value
+
+    return currentRoute.matched.some((record) =>
+        Boolean(record.meta.requiresAuth || record.meta.roles?.length),
+    )
+}
+
 export function setupApiSideEffects(router: Router): void {
     registerApiSideEffectHandlers({
         onUnauthorized: async () => {
@@ -71,8 +79,9 @@ export function setupApiSideEffects(router: Router): void {
 
                 const currentRoute = router.currentRoute.value
                 const isAlreadyAuthPage = isAuthRoutePath(currentRoute.fullPath)
+                const shouldRedirectToLogin = routeRequiresAuth(router)
 
-                if (!isAlreadyAuthPage) {
+                if (!isAlreadyAuthPage && shouldRedirectToLogin) {
                     const redirectPath = currentRoute.fullPath || ROUTE_PATH.HOME
                     sessionStore.setAuthRedirect(redirectPath)
                     sessionStore.setAuthSheetBackground(
@@ -81,10 +90,8 @@ export function setupApiSideEffects(router: Router): void {
                             : '',
                     )
                     await router.push({
-                        path: ROUTE_PATH.LOGIN,
-                        query: redirectPath
-                            ? { redirect: redirectPath }
-                            : undefined,
+                        path: ROUTE_PATH.HOME,
+                        query: { auth: 'login' },
                     })
                 }
             } finally {

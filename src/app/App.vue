@@ -4,15 +4,18 @@ import { RouterView, useRoute, useRouter, type RouteLocationNormalizedLoaded } f
 
 import { ROUTE_NAME, ROUTE_PATH } from '@/shared/constants/routes'
 import { UI_TIMING } from '@/shared/constants/ui'
+import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { AppBackground } from '@/widgets/app-background'
 import { AppHeader } from '@/widgets/app-header'
+import { AuthDialog } from '@/widgets/auth-dialog'
 import { PageSheet } from '@/widgets/page-sheet'
 import { ToastStack } from '@/widgets/toast-stack'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 
@@ -32,6 +35,7 @@ let sheetLeaveTimer: number | null = null
 const backgroundRoute = ref<RouteLocationNormalizedLoaded | null>(null)
 const displayedSheetRoute = ref<RouteLocationNormalizedLoaded | null>(null)
 const sheetVisible = ref(false)
+const authDialogOpen = ref(false)
 
 const liveRoute = computed(() => router.currentRoute.value)
 
@@ -129,6 +133,16 @@ function isAuthRoute(
   targetRoute: RouteLocationNormalizedLoaded | null | undefined,
 ): boolean {
   return Boolean(targetRoute && isAuthRoutePath(targetRoute.fullPath))
+}
+
+function routeRequiresAuth(
+  targetRoute: RouteLocationNormalizedLoaded | null | undefined,
+): boolean {
+  return Boolean(
+    targetRoute?.matched.some((record) =>
+      Boolean(record.meta.requiresAuth || record.meta.roles?.length),
+    ),
+  )
 }
 
 function getFallbackBackgroundRoute(): RouteLocationNormalizedLoaded {
@@ -272,6 +286,46 @@ watch(
 )
 
 watch(
+  () => route.query.auth,
+  async (value) => {
+    if (value !== 'login') return
+
+    if (!authStore.isAuthenticated) {
+      authDialogOpen.value = true
+    }
+
+    const nextQuery = { ...route.query }
+    delete nextQuery.auth
+
+    await router.replace({
+      query: nextQuery,
+      hash: route.hash,
+    })
+  },
+  { immediate: true },
+)
+
+watch(
+  () => sessionStore.lastAuthCode,
+  (code) => {
+    if (
+      code === 401 &&
+      !authStore.isAuthenticated &&
+      !isAuthRoute(liveRoute.value) &&
+      routeRequiresAuth(liveRoute.value)
+    ) {
+      authDialogOpen.value = true
+    }
+  },
+)
+
+watch(authDialogOpen, (open) => {
+  if (!open && sessionStore.lastAuthCode === 401) {
+    sessionStore.setAuthCode(null)
+  }
+})
+
+watch(
   () => [uiStore.drawerOpen, uiStore.isDrawerClosing, uiStore.pendingRoute] as const,
   ([drawerOpen, isDrawerClosing, _pendingRoute]) => {
     if (drawerNavigationTimer !== null) {
@@ -345,6 +399,7 @@ onBeforeUnmount(() => {
       </RouterView>
     </PageSheet>
 
+    <AuthDialog v-model="authDialogOpen" initial-mode="login" />
     <ToastStack />
   </div>
 </template>

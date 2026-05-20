@@ -135,7 +135,7 @@ useIntersectionObserver(
               继续下滑，画廊会自动向后展开
             </p>
             <p v-else class="text-sm text-[var(--color-text-muted)]">
-              这个栏目已经全部展开完毕
+              END
             </p>
           </section>
         </div>
@@ -143,8 +143,8 @@ useIntersectionObserver(
         <div v-else key="category-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
           <EmptyState
             title="这里还没有文章"
-            :description="errorMessage || '当前栏目暂时没有内容。'"
-            emoji="C"
+            :description="errorMessage || ''"
+            emoji="🥲"
           />
         </div>
       </Transition>

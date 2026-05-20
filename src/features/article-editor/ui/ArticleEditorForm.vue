@@ -1801,7 +1801,7 @@ defineExpose({
               :disabled="disabledState"
               rows="4"
               :maxlength="ARTICLE_SUMMARY_MAX_LENGTH"
-              placeholder="一句话介绍这篇文章..."
+              placeholder="介绍这篇文章..."
             />
             <p v-if="errors.summary" class="editor-field-error editor-field-error--side">
               {{ errors.summary }}
@@ -1810,12 +1810,11 @@ defineExpose({
           </section>
 
           <section class="editor-side-section">
-            <div class="editor-side-label">草稿可见性</div>
             <Switch
               v-model="form.draftVisible"
               :disabled="disabledState"
-              label="在个人页展示"
-              description="开启后，可见草稿会出现在你的个人页；不会进入首页、分类页或搜索结果。"
+              label="草稿可见"
+              description="开启后，草稿会在个人页展示"
               @change="handleFormMutation"
             />
           </section>

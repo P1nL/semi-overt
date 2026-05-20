@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
@@ -25,7 +25,6 @@ import { AuthDialog } from '@/widgets/auth-dialog'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
-const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const queryClient = useQueryClient()
@@ -90,27 +89,6 @@ function closeUserMenu(options: { restoreFocus?: boolean } = {}) {
     })
   }
 }
-
-watch(
-  () => route.query.auth,
-  async (value) => {
-    if (value !== 'login') return
-
-    if (!authStore.isAuthenticated) {
-      await nextTick()
-      authDialogOpen.value = true
-    }
-
-    const nextQuery = { ...route.query }
-    delete nextQuery.auth
-
-    await router.replace({
-      query: nextQuery,
-      hash: route.hash,
-    })
-  },
-  { immediate: true },
-)
 
 const userLabel = computed(() => authStore.displayName || (authStore.isAdmin ? '管理员' : '个人中心'))
 const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')

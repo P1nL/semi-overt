@@ -664,7 +664,7 @@ async function submitArticle() {
   } catch (error) {
     const message = getErrorMessage(error, '提交失败，请稍后重试')
     if (
-      /30\s*(分钟|鍒嗛挓)/.test(message)
+      /30\s*(分钟)/.test(message)
     ) {
       const backendCooldownUntil = parseCooldownUntilFromErrorDetails(error)
       const persistedUntil = readPersistedPublishCooldownUntil(String(article.id))
