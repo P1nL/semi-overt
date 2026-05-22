@@ -230,6 +230,7 @@ export function mapArticleDetailDtoToVm(dto: ArticleDetailEntityDto): ArticleDet
             profilePath: '',
         },
         latestReviewReason: dto.latestReviewReason ?? null,
+        assignedAdminId: dto.assignedAdminId ?? null,
         submitCount: dto.submitCount ?? 0,
         submitCountText: `已提交 ${dto.submitCount ?? 0} 次`,
         lastSubmittedAt: toDisplayDate(dto.lastSubmittedAt),

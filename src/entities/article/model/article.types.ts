@@ -21,6 +21,7 @@ export interface ArticleDetailEntityDto extends ArticleDetailRespDto {
     status: ArticleStatus | string
     durationCategory: ArticleDurationCategory | string
     draftVisible?: boolean
+    assignedAdminId?: number | null
 }
 
 export interface ArticleDraftEntityDto extends DraftItemRespDto {
@@ -96,6 +97,7 @@ export interface ArticleDetailVm {
     status: ArticleStatusVm
     author: ArticleAuthorVm
     latestReviewReason: string | null
+    assignedAdminId: number | null
     submitCount: number
     submitCountText: string
     lastSubmittedAt: string | null

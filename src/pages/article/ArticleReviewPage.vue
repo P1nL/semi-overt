@@ -12,6 +12,7 @@ import { ReviewActionBar, type ReviewActionResult } from '@/features/review-acti
 import { useReviewLogsQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
+import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
@@ -28,7 +29,11 @@ watch(articleId, () => {
   article.value = null
 })
 
-const reviewLogsQuery = useReviewLogsQuery(articleId)
+const reviewLogsQuery = useReviewLogsQuery(articleId, true, {
+  refetchIntervalMs: REVIEW_AUTO_REFRESH_INTERVAL_MS,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+})
 const reviewLogs = computed(() => reviewLogsQuery.data.value ?? [])
 const pageError = computed(() =>
   reviewLogsQuery.error.value
@@ -80,6 +85,7 @@ function onLoaded(value: ArticleDetailVm) {
               <ArticleReader
                 :key="`${articleId}-${readerKey}`"
                 :article-id="articleId"
+                :review-refresh-interval-ms="REVIEW_AUTO_REFRESH_INTERVAL_MS"
                 @loaded="onLoaded"
               />
             </section>
@@ -112,6 +118,7 @@ function onLoaded(value: ArticleDetailVm) {
           <ReviewActionBar
             :article-id="articleId"
             :author-username="article?.author?.username"
+            :assigned-admin-id="article?.assignedAdminId"
             :status="article?.status?.value"
             @acted="onActed"
           />

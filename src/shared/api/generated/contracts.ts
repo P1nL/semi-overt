@@ -149,6 +149,7 @@ export interface ArticleDetailRespDto {
     durationCategory: 'QUICK' | 'SHORT' | 'DEEP' | string
     status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'RETURNED' | 'REJECTED' | string
     author: ArticleAuthorDto
+    assignedAdminId?: number | null
     latestReviewReason?: string | null
     submitCount?: number
     lastSubmittedAt?: string | null
@@ -193,6 +194,7 @@ export interface PendingReviewItemDto {
     submittedAt: string
     wordCount: number
     author: ArticleAuthorDto
+    assignedAdminId?: number | null
 }
 
 export interface ReviewActionReqDto {

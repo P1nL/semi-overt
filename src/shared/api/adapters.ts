@@ -50,6 +50,7 @@ interface BackendArticleResp {
     rejectReason?: string | null
     latestReason?: string | null
     latestReviewReason?: string | null
+    assignedAdminId?: number | null
     draftVisible?: boolean | null
     author?: {
         id?: number | null
@@ -147,6 +148,7 @@ interface BackendReviewPendingItemResp {
     submittedAt: string
     wordCount: number
     status?: string
+    assignedAdminId?: number | null
     author?: {
         id: number
         username: string
@@ -291,6 +293,7 @@ export function normalizeArticleDetailDto(raw: BackendArticleDetailResp): Articl
             avatarUrl: null,
         },
         latestReviewReason: raw.latestReviewReason ?? raw.rejectReason ?? null,
+        assignedAdminId: raw.assignedAdminId ?? null,
         submitCount: raw.submitCount ?? 0,
         lastSubmittedAt: raw.lastSubmittedAt ?? null,
         publishedAt: raw.publishedAt ?? null,
@@ -409,6 +412,7 @@ export function normalizePendingReviewListResp(
                 submitCount: item.submitCount,
                 submittedAt: item.submittedAt,
                 wordCount: item.wordCount,
+                assignedAdminId: item.assignedAdminId ?? null,
                 author: {
                     id: authorId,
                     username,

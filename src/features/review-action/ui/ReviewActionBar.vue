@@ -18,7 +18,9 @@ import { queryKeys } from '@/shared/api/queryKeys'
 import { Button, Textarea } from '@/shared/components/base'
 import { REVIEW_ACTION, REVIEW_REASON_MAX_LENGTH } from '@/shared/constants/review'
 import { useToast } from '@/shared/composables/useToast'
+import { ApiBusinessError } from '@/shared/types/api'
 import { getErrorMessage } from '@/shared/utils/error'
+import { useAuthStore } from '@/stores/auth'
 
 type ReasonAction = Extract<ReviewActionValue, 'RETURN' | 'REJECT'>
 type PopoverPlacement = 'top' | 'bottom'
@@ -51,11 +53,13 @@ const props = withDefaults(
     articleId: number | string
     status?: string | null
     authorUsername?: string | null
+    assignedAdminId?: number | string | null
     disabled?: boolean
   }>(),
   {
     status: null,
     authorUsername: null,
+    assignedAdminId: null,
     disabled: false,
   },
 )
@@ -66,6 +70,7 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const queryClient = useQueryClient()
+const authStore = useAuthStore()
 
 const barRef = ref<HTMLElement | null>(null)
 const activeReasonAction = ref<ReasonAction | null>(null)
@@ -90,8 +95,44 @@ const reasonErrors = reactive<Record<ReasonAction, string>>({
   REJECT: '',
 })
 
-const canAct = computed(() => !props.disabled && !acting.value && canReviewArticle(props.status))
-const showProcessedState = computed(() => !canReviewArticle(props.status) && Boolean(props.status))
+const currentAdminId = computed(() => {
+  const rawId = authStore.user?.id
+  const normalized = typeof rawId === 'number' ? rawId : Number(rawId)
+  return Number.isFinite(normalized) ? normalized : null
+})
+
+const assignedAdminId = computed(() => {
+  if (props.assignedAdminId == null) return null
+  const normalized = typeof props.assignedAdminId === 'number'
+    ? props.assignedAdminId
+    : Number(props.assignedAdminId)
+  return Number.isFinite(normalized) ? normalized : null
+})
+
+const isAssignedToCurrentAdmin = computed(() =>
+  assignedAdminId.value != null
+  && currentAdminId.value != null
+  && assignedAdminId.value === currentAdminId.value,
+)
+
+const canAct = computed(() =>
+  !props.disabled
+  && !acting.value
+  && canReviewArticle(props.status)
+  && isAssignedToCurrentAdmin.value,
+)
+const showProcessedState = computed(() =>
+  props.disabled
+  || !canReviewArticle(props.status)
+  || !isAssignedToCurrentAdmin.value,
+)
+const assignmentNotice = computed(() => {
+  if (!canReviewArticle(props.status)) return ''
+  if (currentAdminId.value == null) return ''
+  if (assignedAdminId.value == null) return '该待审任务尚未分配，请刷新后重试'
+  if (!isAssignedToCurrentAdmin.value) return '该待审任务已分配给其他管理员'
+  return ''
+})
 
 function setTriggerRef(
   action: ReasonAction,
@@ -147,6 +188,34 @@ function closeReasonPopover() {
 function resetInteractionState() {
   resetApproveState()
   closeReasonPopover()
+}
+
+async function refreshReviewRelatedData(articleIdStr: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.home,
+    }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.reviewPendingRoot,
+    }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.userProfileRoot,
+    }),
+    ...(props.authorUsername?.trim()
+      ? [
+          queryClient.refetchQueries({
+            queryKey: [queryKeys.userProfileRoot[0], props.authorUsername.trim()],
+            type: 'active',
+          }),
+        ]
+      : []),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.articleDetail(articleIdStr),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.reviewLogs(articleIdStr),
+    }),
+  ])
 }
 
 function syncPopoverPlacement(action: ReasonAction) {
@@ -270,37 +339,25 @@ async function submitAction(action: ReviewActionValue) {
       }
     })
 
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.home,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.reviewPendingRoot,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.userProfileRoot,
-      }),
-      ...(props.authorUsername?.trim()
-        ? [
-            queryClient.refetchQueries({
-              queryKey: [queryKeys.userProfileRoot[0], props.authorUsername.trim()],
-              type: 'active',
-            }),
-          ]
-        : []),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.articleDetail(articleIdStr),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.reviewLogs(articleIdStr),
-      }),
-    ])
+    await refreshReviewRelatedData(articleIdStr)
 
     emit('acted', result)
     toast.success(`审核${action === REVIEW_ACTION.APPROVE ? '通过' : action === REVIEW_ACTION.RETURN ? '退回' : '拒绝'}成功`)
     resetInteractionState()
   } catch (error) {
-    const message = getErrorMessage(error, '审核操作失败，请稍后重试')
+    const isConflict = error instanceof ApiBusinessError && error.code === 409
+    const message = isConflict
+      ? getErrorMessage(error, '该文章已被其他管理员处理，请刷新后查看')
+      : getErrorMessage(error, '审核操作失败，请稍后重试')
+
+    if (isConflict) {
+      resetInteractionState()
+      actionErrorMessage.value = message
+      await refreshReviewRelatedData(String(props.articleId))
+      toast.error(message)
+      return
+    }
+
     actionErrorMessage.value = message
     toast.error(message)
   } finally {
@@ -310,9 +367,9 @@ async function submitAction(action: ReviewActionValue) {
 }
 
 watch(
-  () => props.status,
-  (status) => {
-    if (!canReviewArticle(status)) {
+  () => [props.status, isAssignedToCurrentAdmin.value, props.disabled] as const,
+  ([status, isAssigned, disabled]) => {
+    if (!canReviewArticle(status) || !isAssigned || disabled) {
       resetInteractionState()
     }
   },
@@ -330,6 +387,13 @@ onClickOutside(barRef, () => {
     ref="barRef"
     class="flex flex-wrap items-center justify-end gap-3"
   >
+    <p
+      v-if="assignmentNotice"
+      class="basis-full text-right text-xs text-[var(--color-text-muted)]"
+    >
+      {{ assignmentNotice }}
+    </p>
+
     <Button
       type="button"
       :variant="approvePending ? 'success' : 'secondary'"

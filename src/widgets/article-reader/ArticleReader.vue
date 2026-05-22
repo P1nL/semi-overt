@@ -12,6 +12,7 @@ import ArticleReaderHeader from './ArticleReaderHeader.vue'
 const props = defineProps<{
   articleId: number | string
   showStatus?: boolean
+  reviewRefreshIntervalMs?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -19,7 +20,14 @@ const emit = defineEmits<{
   error: [string]
 }>()
 
-const articleQuery = useArticleDetailQuery(computed(() => props.articleId))
+const articleQuery = useArticleDetailQuery(
+  computed(() => props.articleId),
+  {
+    refetchIntervalMs: computed(() => props.reviewRefreshIntervalMs ?? false),
+    refetchOnWindowFocus: computed(() => Boolean(props.reviewRefreshIntervalMs)),
+    refetchOnReconnect: computed(() => Boolean(props.reviewRefreshIntervalMs)),
+  },
+)
 const article = computed(() => articleQuery.data.value ?? null)
 const loading = computed(() => articleQuery.isFetching.value)
 const errorMessage = computed(() => {

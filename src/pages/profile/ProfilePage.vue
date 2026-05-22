@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { usePendingReviewsQuery, useUserProfileQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
+import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import type { ProfileArticleTab } from '@/shared/types/profile'
 import { getErrorMessage } from '@/shared/utils/error'
 import { preloadImages } from '@/shared/utils/preloadImage'
@@ -95,7 +96,11 @@ const showAdminReviewQueue = computed(
   () => authStore.isAdmin && isOwnerProfile.value,
 )
 
-const pendingReviewsQuery = usePendingReviewsQuery(1, 10, showAdminReviewQueue)
+const pendingReviewsQuery = usePendingReviewsQuery(1, 10, showAdminReviewQueue, {
+  refetchIntervalMs: REVIEW_AUTO_REFRESH_INTERVAL_MS,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+})
 const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
 const reviewQueueError = computed(() =>
   pendingReviewsQuery.error.value

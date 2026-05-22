@@ -56,6 +56,7 @@ export function mapPendingReviewItemDtoToVm(dto: PendingReviewItemEntityDto): Pe
         wordCount: dto.wordCount,
         wordCountText: `${dto.wordCount} 字`,
         author: mapArticleAuthorDtoToVm(dto.author),
+        assignedAdminId: dto.assignedAdminId ?? null,
         reviewPath: `/review/articles/${dto.id}`,
         articlePath: `/articles/${dto.id}`,
     }

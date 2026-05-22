@@ -56,7 +56,7 @@ function onToggle() {
       <span
           :class="
           cn(
-            'absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow-[0_6px_14px_rgb(15_23_42_/_0.16)] transition-transform duration-300 dark:bg-[var(--color-surface)]',
+            'absolute left-0.25 top-0.5 size-5.5 rounded-full bg-white shadow-[0_6px_14px_rgb(15_23_42_/_0.16)] transition-transform duration-300 dark:bg-[var(--color-surface)]',
             modelValue ? 'translate-x-5' : 'translate-x-0.5',
           )
         "

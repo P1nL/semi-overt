@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+  type Component,
+} from 'vue'
 import { RouterView, useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 
 import { ROUTE_NAME, ROUTE_PATH } from '@/shared/constants/routes'
@@ -31,9 +40,11 @@ const AUTH_ROUTE_PATHS = new Set<string>([
 
 let drawerNavigationTimer: number | null = null
 let sheetLeaveTimer: number | null = null
+type AsyncRouteLoader = () => Promise<Component | { default: Component }>
+const asyncRouteComponentCache = new WeakMap<AsyncRouteLoader, Component>()
 
-const backgroundRoute = ref<RouteLocationNormalizedLoaded | null>(null)
-const displayedSheetRoute = ref<RouteLocationNormalizedLoaded | null>(null)
+const backgroundRoute = shallowRef<RouteLocationNormalizedLoaded | null>(null)
+const displayedSheetRoute = shallowRef<RouteLocationNormalizedLoaded | null>(null)
 const sheetVisible = ref(false)
 const authDialogOpen = ref(false)
 
@@ -107,6 +118,24 @@ function getRouteViewProps(targetRoute: RouteLocationNormalizedLoaded) {
   }
 
   return {}
+}
+
+function isAsyncRouteLoader(component: unknown): component is AsyncRouteLoader {
+  if (typeof component !== 'function') return false
+
+  const componentRecord = component as unknown as Record<string, unknown>
+  return !componentRecord.render && !componentRecord.__vccOpts && !componentRecord.__asyncLoader
+}
+
+function resolveRouteViewComponent(component: Component | undefined): Component | undefined {
+  if (!isAsyncRouteLoader(component)) return component
+
+  const cachedComponent = asyncRouteComponentCache.get(component)
+  if (cachedComponent) return cachedComponent
+
+  const asyncComponent = defineAsyncComponent(component)
+  asyncRouteComponentCache.set(component, asyncComponent)
+  return asyncComponent
 }
 
 function isSheetRoute(
@@ -372,11 +401,15 @@ onBeforeUnmount(() => {
 
       <RouterView v-if="shouldRenderBaseRoute" v-slot="{ Component, route: currentRoute }" :route="baseRenderRoute">
         <Transition v-if="shouldAnimateBaseRoute" name="page-fade" mode="out-in">
-          <component :is="Component" :key="getRouteViewKey(currentRoute)" v-bind="getRouteViewProps(currentRoute)" />
+          <component
+            :is="resolveRouteViewComponent(Component)"
+            :key="getRouteViewKey(currentRoute)"
+            v-bind="getRouteViewProps(currentRoute)"
+          />
         </Transition>
         <component
           v-else
-          :is="Component"
+          :is="resolveRouteViewComponent(Component)"
           :key="getRouteViewKey(currentRoute)"
           v-bind="getRouteViewProps(currentRoute)"
         />
@@ -395,7 +428,11 @@ onBeforeUnmount(() => {
         v-slot="{ Component, route: currentRoute }"
         :route="displayedSheetRoute"
       >
-        <component :is="Component" :key="getRouteViewKey(currentRoute)" v-bind="getRouteViewProps(currentRoute)" />
+        <component
+          :is="resolveRouteViewComponent(Component)"
+          :key="getRouteViewKey(currentRoute)"
+          v-bind="getRouteViewProps(currentRoute)"
+        />
       </RouterView>
     </PageSheet>
 

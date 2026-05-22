@@ -16,6 +16,7 @@ export interface PendingReviewItemVm {
     wordCount: number
     wordCountText: string
     author: ArticleAuthorVm | null
+    assignedAdminId: number | null
     reviewPath: string
     articlePath: string
 }

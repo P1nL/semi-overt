@@ -4,3 +4,4 @@ export { REVIEW_ACTION } from '@/entities/review'
 
 // shared 层独有的约束配置
 export const REVIEW_REASON_MAX_LENGTH = 500
+export const REVIEW_AUTO_REFRESH_INTERVAL_MS = 5_000

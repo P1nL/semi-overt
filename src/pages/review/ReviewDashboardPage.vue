@@ -4,10 +4,15 @@ import { computed } from 'vue'
 import { Button, EmptyState } from '@/shared/components/base'
 import { usePendingReviewsQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
+import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
-const pendingReviewsQuery = usePendingReviewsQuery(1, 10)
+const pendingReviewsQuery = usePendingReviewsQuery(1, 10, true, {
+  refetchIntervalMs: REVIEW_AUTO_REFRESH_INTERVAL_MS,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+})
 const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
 const pageError = computed(() =>
   pendingReviewsQuery.error.value
