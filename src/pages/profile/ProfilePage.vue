@@ -102,6 +102,9 @@ const pendingReviewsQuery = usePendingReviewsQuery(1, 10, showAdminReviewQueue, 
   refetchOnReconnect: true,
 })
 const pendingItems = computed(() => pendingReviewsQuery.data.value?.list ?? [])
+const showReviewQueueSkeleton = computed(() =>
+  pendingReviewsQuery.isFetching.value && !pendingReviewsQuery.data.value,
+)
 const reviewQueueError = computed(() =>
   pendingReviewsQuery.error.value
     ? getErrorMessage(pendingReviewsQuery.error.value, '待审核列表加载失败，请稍后重试。')
@@ -137,7 +140,7 @@ async function onTabChange(tab: ProfileArticleTab) {
         <div class="mt-4">
           <ReviewQueueStrip
             :items="pendingItems"
-            :loading="pendingReviewsQuery.isFetching.value"
+            :loading="showReviewQueueSkeleton"
           />
         </div>
 
