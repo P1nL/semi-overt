@@ -80,12 +80,18 @@ export interface BackendUserProfileResp {
     user?: BackendUserInfoResp
     profile?: BackendUserInfoResp
     stats?: Record<string, number | undefined>
+    writingCalendar?: BackendWritingCalendarDayResp[]
     articles?: BackendArticleResp[]
     list?: BackendArticleResp[]
     total?: number
     page?: number
     pageSize?: number
     pages?: number
+}
+
+export interface BackendWritingCalendarDayResp {
+    date?: string | null
+    wordCount?: number | string | null
 }
 
 export interface BackendHomeResp {
@@ -315,6 +321,12 @@ export function normalizeUserProfileResp(raw: BackendUserProfileResp): UserProfi
             draft: raw.stats?.draft ?? 0,
             totalWordCount: raw.stats?.totalWordCount ?? 0,
         },
+        writingCalendar: (raw.writingCalendar ?? [])
+            .filter((item) => Boolean(item.date))
+            .map((item) => ({
+                date: String(item.date),
+                wordCount: toNumber(item.wordCount),
+            })),
         list: list.map(normalizeArticleCardDto),
         total: raw.total ?? list.length,
         page: raw.page ?? 1,

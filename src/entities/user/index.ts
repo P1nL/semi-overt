@@ -20,6 +20,7 @@ export type {
     UserRoleVm,
     UserStatItemVm,
     UserProfileVm,
+    WritingCalendarDayVm,
 } from './model/user.types'
 
 // ui 层

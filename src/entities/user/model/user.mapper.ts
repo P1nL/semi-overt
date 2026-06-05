@@ -34,6 +34,7 @@ export function mapUserProfileDtoToVm(dto: UserProfileEntityDto): UserProfileVm 
         page: 1,
         pageSize: 10,
         articles: [],
+        writingCalendar: [],
     }
 }
 
@@ -55,5 +56,9 @@ export function mapUserProfilePageDtoToVm(dto: UserProfilePageEntityDto): UserPr
         page: Number(dto.page ?? 1),
         pageSize: Number(dto.pageSize ?? 10),
         articles: mapArticleCardListDtoToVm(dto.list),
+        writingCalendar: (dto.writingCalendar ?? []).map((day) => ({
+            date: day.date,
+            wordCount: Number(day.wordCount ?? 0),
+        })),
     }
 }

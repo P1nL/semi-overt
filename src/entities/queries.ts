@@ -221,6 +221,38 @@ export function useUserProfileQuery(
     })
 }
 
+export function useInfiniteUserProfileQuery(
+    username: MaybeRefOrGetter<string>,
+    params: MaybeRefOrGetter<Omit<GetUserProfileParams, 'page'>>,
+) {
+    return useInfiniteQuery({
+        queryKey: computed(() => {
+            const resolvedUsername = toValue(username)
+            const resolvedParams = toValue(params)
+
+            return queryKeys.userProfileInfinite(
+                resolvedUsername,
+                resolvedParams.tab ?? 'approved',
+                resolvePositiveInt(resolvedParams.pageSize, 10),
+            )
+        }),
+        initialPageParam: 1,
+        queryFn: async ({ pageParam }) => {
+            const resolvedParams = toValue(params)
+
+            return mapUserProfilePageDtoToVm(await userApi.getUserProfile(toValue(username), {
+                ...resolvedParams,
+                page: resolvePositiveInt(Number(pageParam), 1),
+                pageSize: resolvePositiveInt(resolvedParams.pageSize, 10),
+            }))
+        },
+        getNextPageParam: (lastPage) =>
+            lastPage.page * lastPage.pageSize < lastPage.total ? lastPage.page + 1 : undefined,
+        enabled: computed(() => Boolean(toValue(username).trim())),
+        placeholderData: keepPreviousData,
+    })
+}
+
 export function usePendingReviewsQuery(
     page: MaybeRefOrGetter<number | undefined>,
     pageSize: MaybeRefOrGetter<number | undefined>,

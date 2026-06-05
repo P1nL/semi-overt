@@ -96,11 +96,17 @@ export interface UpdateProfileReqDto {
 export interface UserProfileRespDto {
     profile: ProfileDto
     stats: Record<string, number>
+    writingCalendar?: WritingCalendarDayDto[]
     list: ArticleCardDto[]
     total?: number
     page?: number
     pageSize?: number
     pages?: number
+}
+
+export interface WritingCalendarDayDto {
+    date: string
+    wordCount: number
 }
 
 export interface CreateArticleRespDto {

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 
-import { usePendingReviewsQuery, useUserProfileQuery } from '@/entities/queries'
+import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
+import { queryKeys } from '@/shared/api/queryKeys'
 import { SectionHeader } from '@/shared/components/layout'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import type { ProfileArticleTab } from '@/shared/types/profile'
@@ -12,10 +14,12 @@ import { useAuthStore } from '@/stores/auth'
 import { ProfileHeader } from '@/widgets/profile-header'
 import { ProfileCardQueue } from '@/widgets/profile-card-queue'
 import { ProfileTabs } from '@/widgets/profile-tabs'
+import { ProfileWritingCalendar } from '@/widgets/profile-writing-calendar'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
 const route = useRoute()
 const router = useRouter()
+const queryClient = useQueryClient()
 const authStore = useAuthStore()
 
 const username = computed(() => String(route.params.username || '').trim())
@@ -30,14 +34,25 @@ const activeTab = computed<ProfileArticleTab>(() => {
   return defaultTab.value
 })
 
-const profileQuery = useUserProfileQuery(username, computed(() => ({
+const profileQuery = useInfiniteUserProfileQuery(username, computed(() => ({
   tab: activeTab.value,
-  page: 1,
   pageSize: 10,
 })))
 
-const profile = computed(() => profileQuery.data.value ?? null)
-const articles = computed(() => profile.value?.articles ?? [])
+const profilePages = computed(() => profileQuery.data.value?.pages ?? [])
+const profile = computed(() => profilePages.value[0] ?? null)
+const articles = computed(() => {
+  const seen = new Set<string>()
+
+  return profilePages.value
+    .flatMap((page) => page.articles)
+    .filter((article) => {
+      const key = String(article.id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+})
 
 watch(
   () => [profile.value?.coverUrl, profile.value?.avatarUrl] as const,
@@ -121,6 +136,18 @@ async function onTabChange(tab: ProfileArticleTab) {
     query: nextQuery,
   })
 }
+
+function loadMoreArticles() {
+  if (!profileQuery.hasNextPage.value || profileQuery.isFetchingNextPage.value) return
+  void profileQuery.fetchNextPage()
+}
+
+onBeforeUnmount(() => {
+  queryClient.removeQueries({
+    queryKey: queryKeys.userProfileInfinite(username.value, activeTab.value, 10),
+    exact: true,
+  })
+})
 </script>
 
 <template>
@@ -129,6 +156,11 @@ async function onTabChange(tab: ProfileArticleTab) {
       <ProfileHeader
         v-if="profile"
         :profile="profile"
+      />
+
+      <ProfileWritingCalendar
+        v-if="profile"
+        :days="profile.writingCalendar"
       />
 
       <section
@@ -184,6 +216,9 @@ async function onTabChange(tab: ProfileArticleTab) {
               <ProfileCardQueue
                 :articles="articles"
                 :public-reader-mode="!isOwnerProfile"
+                :has-more="profileQuery.hasNextPage.value"
+                :loading-more="profileQuery.isFetchingNextPage.value"
+                @load-more="loadMoreArticles"
               />
             </div>
           </Transition>

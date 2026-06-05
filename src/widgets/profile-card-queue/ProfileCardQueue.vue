@@ -15,12 +15,19 @@ const props = withDefaults(
   defineProps<{
     articles?: ArticleCardVm[]
     publicReaderMode?: boolean
+    hasMore?: boolean
+    loadingMore?: boolean
   }>(),
   {
     articles: () => [],
     publicReaderMode: false,
+    hasMore: false,
+    loadingMore: false,
   },
 )
+const emit = defineEmits<{
+  (event: 'load-more'): void
+}>()
 
 const cardsRef = ref<HTMLElement | null>(null)
 const isCompactViewport = ref(false)
@@ -169,6 +176,31 @@ function getArticleTargetPath(article: ArticleCardVm): string {
   }
 
   return article.editPath
+}
+
+function requestLoadMore() {
+  if (!props.hasMore || props.loadingMore) return
+  emit('load-more')
+}
+
+function handleGridScroll(event: Event) {
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+
+  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (distanceToBottom > 420) return
+
+  requestLoadMore()
+}
+
+function handleMobileScroll(event: Event) {
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+
+  const distanceToEnd = el.scrollWidth - el.scrollLeft - el.clientWidth
+  if (distanceToEnd > 260) return
+
+  requestLoadMore()
 }
 
 /**
@@ -555,7 +587,12 @@ onBeforeUnmount(() => {
 
       <!-- 平铺模式：>5 张时，2×2 网格可滚动 -->
       <Transition name="ptm-grid-fade">
-      <div v-if="isGridMode" class="ptm__gallery-state ptm__grid-state" aria-label="文章卡片列表">
+      <div
+        v-if="isGridMode"
+        class="ptm__gallery-state ptm__grid-state"
+        aria-label="文章卡片列表"
+        @scroll.passive="handleGridScroll"
+      >
         <div class="ptm__grid">
           <RouterLink
             v-for="article in displayedArticles"
@@ -572,12 +609,23 @@ onBeforeUnmount(() => {
               :fill-height="true"
             />
           </RouterLink>
+
+          <div class="ptm__grid-load" aria-live="polite">
+            <span v-if="loadingMore">正在加载更多文章…</span>
+            <span v-else-if="hasMore">继续下滑，自动加载更多</span>
+            <span v-else>END</span>
+          </div>
         </div>
       </div>
       </Transition>
     </div>
 
-    <div v-else-if="hasArticles" class="ptm__mobile-strip content-rise-in" aria-label="文章列表">
+    <div
+      v-else-if="hasArticles"
+      class="ptm__mobile-strip content-rise-in"
+      aria-label="文章列表"
+      @scroll.passive="handleMobileScroll"
+    >
         <RouterLink
           v-for="article in displayedArticles"
           :key="article.id"
@@ -586,6 +634,11 @@ onBeforeUnmount(() => {
         >
           <ArticleCard :article="article" :clickable="false" :show-status="true" :show-reason="true" :fill-height="true" />
         </RouterLink>
+        <div class="ptm__mobile-load" aria-live="polite">
+          <span v-if="loadingMore">加载中…</span>
+          <span v-else-if="hasMore">继续滑动加载</span>
+          <span v-else>END</span>
+        </div>
     </div>
 
     <div v-else class="ptm__gallery ptm__gallery--empty content-rise-in" aria-label="文章列表为空">
@@ -896,6 +949,19 @@ html.dark .ptm__card :deep(.content-card-shell::before) {
   scroll-snap-align: center;
 }
 
+.ptm__mobile-load {
+  display: grid;
+  min-height: 100%;
+  min-width: 9rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-surface-glass) 70%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  scroll-snap-align: center;
+}
+
 .ptm__mobile-item :deep(.content-card-shell) {
   min-height: 100%;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
@@ -982,6 +1048,15 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
   align-items: start;
   padding-top: 0.35rem;
   padding-bottom: 1.25rem;
+}
+
+.ptm__grid-load {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 3.5rem;
+  place-items: center;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
 }
 
 .ptm__grid-item {

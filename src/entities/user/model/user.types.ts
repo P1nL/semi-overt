@@ -37,6 +37,11 @@ export interface UserStatItemVm {
     value: number
 }
 
+export interface WritingCalendarDayVm {
+    date: string
+    wordCount: number
+}
+
 export interface UserProfileVm {
     id: number
     username: string
@@ -51,4 +56,5 @@ export interface UserProfileVm {
     page: number
     pageSize: number
     articles: ArticleCardVm[]
+    writingCalendar: WritingCalendarDayVm[]
 }

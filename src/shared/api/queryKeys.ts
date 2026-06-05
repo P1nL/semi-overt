@@ -14,6 +14,8 @@ export const queryKeys = {
     userProfileRoot: ['user-profile'] as const,
     userProfile: (username: string, tab: string, page: number, pageSize: number) =>
         ['user-profile', username, tab, page, pageSize] as const,
+    userProfileInfinite: (username: string, tab: string, pageSize: number) =>
+        ['user-profile', username, tab, 'infinite', pageSize] as const,
     reviewPending: (page: number, pageSize: number) =>
         ['review-pending', page, pageSize] as const,
     reviewPendingRoot: ['review-pending'] as const,
