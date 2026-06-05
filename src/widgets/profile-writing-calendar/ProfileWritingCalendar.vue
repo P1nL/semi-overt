@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
     <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <h2 class="text-base font-semibold tracking-[-0.02em] text-[var(--color-text)]">
-          创作字数
+          WORK
         </h2>
 
       </div>
