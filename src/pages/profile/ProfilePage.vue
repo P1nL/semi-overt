@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuery } from '@tanstack/vue-query'
 
 import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
 import type { ArticleCardVm } from '@/entities/article'
@@ -24,7 +24,6 @@ import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
 const route = useRoute()
 const router = useRouter()
-const queryClient = useQueryClient()
 const authStore = useAuthStore()
 
 const username = computed(() => String(route.params.username || '').trim())
@@ -204,13 +203,6 @@ function loadMoreArticles() {
   if (!profileQuery.hasNextPage.value || profileQuery.isFetchingNextPage.value) return
   void profileQuery.fetchNextPage()
 }
-
-onBeforeUnmount(() => {
-  queryClient.removeQueries({
-    queryKey: queryKeys.userProfileInfinite(username.value, activeTab.value, 10),
-    exact: true,
-  })
-})
 </script>
 
 <template>
