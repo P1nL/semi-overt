@@ -4,10 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 
 import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
+import type { ArticleCardVm } from '@/entities/article'
 import { queryKeys } from '@/shared/api/queryKeys'
 import { SectionHeader } from '@/shared/components/layout'
+import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import type { ProfileArticleTab } from '@/shared/types/profile'
+import { isPublishedArticle } from '@/shared/utils/article'
 import { getErrorMessage } from '@/shared/utils/error'
 import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
@@ -41,6 +44,19 @@ const profileQuery = useInfiniteUserProfileQuery(username, computed(() => ({
 
 const profilePages = computed(() => profileQuery.data.value?.pages ?? [])
 const profile = computed(() => profilePages.value[0] ?? null)
+const isOwnerProfile = computed(
+  () => authStore.user?.username === profile.value?.username,
+)
+
+function isPublicReadableProfileArticle(article: ArticleCardVm): boolean {
+  const status = article.status?.value
+  return isPublishedArticle(status) || isPublicReadableDraft(article)
+}
+
+function isPublicReadableDraft(article: ArticleCardVm): boolean {
+  return article.status?.value === ARTICLE_STATUS.DRAFT && article.draftVisible
+}
+
 const articles = computed(() => {
   const seen = new Set<string>()
 
@@ -52,6 +68,7 @@ const articles = computed(() => {
       seen.add(key)
       return true
     })
+    .filter((article) => isOwnerProfile.value || isPublicReadableProfileArticle(article))
 })
 
 watch(
@@ -94,6 +111,18 @@ const tabCounts = computed(() => {
     }
   })
 
+  if (!isOwnerProfile.value && activeTab.value === 'draft') {
+    const visibleDraftsOnLoadedPages = profilePages.value
+      .flatMap((page) => page.articles)
+      .filter(isPublicReadableDraft)
+      .length
+
+    if (visibleDraftsOnLoadedPages === 0) {
+      result.draft = 0
+      result.all = result.approved ?? 0
+    }
+  }
+
   return result
 })
 
@@ -102,10 +131,6 @@ const contentState = computed(() => {
   if (!hasResolvedProfile.value && profileQuery.isFetching.value) return 'loading'
   return null
 })
-
-const isOwnerProfile = computed(
-  () => authStore.user?.username === profile.value?.username,
-)
 
 const showAdminReviewQueue = computed(
   () => authStore.isAdmin && isOwnerProfile.value,
