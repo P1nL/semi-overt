@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 
 import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
 import type { ArticleCardVm } from '@/entities/article'
+import { mapUserProfilePageDtoToVm } from '@/entities/user'
+import { userApi } from '@/shared/api/modules/user'
 import { queryKeys } from '@/shared/api/queryKeys'
 import { SectionHeader } from '@/shared/components/layout'
 import { ARTICLE_STATUS } from '@/shared/constants/article'
@@ -44,6 +46,7 @@ const profileQuery = useInfiniteUserProfileQuery(username, computed(() => ({
 
 const profilePages = computed(() => profileQuery.data.value?.pages ?? [])
 const profile = computed(() => profilePages.value[0] ?? null)
+const hasResolvedProfile = computed(() => profile.value !== null)
 const isOwnerProfile = computed(
   () => authStore.user?.username === profile.value?.username,
 )
@@ -56,6 +59,33 @@ function isPublicReadableProfileArticle(article: ArticleCardVm): boolean {
 function isPublicReadableDraft(article: ArticleCardVm): boolean {
   return article.status?.value === ARTICLE_STATUS.DRAFT && article.draftVisible
 }
+
+const publicDraftProbeQuery = useQuery({
+  queryKey: computed(() => queryKeys.userProfile(username.value, 'draft-public-probe', 1, 50)),
+  queryFn: async () => mapUserProfilePageDtoToVm(await userApi.getUserProfile(username.value, {
+    tab: 'draft',
+    page: 1,
+    pageSize: 50,
+  })),
+  enabled: computed(() => Boolean(username.value) && hasResolvedProfile.value && !isOwnerProfile.value),
+})
+
+const publicDraftCount = computed(() => {
+  if (isOwnerProfile.value) return 0
+
+  const draftsById = new Set<string>()
+
+  profilePages.value
+    .flatMap((page) => page.articles)
+    .filter(isPublicReadableDraft)
+    .forEach((article) => draftsById.add(String(article.id)))
+
+  ;(publicDraftProbeQuery.data.value?.articles ?? [])
+    .filter(isPublicReadableDraft)
+    .forEach((article) => draftsById.add(String(article.id)))
+
+  return draftsById.size
+})
 
 const articles = computed(() => {
   const seen = new Set<string>()
@@ -111,16 +141,9 @@ const tabCounts = computed(() => {
     }
   })
 
-  if (!isOwnerProfile.value && activeTab.value === 'draft') {
-    const visibleDraftsOnLoadedPages = profilePages.value
-      .flatMap((page) => page.articles)
-      .filter(isPublicReadableDraft)
-      .length
-
-    if (visibleDraftsOnLoadedPages === 0) {
-      result.draft = 0
-      result.all = result.approved ?? 0
-    }
+  if (!isOwnerProfile.value) {
+    result.draft = publicDraftCount.value
+    result.all = (result.approved ?? 0) + publicDraftCount.value
   }
 
   return result
@@ -142,7 +165,6 @@ watch(
   { flush: 'post' },
 )
 
-const hasResolvedProfile = computed(() => profile.value !== null)
 const contentState = computed(() => {
   if (!hasResolvedProfile.value && profileQuery.isFetching.value) return 'loading'
   return null
