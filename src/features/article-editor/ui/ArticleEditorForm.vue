@@ -482,6 +482,7 @@ async function saveDraft(showToast = false): Promise<boolean> {
     form.wordCount = localStats.wordCount
     form.readMinutes = localStats.readMinutes
     form.durationCategory = localStats.durationCategory
+    form.draftVisible = response.draftVisible
     editorStore.dirty = false
 
     const payload: EditorDraftSavedPayload = {

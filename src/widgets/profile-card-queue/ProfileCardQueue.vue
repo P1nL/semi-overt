@@ -171,7 +171,9 @@ function getArticleTargetPath(article: ArticleCardVm): string {
     return article.articlePath
   }
 
-  if (props.publicReaderMode && status === ARTICLE_STATUS.DRAFT && article.draftVisible) {
+  // 公开个人页的草稿列表已经由后端按 draftVisible 过滤；
+  // 访客看到的 DRAFT 应进入只读详情页，而不是作者编辑页。
+  if (props.publicReaderMode && status === ARTICLE_STATUS.DRAFT) {
     return article.articlePath
   }
 
