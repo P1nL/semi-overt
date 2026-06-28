@@ -126,6 +126,22 @@ const tabCounts = computed(() => {
   return result
 })
 
+watch(
+  () => [profile.value !== null, isOwnerProfile.value, activeTab.value, tabCounts.value.draft ?? 0] as const,
+  ([resolved, isOwner, tab, publicDraftCount]) => {
+    if (!resolved || isOwner || tab === 'approved') return
+    if (tab === 'draft' && publicDraftCount > 0) return
+
+    void router.replace({
+      query: {
+        ...route.query,
+        tab: undefined,
+      },
+    })
+  },
+  { flush: 'post' },
+)
+
 const hasResolvedProfile = computed(() => profile.value !== null)
 const contentState = computed(() => {
   if (!hasResolvedProfile.value && profileQuery.isFetching.value) return 'loading'
