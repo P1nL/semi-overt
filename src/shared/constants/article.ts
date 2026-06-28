@@ -7,6 +7,7 @@ export {
     ARTICLE_DURATION_LABEL_MAP,
     ARTICLE_DEFAULT_TITLE,
     ARTICLE_WORDS_PER_MINUTE,
+    ARTICLE_SUMMARY_MAX_LENGTH,
 } from '@/entities/article'
 
 export type {
@@ -15,7 +16,6 @@ export type {
 } from '@/entities/article'
 
 // 以下为 shared 层独有的约束配置，不属于业务域常量
-export const ARTICLE_SUMMARY_MAX_LENGTH = 255
 export const ARTICLE_TITLE_MAX_LENGTH = 120
 
 export const ARTICLE_IMAGE_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const

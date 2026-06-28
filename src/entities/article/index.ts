@@ -10,6 +10,7 @@ export {
     ARTICLE_DEFAULT_TITLE,
     ARTICLE_DEFAULT_AUTHOR_NAME,
     ARTICLE_WORDS_PER_MINUTE,
+    ARTICLE_SUMMARY_MAX_LENGTH,
 } from './model/article.constants'
 
 export type {
