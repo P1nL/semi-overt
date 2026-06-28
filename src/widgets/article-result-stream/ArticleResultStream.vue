@@ -3,6 +3,11 @@ import { ArticleCard, type ArticleCardVm } from '@/entities/article'
 import { ArticleParallaxGallery } from '@/widgets/article-parallax-gallery'
 import { RESULT_VIEW_MODE, type ResultViewMode } from './result-view'
 
+const RESULT_VIEW_SWITCH_DURATION = {
+  enter: 760,
+  leave: 320,
+}
+
 const props = withDefaults(
   defineProps<{
     items: ArticleCardVm[]
@@ -14,7 +19,7 @@ const props = withDefaults(
 
 <template>
   <section class="article-result-stream">
-    <Transition name="result-view-switch" mode="out-in">
+    <Transition name="result-view-switch" mode="out-in" :duration="RESULT_VIEW_SWITCH_DURATION">
       <div :key="view" class="article-result-stream__panel" :class="`article-result-stream__panel--${view}`">
         <ArticleParallaxGallery
           v-if="view === RESULT_VIEW_MODE.GALLERY"
@@ -124,24 +129,22 @@ const props = withDefaults(
   transform: translate3d(0, 0, 0);
 }
 
-.article-result-stream__panel--list.result-view-switch-enter-active .article-result-stream__list > *,
-.article-result-stream__panel--grid.result-view-switch-enter-active .article-result-stream__grid > * {
-  transition:
-    opacity 460ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: var(--result-item-enter-delay);
+.article-result-stream__panel--list.result-view-switch-enter-active,
+.article-result-stream__panel--grid.result-view-switch-enter-active {
+  transition: none;
 }
 
-.article-result-stream__panel--list.result-view-switch-enter-from .article-result-stream__list > *,
-.article-result-stream__panel--grid.result-view-switch-enter-from .article-result-stream__grid > * {
-  opacity: 0;
-  transform: translate3d(0, 10px, 0);
-}
-
-.article-result-stream__panel--list.result-view-switch-enter-to .article-result-stream__list > *,
-.article-result-stream__panel--grid.result-view-switch-enter-to .article-result-stream__grid > * {
+.article-result-stream__panel--list.result-view-switch-enter-from,
+.article-result-stream__panel--grid.result-view-switch-enter-from,
+.article-result-stream__panel--list.result-view-switch-enter-to,
+.article-result-stream__panel--grid.result-view-switch-enter-to {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+}
+
+.article-result-stream__panel--list .article-result-stream__list > *,
+.article-result-stream__panel--grid .article-result-stream__grid > * {
+  animation: result-item-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--result-item-enter-delay);
 }
 
 .article-result-stream__panel--list.result-view-switch-leave-active .article-result-stream__list > *,
@@ -155,6 +158,18 @@ const props = withDefaults(
 .article-result-stream__panel--grid.result-view-switch-leave-to .article-result-stream__grid > * {
   opacity: 0;
   transform: translate3d(0, -4px, 0);
+}
+
+@keyframes result-item-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @media (min-width: 700px) {

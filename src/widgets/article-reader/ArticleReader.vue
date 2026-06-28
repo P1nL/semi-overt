@@ -29,7 +29,7 @@ const articleQuery = useArticleDetailQuery(
   },
 )
 const article = computed(() => articleQuery.data.value ?? null)
-const loading = computed(() => articleQuery.isFetching.value)
+const initialLoading = computed(() => articleQuery.isPending.value && !article.value)
 const errorMessage = computed(() => {
   if (!articleQuery.error.value) {
     return ''
@@ -62,7 +62,7 @@ watch(
   <section class="space-y-6 md:space-y-8">
     <InlineMessage v-if="errorMessage" tone="error" :message="errorMessage" />
 
-    <div v-if="loading" class="space-y-4">
+    <div v-if="initialLoading" class="space-y-4">
       <Skeleton variant="rect" width="66%" height="40px" />
       <Skeleton variant="rect" width="192px" height="20px" />
       <Skeleton variant="image" />

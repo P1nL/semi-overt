@@ -18,6 +18,7 @@ import {
     ARTICLE_DEFAULT_TITLE,
     ARTICLE_DURATION_CATEGORY,
     ARTICLE_DURATION_LABEL_MAP,
+    ARTICLE_SUMMARY_MAX_LENGTH,
     ARTICLE_STATUS,
     ARTICLE_STATUS_BADGE_VARIANT_MAP,
     ARTICLE_STATUS_LABEL_MAP,
@@ -47,6 +48,10 @@ function normalizeStatus(status?: string | null): string {
 
 function normalizeDuration(category?: string | null): string {
     return category?.toUpperCase() || ARTICLE_DURATION_CATEGORY.SHORT
+}
+
+function limitSummaryText(value: string): string {
+    return Array.from(value).slice(0, ARTICLE_SUMMARY_MAX_LENGTH).join('')
 }
 
 function normalizeReadMinutes(value?: number | null, wordCount?: number | null): number {
@@ -120,7 +125,7 @@ function createArticleSummaryVm(summary?: string | null, previewText?: string | 
 
     if (rawText) {
         return {
-            text: rawText,
+            text: limitSummaryText(rawText),
             rawText,
             isFallback: false,
         }
@@ -128,7 +133,7 @@ function createArticleSummaryVm(summary?: string | null, previewText?: string | 
 
     if (previewDisplayText) {
         return {
-            text: previewDisplayText,
+            text: limitSummaryText(previewDisplayText),
             rawText: null,
             isFallback: true,
         }

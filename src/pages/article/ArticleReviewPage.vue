@@ -20,9 +20,9 @@ import { ArticleToc } from '@/widgets/article-toc'
 const route = useRoute()
 
 const articleId = computed(() => String(route.params.id || ''))
-const readerKey = ref(0)
 const article = ref<ArticleDetailVm | null>(null)
-const tocSyncKey = ref(`${articleId.value}-0`)
+const tocSyncVersion = ref(0)
+const tocSyncKey = computed(() => `${articleId.value}-${tocSyncVersion.value}`)
 
 // articleId 变化时重置 article，避免切换文章时短暂显示上一篇的状态
 watch(articleId, () => {
@@ -63,8 +63,15 @@ async function onActed(result: ReviewActionResult) {
 }
 
 function onLoaded(value: ArticleDetailVm) {
+  const shouldSyncToc =
+    article.value?.id !== value.id ||
+    article.value?.content !== value.content
+
   article.value = value
-  tocSyncKey.value = `${articleId.value}-${Date.now()}`
+
+  if (shouldSyncToc) {
+    tocSyncVersion.value += 1
+  }
 }
 
 </script>
@@ -83,7 +90,7 @@ function onLoaded(value: ArticleDetailVm) {
           <section class="mx-auto w-full max-w-[900px] space-y-6">
             <section class="surface-1 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8">
               <ArticleReader
-                :key="`${articleId}-${readerKey}`"
+                :key="articleId"
                 :article-id="articleId"
                 :review-refresh-interval-ms="REVIEW_AUTO_REFRESH_INTERVAL_MS"
                 @loaded="onLoaded"
