@@ -6,6 +6,10 @@ export interface ApiSideEffectHandlers {
     onNotFound?: () => void | Promise<void>
 }
 
+export interface UnwrapApiResponseOptions {
+    runSideEffects?: boolean
+}
+
 let sideEffectHandlers: ApiSideEffectHandlers = {}
 
 export function registerApiSideEffectHandlers(handlers: ApiSideEffectHandlers): void {
@@ -46,7 +50,10 @@ export async function runApiSideEffects(code: number, message: string): Promise<
     }
 }
 
-export async function unwrapApiResponse<T>(payload: unknown): Promise<T> {
+export async function unwrapApiResponse<T>(
+    payload: unknown,
+    options: UnwrapApiResponseOptions = {},
+): Promise<T> {
     if (!isApiResponse<T>(payload)) {
         throw new ApiBusinessError('响应格式不合法', {
             code: -1,
@@ -55,7 +62,11 @@ export async function unwrapApiResponse<T>(payload: unknown): Promise<T> {
     }
 
     if (!isBusinessSuccess(payload.code)) {
-        await runApiSideEffects(payload.code, payload.message)
+        const runSideEffects = options.runSideEffects ?? true
+
+        if (runSideEffects) {
+            await runApiSideEffects(payload.code, payload.message)
+        }
 
         throw new ApiBusinessError(payload.message || '请求失败', {
             code: payload.code,

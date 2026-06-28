@@ -152,67 +152,75 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
-    <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <ProfileHeader
-        v-if="profile"
-        :profile="profile"
-      />
-
-      <ProfileWritingCalendar
-        v-if="profile"
-        :days="profile.writingCalendar"
-      />
-
-      <section
-        v-if="showAdminReviewQueue"
-        class="surface-1 rounded-[var(--radius-xl)] p-4 md:p-5"
-      >
-        <SectionHeader title="审核" description="" compact />
-
-        <div class="mt-4">
-          <ReviewQueueStrip
-            :items="pendingItems"
-            :loading="showReviewQueueSkeleton"
-          />
-        </div>
-
-        <p
-          v-if="!pendingReviewsQuery.isFetching.value && reviewQueueError"
-          class="mt-3 text-sm text-[var(--color-danger)]"
+    <main class="page-container py-8 md:py-10">
+      <Transition name="content-fade" mode="out-in">
+        <div
+          v-if="contentState === 'loading'"
+          key="profile-page-loading"
+          class="grid min-h-[calc(100vh-var(--header-height)-4rem)] place-items-center md:min-h-[calc(100vh-var(--header-height-md)-5rem)]"
+          role="status"
+          aria-live="polite"
+          aria-label="正在加载个人页"
         >
-          {{ reviewQueueError }}
-        </p>
-      </section>
-
-      <section class="profile-content-layout">
-        <aside class="profile-content-layout__tabs">
-          <ProfileTabs
-            :model-value="activeTab"
-            :counts="tabCounts"
-            :public-only="!isOwnerProfile"
-            orientation="vertical"
-            @change="onTabChange"
-          />
-        </aside>
-
-        <div class="profile-content-layout__main">
-          <div class="profile-content-layout__tabs-mobile surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4">
-            <ProfileTabs
-              :model-value="activeTab"
-              :counts="tabCounts"
-              :public-only="!isOwnerProfile"
-              @change="onTabChange"
+          <div class="surface-1 flex size-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--color-border)_80%,transparent)] text-[var(--color-text-muted)] shadow-[var(--shadow-md)]">
+            <span
+              class="inline-block size-5 animate-[spin_0.8s_linear_infinite] rounded-full border-2 border-current border-r-transparent"
+              aria-hidden="true"
             />
           </div>
+        </div>
 
-          <Transition name="content-fade" mode="out-in">
-            <div
-              v-if="contentState === 'loading'"
-              key="profile-loading"
-              class="content-loading-shell"
-            />
+        <div
+          v-else-if="profile"
+          key="profile-page-content"
+          class="space-y-8 md:space-y-10"
+        >
+          <ProfileHeader :profile="profile" />
 
-            <div v-else key="profile-content">
+          <ProfileWritingCalendar :days="profile.writingCalendar" />
+
+          <section
+            v-if="showAdminReviewQueue"
+            class="surface-1 rounded-[var(--radius-xl)] p-4 md:p-5"
+          >
+            <SectionHeader title="审核" description="" compact />
+
+            <div class="mt-4">
+              <ReviewQueueStrip
+                :items="pendingItems"
+                :loading="showReviewQueueSkeleton"
+              />
+            </div>
+
+            <p
+              v-if="!pendingReviewsQuery.isFetching.value && reviewQueueError"
+              class="mt-3 text-sm text-[var(--color-danger)]"
+            >
+              {{ reviewQueueError }}
+            </p>
+          </section>
+
+          <section class="profile-content-layout">
+            <aside class="profile-content-layout__tabs">
+              <ProfileTabs
+                :model-value="activeTab"
+                :counts="tabCounts"
+                :public-only="!isOwnerProfile"
+                orientation="vertical"
+                @change="onTabChange"
+              />
+            </aside>
+
+            <div class="profile-content-layout__main">
+              <div class="profile-content-layout__tabs-mobile surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4">
+                <ProfileTabs
+                  :model-value="activeTab"
+                  :counts="tabCounts"
+                  :public-only="!isOwnerProfile"
+                  @change="onTabChange"
+                />
+              </div>
+
               <ProfileCardQueue
                 :articles="articles"
                 :public-reader-mode="!isOwnerProfile"
@@ -221,9 +229,9 @@ onBeforeUnmount(() => {
                 @load-more="loadMoreArticles"
               />
             </div>
-          </Transition>
+          </section>
         </div>
-      </section>
+      </Transition>
     </main>
   </div>
 </template>

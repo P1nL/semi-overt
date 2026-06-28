@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useMotions, type Variant } from '@vueuse/motion'
 import { useMediaQuery } from '@vueuse/core'
+import { useRouter } from 'vue-router'
 
 import type { ArticleCardVm } from '@/entities/article'
 
@@ -26,16 +27,19 @@ const props = withDefaults(
     },
 )
 
+const router = useRouter()
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
 const visibleItemSignature = computed(() => visibleItems.value.map((item) => item.id).join('|'))
 const layoutVersion = ref(0)
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
 const isDesktopRail = useMediaQuery('(min-width: 1024px)')
+const HOVER_SETTLE_BEFORE_NAVIGATE_MS = 280
 const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
 const regularRotatePattern = ['-1.8deg', '1.2deg', '-0.9deg', '2.4deg', '-1.4deg', '0.8deg'] as const
 const featuredRotatePattern = ['-2.2deg', '1.4deg', '-1deg', '2.6deg', '-1.5deg', '0.9deg'] as const
+let navigationSettleTimer: number | null = null
 
 const getStaticRotate = (index: number) => {
   if (!isDesktopRail.value) {
@@ -151,6 +155,40 @@ async function syncMotionState() {
   })
 }
 
+function clearNavigationSettleTimer() {
+  if (navigationSettleTimer === null) return
+
+  window.clearTimeout(navigationSettleTimer)
+  navigationSettleTimer = null
+}
+
+function shouldUseNativeNavigation(event: MouseEvent) {
+  return (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+}
+
+async function onItemClick(event: MouseEvent, item: ArticleCardVm) {
+  if (shouldUseNativeNavigation(event)) return
+  if (!isDesktopRail.value || hoveredIndex.value === null) return
+
+  event.preventDefault()
+  clearNavigationSettleTimer()
+
+  hoveredIndex.value = null
+  await syncMotionState()
+
+  navigationSettleTimer = window.setTimeout(() => {
+    navigationSettleTimer = null
+    void router.push(item.articlePath)
+  }, HOVER_SETTLE_BEFORE_NAVIGATE_MS)
+}
+
 watch([hoveredIndex, visibleItems, isDesktopRail], () => {
   void syncMotionState()
 }, { immediate: true, flush: 'post' })
@@ -160,6 +198,10 @@ watch(visibleItemSignature, () => {
   layoutVersion.value += 1
   void syncMotionState()
 }, { flush: 'post' })
+
+onBeforeUnmount(() => {
+  clearNavigationSettleTimer()
+})
 // --- 🌟 动画核心逻辑结束 ---
 </script>
 
@@ -177,6 +219,7 @@ watch(visibleItemSignature, () => {
             class="home-showcase-rail__item"
             :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
+            @click.capture="onItemClick($event, item)"
             v-motion="getMotionKey(index)"
             :initial="getMotionState(index)"
         >

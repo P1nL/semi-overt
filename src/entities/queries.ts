@@ -184,6 +184,10 @@ export function useInfiniteSearchUsersQuery(
     })
 }
 
+export async function fetchArticleDetailVm(articleId: number | string) {
+    return mapArticleDetailDtoToVm(await articleApi.getArticleDetail(String(articleId)))
+}
+
 export function useArticleDetailQuery(
     articleId: MaybeRefOrGetter<number | string | null | undefined>,
     options: QueryRefreshOptions = {},
@@ -193,7 +197,7 @@ export function useArticleDetailQuery(
 
     return useQuery({
         queryKey: computed(() => queryKeys.articleDetail(String(toValue(articleId) ?? ''))),
-        queryFn: async () => mapArticleDetailDtoToVm(await articleApi.getArticleDetail(String(toValue(articleId)))),
+        queryFn: async () => fetchArticleDetailVm(String(toValue(articleId))),
         enabled,
         ...refreshOptions,
     })

@@ -26,9 +26,12 @@ function mergeConfig(config?: RequestConfig): AxiosRequestConfig {
 
 async function requestAndUnwrap<T>(
     promise: Promise<AxiosResponse<ApiResponse<T>>>,
+    config?: RequestConfig,
 ): Promise<T> {
     const response = await promise
-    return await unwrapApiResponse<T>(response.data)
+    return await unwrapApiResponse<T>(response.data, {
+        runSideEffects: config?.withAuth !== false,
+    })
 }
 
 export async function get<T>(
@@ -41,6 +44,7 @@ export async function get<T>(
             ...mergeConfig(config),
             params,
         }),
+        config,
     )
 }
 
@@ -51,6 +55,7 @@ export async function post<T>(
 ): Promise<T> {
     return requestAndUnwrap<T>(
         http.post<ApiResponse<T>>(url, data, mergeConfig(config)),
+        config,
     )
 }
 
@@ -61,6 +66,7 @@ export async function put<T>(
 ): Promise<T> {
     return requestAndUnwrap<T>(
         http.put<ApiResponse<T>>(url, data, mergeConfig(config)),
+        config,
     )
 }
 
@@ -71,6 +77,7 @@ export async function patch<T>(
 ): Promise<T> {
     return requestAndUnwrap<T>(
         http.patch<ApiResponse<T>>(url, data, mergeConfig(config)),
+        config,
     )
 }
 
@@ -83,6 +90,7 @@ export async function del<T>(
             ...mergeConfig(config),
             params: config?.params,
         }),
+        config,
     )
 }
 
@@ -95,6 +103,7 @@ export async function upload<T>(
         http.post<ApiResponse<T>>(url, formData, {
             ...mergeConfig(config),
         }),
+        config,
     )
 }
 

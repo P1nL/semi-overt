@@ -198,21 +198,23 @@ onBeforeUnmount(() => {
 }
 
 .page-sheet-panel {
-  opacity: 0;
   pointer-events: none;
-  transform: translateY(56px);
-  transition:
-    opacity 240ms ease,
-    transform 240ms cubic-bezier(0.4, 0, 1, 1);
+  transform: translate3d(0, 100%, 0);
+  transition: transform 360ms cubic-bezier(0.4, 0, 1, 1);
+  will-change: transform;
 }
 
-.page-sheet-panel--open {
-  opacity: 1;
+.page-sheet-panel.page-sheet-panel--open {
   pointer-events: auto;
-  transform: translateY(0);
-  transition:
-    opacity 320ms ease,
-    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translate3d(0, 0, 0);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-sheet-panel {
+    transition-duration: 1ms;
+    will-change: auto;
+  }
 }
 
 </style>
