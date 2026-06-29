@@ -31,15 +31,9 @@ type TabItem = {
 
 const tabItems = computed(() => {
   if (props.publicOnly) {
-    const publicTabs: TabItem[] = [
+    return [
       { label: '已发布', value: 'approved' as const, badge: props.counts.approved ?? 0 },
     ]
-
-    if ((props.counts.draft ?? 0) > 0) {
-      publicTabs.push({ label: '草稿', value: 'draft' as const, badge: props.counts.draft ?? 0 })
-    }
-
-    return publicTabs
   }
 
   return [

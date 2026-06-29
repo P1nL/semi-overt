@@ -121,7 +121,6 @@ export interface SaveDraftReqDto {
     coverUrl?: string | null
     coverColor?: string | null
     clientWordCount?: number
-    draftVisible?: boolean
 }
 
 export interface SaveDraftRespDto {

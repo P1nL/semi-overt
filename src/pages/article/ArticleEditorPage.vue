@@ -543,15 +543,6 @@ function onDraftSaved(payload: EditorDraftSavedPayload) {
   draftStore.reset()
 
   if (articleId.value) {
-    queryClient.setQueryData(queryKeys.articleDetail(articleId.value), (current) => {
-      if (!current || typeof current !== 'object') return current
-
-      return {
-        ...current,
-        draftVisible: payload.draftVisible,
-      }
-    })
-
     void queryClient.invalidateQueries({
       queryKey: queryKeys.articleDetail(articleId.value),
     })
