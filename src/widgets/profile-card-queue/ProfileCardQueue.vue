@@ -6,7 +6,6 @@ import gsap from 'gsap'
 import type { ArticleCardVm } from '@/entities/article'
 import { ArticleCard } from '@/entities/article/ui'
 import { EmptyState } from '@/shared/components/base'
-import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { isPublishedArticle } from '@/shared/utils/article'
 
 const router = useRouter()
@@ -14,13 +13,11 @@ const router = useRouter()
 const props = withDefaults(
   defineProps<{
     articles?: ArticleCardVm[]
-    publicReaderMode?: boolean
     hasMore?: boolean
     loadingMore?: boolean
   }>(),
   {
     articles: () => [],
-    publicReaderMode: false,
     hasMore: false,
     loadingMore: false,
   },
@@ -168,12 +165,6 @@ function getCardEl(originalIndex: number): HTMLElement | null {
 function getArticleTargetPath(article: ArticleCardVm): string {
   const status = article.status?.value
   if (isPublishedArticle(status)) {
-    return article.articlePath
-  }
-
-  // 公开个人页的草稿列表已经由后端按 draftVisible 过滤；
-  // 访客看到的 DRAFT 应进入只读详情页，而不是作者编辑页。
-  if (props.publicReaderMode && status === ARTICLE_STATUS.DRAFT) {
     return article.articlePath
   }
 

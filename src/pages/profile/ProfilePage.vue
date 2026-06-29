@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQuery } from '@tanstack/vue-query'
 
 import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
 import type { ArticleCardVm } from '@/entities/article'
-import { mapUserProfilePageDtoToVm } from '@/entities/user'
-import { userApi } from '@/shared/api/modules/user'
-import { queryKeys } from '@/shared/api/queryKeys'
 import { SectionHeader } from '@/shared/components/layout'
-import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
 import type { ProfileArticleTab } from '@/shared/types/profile'
 import { isPublishedArticle } from '@/shared/utils/article'
@@ -51,40 +46,8 @@ const isOwnerProfile = computed(
 )
 
 function isPublicReadableProfileArticle(article: ArticleCardVm): boolean {
-  const status = article.status?.value
-  return isPublishedArticle(status) || isPublicReadableDraft(article)
+  return isPublishedArticle(article.status?.value)
 }
-
-function isPublicReadableDraft(article: ArticleCardVm): boolean {
-  return article.status?.value === ARTICLE_STATUS.DRAFT && article.draftVisible
-}
-
-const publicDraftProbeQuery = useQuery({
-  queryKey: computed(() => queryKeys.userProfile(username.value, 'draft-public-probe', 1, 50)),
-  queryFn: async () => mapUserProfilePageDtoToVm(await userApi.getUserProfile(username.value, {
-    tab: 'draft',
-    page: 1,
-    pageSize: 50,
-  })),
-  enabled: computed(() => Boolean(username.value) && hasResolvedProfile.value && !isOwnerProfile.value),
-})
-
-const publicDraftCount = computed(() => {
-  if (isOwnerProfile.value) return 0
-
-  const draftsById = new Set<string>()
-
-  profilePages.value
-    .flatMap((page) => page.articles)
-    .filter(isPublicReadableDraft)
-    .forEach((article) => draftsById.add(String(article.id)))
-
-  ;(publicDraftProbeQuery.data.value?.articles ?? [])
-    .filter(isPublicReadableDraft)
-    .forEach((article) => draftsById.add(String(article.id)))
-
-  return draftsById.size
-})
 
 const articles = computed(() => {
   const seen = new Set<string>()
@@ -141,18 +104,17 @@ const tabCounts = computed(() => {
   })
 
   if (!isOwnerProfile.value) {
-    result.draft = publicDraftCount.value
-    result.all = (result.approved ?? 0) + publicDraftCount.value
+    result.draft = 0
+    result.all = result.approved ?? 0
   }
 
   return result
 })
 
 watch(
-  () => [profile.value !== null, isOwnerProfile.value, activeTab.value, tabCounts.value.draft ?? 0] as const,
-  ([resolved, isOwner, tab, publicDraftCount]) => {
+  () => [profile.value !== null, isOwnerProfile.value, activeTab.value] as const,
+  ([resolved, isOwner, tab]) => {
     if (!resolved || isOwner || tab === 'approved') return
-    if (tab === 'draft' && publicDraftCount > 0) return
 
     void router.replace({
       query: {
@@ -278,7 +240,6 @@ function loadMoreArticles() {
 
               <ProfileCardQueue
                 :articles="articles"
-                :public-reader-mode="!isOwnerProfile"
                 :has-more="profileQuery.hasNextPage.value"
                 :loading-more="profileQuery.isFetchingNextPage.value"
                 @load-more="loadMoreArticles"

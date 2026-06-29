@@ -31,7 +31,6 @@ import { TextSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, type Editor as TiptapEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
-import { Switch } from '@/shared/components/base'
 import {
   buildEditorStats,
   createEmptyEditorFormValues,
@@ -311,7 +310,6 @@ function snapshotFormValues(): EditorFormValues {
     content: form.content,
     coverUrl: form.coverUrl,
     coverColor: form.coverColor,
-    draftVisible: form.draftVisible,
     wordCount: form.wordCount,
     readMinutes: form.readMinutes,
     durationCategory: form.durationCategory,
@@ -324,7 +322,6 @@ function patchFormValues(values: EditorFormValues) {
   form.content = values.content
   form.coverUrl = values.coverUrl
   form.coverColor = values.coverColor
-  form.draftVisible = values.draftVisible
   form.wordCount = values.wordCount
   form.readMinutes = values.readMinutes
   form.durationCategory = values.durationCategory
@@ -337,7 +334,6 @@ function hasFormDifferences(values: EditorFormValues): boolean {
     form.content !== values.content ||
     form.coverUrl !== values.coverUrl ||
     form.coverColor !== values.coverColor ||
-    form.draftVisible !== values.draftVisible ||
     form.wordCount !== values.wordCount ||
     form.readMinutes !== values.readMinutes ||
     form.durationCategory !== values.durationCategory
@@ -482,7 +478,6 @@ async function saveDraft(showToast = false): Promise<boolean> {
     form.wordCount = localStats.wordCount
     form.readMinutes = localStats.readMinutes
     form.durationCategory = localStats.durationCategory
-    form.draftVisible = response.draftVisible
     editorStore.dirty = false
 
     const payload: EditorDraftSavedPayload = {
@@ -491,14 +486,8 @@ async function saveDraft(showToast = false): Promise<boolean> {
       readMinutes: localStats.readMinutes,
       durationCategory: localStats.durationCategory,
       status: response.status,
-      draftVisible: response.draftVisible,
     }
 
-    editorStore.patchCachedArticleDetail(
-      articleId,
-      { draftVisible: response.draftVisible },
-      response.savedAt,
-    )
     emit('draft-saved', payload)
 
     if (
@@ -1808,16 +1797,6 @@ defineExpose({
               {{ errors.summary }}
             </p>
             <p class="editor-side-counter">{{ summaryCountText }}</p>
-          </section>
-
-          <section class="editor-side-section">
-            <Switch
-              v-model="form.draftVisible"
-              :disabled="disabledState"
-              label="草稿可见"
-              description="开启后，草稿会在个人页展示"
-              @change="handleFormMutation"
-            />
           </section>
 
           <section class="editor-side-section">

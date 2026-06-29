@@ -13,7 +13,6 @@ export interface EditorFormValues extends EditorStats {
     content: string
     coverUrl: string
     coverColor: string
-    draftVisible: boolean
 }
 
 export type EditorFieldErrors = Partial<Record<'title' | 'summary' | 'content', string>>
@@ -29,10 +28,7 @@ export interface EditorDraftSavedPayload {
     readMinutes: number
     durationCategory: string
     status: string
-    draftVisible: boolean
 }
 
-export type EditorDraftPayload = SaveDraftReqDto & {
-    draftVisible?: boolean
-}
+export type EditorDraftPayload = SaveDraftReqDto
 
