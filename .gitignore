@@ -13,6 +13,9 @@ dist
 dist-ssr
 coverage
 *.local
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -37,6 +40,17 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Local AI/browser automation artifacts
+.codex-runtime/
+.playwright-mcp/
+test-results/
+playwright-report/
+/playwright-*.json
+/*snapshot*.md
+/*.png
+/*.zip
+/*.tgz
 
 # Local startup helpers
 scripts/start-now-demo.cmd
