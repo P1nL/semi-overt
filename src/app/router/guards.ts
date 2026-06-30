@@ -7,6 +7,7 @@ import type {
 import { pinia } from '@/app/providers/pinia'
 import { ENV } from '@/shared/config/env'
 import { ROUTE_PATH } from '@/shared/constants/routes'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
@@ -200,8 +201,13 @@ async function handleAuthGuard(
 }
 
 function applyDocumentTitle(to: RouteLocationNormalized) {
+    if (to.path === ROUTE_PATH.HOME) {
+        setDocumentTitle()
+        return
+    }
+
     const pageTitle = to.meta.title
-    document.title = pageTitle ? `${pageTitle} - ${ENV.appName}` : ENV.appName
+    setDocumentTitle(typeof pageTitle === 'string' ? pageTitle : null)
 }
 
 export function setupRouterGuards(router: Router) {

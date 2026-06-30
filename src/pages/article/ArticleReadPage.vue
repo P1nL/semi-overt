@@ -3,12 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 
+import type { ArticleDetailVm } from '@/entities/article'
 import { AdminDeleteArticleButton } from '@/features/admin-article-delete'
 import { syncDeletedArticleCache } from '@/features/admin-article-delete/model'
 import { Icon } from '@/shared/components/base'
 import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { queryKeys } from '@/shared/api/queryKeys'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { useAuthStore } from '@/stores/auth'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
@@ -23,7 +25,8 @@ const tocSyncKey = ref(`${articleId.value}-0`)
 const mainRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
 
-function onLoaded() {
+function onLoaded(article: ArticleDetailVm) {
+  setDocumentTitle(article.title)
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
 }
 

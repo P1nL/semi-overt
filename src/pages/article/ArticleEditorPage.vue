@@ -21,6 +21,7 @@ import { ARTICLE_STATUS } from '@/shared/constants/article'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { STORAGE_KEY } from '@/shared/constants/storage'
 import { queryClient } from '@/shared/lib/queryClient'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import { localStore } from '@/shared/utils/storage'
 import { calcWordCount, canCancelReview, canEditArticle, canSubmitArticle } from '@/shared/utils/article'
@@ -282,6 +283,19 @@ const headerTitleModel = computed({
     formValues.value = { ...formValues.value, title: value }
   },
 })
+const editorDocumentTitle = computed(() => {
+  const title = formValues.value.title.trim()
+  if (title) return title
+  return '未命名'
+})
+
+watch(
+  () => [route.fullPath, editorDocumentTitle.value] as const,
+  () => {
+    setDocumentTitle(editorDocumentTitle.value)
+  },
+  { immediate: true },
+)
 
 const saveStatus = computed(() => {
   if (editorStore.submitting) {

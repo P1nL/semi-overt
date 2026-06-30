@@ -6,6 +6,7 @@ import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/
 import type { ArticleCardVm } from '@/entities/article'
 import { SectionHeader } from '@/shared/components/layout'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import type { ProfileArticleTab } from '@/shared/types/profile'
 import { isPublishedArticle } from '@/shared/utils/article'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -62,6 +63,14 @@ const articles = computed(() => {
     })
     .filter((article) => isOwnerProfile.value || isPublicReadableProfileArticle(article))
 })
+
+watch(
+  () => profile.value?.displayName || username.value,
+  (title) => {
+    setDocumentTitle(title || '个人主页')
+  },
+  { immediate: true },
+)
 
 watch(
   () => [profile.value?.coverUrl, profile.value?.avatarUrl] as const,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { useIntersectionObserver } from '@vueuse/core'
 
@@ -9,6 +9,7 @@ import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
 
@@ -63,6 +64,14 @@ const contentState = computed(() => {
   if (list.value.length) return 'content'
   return 'empty'
 })
+
+watch(
+  () => [currentRoute.value.fullPath, sectionMeta.value.label] as const,
+  () => {
+    setDocumentTitle(sectionMeta.value.label)
+  },
+  { immediate: true },
+)
 
 async function onViewChange(nextView: string) {
   if (!isResultViewMode(nextView)) return

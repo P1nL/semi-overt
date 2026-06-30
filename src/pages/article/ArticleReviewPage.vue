@@ -13,6 +13,7 @@ import { useReviewLogsQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleReader } from '@/widgets/article-reader'
 import { ArticleToc } from '@/widgets/article-toc'
@@ -68,6 +69,7 @@ function onLoaded(value: ArticleDetailVm) {
     article.value?.content !== value.content
 
   article.value = value
+  setDocumentTitle(value.title)
 
   if (shouldSyncToc) {
     tocSyncVersion.value += 1

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { useIntersectionObserver } from '@vueuse/core'
 
@@ -8,6 +8,7 @@ import { useInfiniteSearchArticlesQuery, useInfiniteSearchUsersQuery } from '@/e
 import { Avatar, EmptyState } from '@/shared/components/base'
 import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
+import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
 
@@ -97,6 +98,7 @@ const searchTitle = computed(() => {
   if (!activeKeyword.value) return isUserSearch.value ? '搜索作者' : '搜索结果'
   return isUserSearch.value ? `作者：${activeKeyword.value}` : activeKeyword.value
 })
+const documentTitle = computed(() => activeKeyword.value || searchTitle.value)
 const resultSummary = computed(() => {
   if (!activeKeyword.value) return ''
   if (isUserSearch.value) {
@@ -126,6 +128,14 @@ const emptyStateDescription = computed(() => {
 
   return isUserSearch.value ? '先输入一个关键词，开始搜索作者。' : '先输入一个关键词，开始搜索文章。'
 })
+
+watch(
+  () => [currentRoute.value.fullPath, documentTitle.value] as const,
+  () => {
+    setDocumentTitle(documentTitle.value)
+  },
+  { immediate: true },
+)
 
 function resolveSearchLocation(keywordValue: string, nextPage = 1) {
   return {
