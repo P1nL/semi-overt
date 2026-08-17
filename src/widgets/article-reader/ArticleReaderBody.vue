@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 
+import { ContentLinkPreview } from '@/shared/components'
+import { configureMarkdownLinks } from '@/shared/utils/contentLinks'
+
 const props = withDefaults(
     defineProps<{
       content?: string
@@ -19,6 +22,8 @@ const markdown = new MarkdownIt({
   linkify: true,
   breaks: true,
 })
+
+configureMarkdownLinks(markdown)
 
 const articleRef = ref<HTMLElement | null>(null)
 const previewImage = ref<{ src: string; alt: string } | null>(null)
@@ -148,6 +153,8 @@ onBeforeUnmount(() => {
     >
       {{ emptyText }}
     </div>
+
+    <ContentLinkPreview :root="articleRef" />
 
     <Teleport to="body">
       <Transition

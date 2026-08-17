@@ -3,6 +3,8 @@ import type { JSONContent } from '@tiptap/core'
 import type { Editor } from '@tiptap/vue-3'
 import MarkdownIt from 'markdown-it'
 
+import { CONTENT_LINK_REL, CONTENT_LINK_TARGET, configureMarkdownLinks } from '@/shared/utils/contentLinks'
+
 import { normalizeEditorImageWidthPercent } from './editor-image'
 
 const markdown = new MarkdownIt({
@@ -10,6 +12,8 @@ const markdown = new MarkdownIt({
   linkify: true,
   breaks: true,
 })
+
+configureMarkdownLinks(markdown)
 
 export function renderMarkdownToEditorHtml(content: string): string {
   if (!content.trim()) {
@@ -318,7 +322,7 @@ function applyTextMarksAsHtml(text: string, marks: JSONContent['marks'] = []): s
   }
 
   if (linkMark && typeof linkMark.attrs?.href === 'string' && linkMark.attrs.href) {
-    output = `<a href="${escapeHtmlAttribute(linkMark.attrs.href)}">${output}</a>`
+    output = `<a href="${escapeHtmlAttribute(linkMark.attrs.href)}" target="${CONTENT_LINK_TARGET}" rel="${CONTENT_LINK_REL}">${output}</a>`
   }
 
   return output

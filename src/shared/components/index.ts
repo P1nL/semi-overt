@@ -1,4 +1,5 @@
 export * from './base'
+export * from './content'
 export * from './feedback'
 export * from './form'
 export * from './layout'
