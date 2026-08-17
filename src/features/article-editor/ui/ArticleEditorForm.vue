@@ -15,11 +15,14 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Check,
   ChevronDown,
+  Copy,
   Highlighter,
   Italic,
   List,
   ListOrdered,
+  LoaderCircle,
   Strikethrough,
   Redo2,
   Text,
@@ -105,6 +108,14 @@ const tableMenuOpen = ref(false)
 const tableMenuRef = ref<HTMLElement | null>(null)
 const tableMenuTriggerRef = ref<HTMLButtonElement | null>(null)
 const toolbarSentinelRef = ref<HTMLElement | null>(null)
+const linkPreviewRef = ref<HTMLElement | null>(null)
+const activeLinkElement = ref<HTMLAnchorElement | null>(null)
+const linkPreviewHref = ref('')
+const linkPreviewVisible = ref(false)
+const linkPreviewPositioned = ref(false)
+const linkPreviewPosition = reactive({ top: 0, left: 0 })
+type LinkCopyState = 'idle' | 'copying' | 'copied'
+const linkCopyState = ref<LinkCopyState>('idle')
 // 表格自定义行列输入
 const tableCustomRows = ref(3)
 const tableCustomCols = ref(3)
@@ -121,7 +132,11 @@ const errors = reactive<{
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let toolbarObserver: IntersectionObserver | null = null
+let linkPreviewHideTimer: ReturnType<typeof setTimeout> | null = null
+let linkCopyResetTimer: ReturnType<typeof setTimeout> | null = null
 const MIN_SAVE_FEEDBACK_MS = 560
+const MIN_LINK_COPY_FEEDBACK_MS = 420
+const LINK_COPY_SUCCESS_MS = 1200
 
 const disabledState = computed(() => props.disabled || loading.value || editorStore.submitting)
 const titleCountText = computed(() => `${form.title.length}/${ARTICLE_TITLE_MAX_LENGTH}`)
@@ -136,6 +151,10 @@ const headingOptions = [
 ] as const
 const headingLevels = headingOptions.map((option) => option.level) as ReadonlyArray<2 | 3 | 4>
 type HeadingLevel = (typeof headingOptions)[number]['level']
+
+const EditorLink = Link.extend({
+  inclusive: false,
+})
 
 const UnderlineMark = Mark.create({
   name: 'underline',
@@ -178,11 +197,13 @@ const contentEditor = useEditor({
   extensions: [
     StarterKit.configure({
       heading: false,
+      link: false,
+      underline: false,
     }),
     Heading.configure({
       levels: [2, 3, 4],
     }),
-    Link.configure({
+    EditorLink.configure({
       openOnClick: false,
       autolink: true,
       linkOnPaste: true,
@@ -229,6 +250,21 @@ const contentEditor = useEditor({
 
       const editor = contentEditor.value
       if (!editor) return false
+
+      const pastedLinkHref = resolvePastedLinkHref(text)
+      if (pastedLinkHref) {
+        if (!editor.state.selection.empty) return false
+
+        event.preventDefault()
+        return finalizeLinkEditing(
+          editor.chain().focus().insertContent({
+            type: 'text',
+            text: text.trim(),
+            marks: [{ type: 'link', attrs: { href: pastedLinkHref } }],
+          }),
+          editor,
+        ).run()
+      }
 
       event.preventDefault()
       return editor.chain().focus().insertContent(createPlainTextPasteContent(text)).run()
@@ -594,6 +630,31 @@ function insertCustomTable(withHeaderRow: boolean) {
   insertTablePreset(rows, cols, withHeaderRow)
 }
 
+function resolvePastedLinkHref(text: string): string | null {
+  const value = text.trim()
+  if (!value || /\s/.test(value)) return null
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return `mailto:${value}`
+  }
+
+  const hasSupportedProtocol = /^(https?:\/\/|mailto:|tel:)/i.test(value)
+  const looksLikeDomain = /^(?:www\.)?[^\s./]+(?:\.[^\s./]+)+(?:[/:?#].*)?$/i.test(value)
+  if (!hasSupportedProtocol && !looksLikeDomain) return null
+
+  const href = normalizeLinkHref(value)
+
+  try {
+    const parsed = new URL(href)
+    if (parsed.protocol === 'mailto:' || parsed.protocol === 'tel:') return href
+    if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname) return href
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 function createPlainTextPasteContent(text: string): JSONContent | JSONContent[] {
   const normalized = text.replace(/\r\n?/g, '\n')
 
@@ -695,6 +756,215 @@ function setTextAlignment(alignment: 'left' | 'center' | 'right') {
   runEditorCommand((editor) => editor.chain().focus().setTextAlign(alignment).run())
 }
 
+function getEditorLinkFromTarget(target: EventTarget | null): HTMLAnchorElement | null {
+  if (!(target instanceof Element)) return null
+
+  const link = target.closest('.editor-content-surface a[href]')
+  return link instanceof HTMLAnchorElement ? link : null
+}
+
+function clearLinkPreviewHideTimer() {
+  if (!linkPreviewHideTimer) return
+
+  clearTimeout(linkPreviewHideTimer)
+  linkPreviewHideTimer = null
+}
+
+function clearLinkCopyResetTimer() {
+  if (!linkCopyResetTimer) return
+
+  clearTimeout(linkCopyResetTimer)
+  linkCopyResetTimer = null
+}
+
+function resetLinkCopyState() {
+  clearLinkCopyResetTimer()
+  linkCopyState.value = 'idle'
+}
+
+function hideLinkPreview() {
+  clearLinkPreviewHideTimer()
+  resetLinkCopyState()
+  linkPreviewVisible.value = false
+  linkPreviewPositioned.value = false
+  linkPreviewHref.value = ''
+  activeLinkElement.value = null
+}
+
+function scheduleLinkPreviewHide() {
+  clearLinkPreviewHideTimer()
+  linkPreviewHideTimer = setTimeout(() => {
+    hideLinkPreview()
+  }, 180)
+}
+
+function clampLinkPreviewCoordinate(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+function positionLinkPreview() {
+  if (typeof window === 'undefined') return
+
+  const link = activeLinkElement.value
+  const preview = linkPreviewRef.value
+  if (!link || !preview || !link.isConnected) {
+    hideLinkPreview()
+    return
+  }
+
+  const linkRects = Array.from(link.getClientRects())
+  const linkRect = linkRects[linkRects.length - 1] ?? link.getBoundingClientRect()
+  const previewRect = preview.getBoundingClientRect()
+  const viewportMargin = 12
+  const previewGap = 8
+  const maxLeft = window.innerWidth - previewRect.width - viewportMargin
+  const maxTop = window.innerHeight - previewRect.height - viewportMargin
+
+  let left = linkRect.right + previewGap
+  let top = linkRect.top + (linkRect.height - previewRect.height) / 2
+
+  if (left > maxLeft) {
+    left = clampLinkPreviewCoordinate(linkRect.left, viewportMargin, maxLeft)
+    top = linkRect.bottom + previewGap
+
+    if (top > maxTop) {
+      top = linkRect.top - previewRect.height - previewGap
+    }
+  }
+
+  linkPreviewPosition.left = Math.round(clampLinkPreviewCoordinate(left, viewportMargin, maxLeft))
+  linkPreviewPosition.top = Math.round(clampLinkPreviewCoordinate(top, viewportMargin, maxTop))
+  linkPreviewPositioned.value = true
+}
+
+function showLinkPreview(link: HTMLAnchorElement) {
+  const href = link.getAttribute('href')?.trim()
+  if (!href) return
+
+  clearLinkPreviewHideTimer()
+  if (link !== activeLinkElement.value || href !== linkPreviewHref.value) {
+    resetLinkCopyState()
+  }
+  activeLinkElement.value = link
+  linkPreviewHref.value = href
+  linkPreviewVisible.value = true
+  linkPreviewPositioned.value = false
+
+  void nextTick(() => {
+    if (activeLinkElement.value !== link) return
+    positionLinkPreview()
+  })
+}
+
+function handleEditorLinkMouseOver(event: MouseEvent) {
+  const link = getEditorLinkFromTarget(event.target)
+  if (!link) return
+
+  if (link === activeLinkElement.value && linkPreviewVisible.value) {
+    clearLinkPreviewHideTimer()
+    return
+  }
+
+  showLinkPreview(link)
+}
+
+function handleEditorLinkMouseOut(event: MouseEvent) {
+  const link = getEditorLinkFromTarget(event.target)
+  if (!link) return
+
+  if (getEditorLinkFromTarget(event.relatedTarget) === link) return
+
+  const nextTarget = event.relatedTarget
+  if (nextTarget instanceof Node && linkPreviewRef.value?.contains(nextTarget)) {
+    clearLinkPreviewHideTimer()
+    return
+  }
+
+  scheduleLinkPreviewHide()
+}
+
+function handleEditorLinkFocusIn(event: FocusEvent) {
+  const link = getEditorLinkFromTarget(event.target)
+  if (link) showLinkPreview(link)
+}
+
+function handleEditorLinkFocusOut(event: FocusEvent) {
+  const nextTarget = event.relatedTarget
+  if (nextTarget instanceof Node && linkPreviewRef.value?.contains(nextTarget)) return
+
+  scheduleLinkPreviewHide()
+}
+
+function handleLinkPreviewViewportChange() {
+  if (linkPreviewVisible.value) positionLinkPreview()
+}
+
+function copyTextWithFallback(value: string) {
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+
+  const copied = document.execCommand('copy')
+  textarea.remove()
+
+  if (!copied) {
+    throw new Error('document.execCommand copy failed')
+  }
+}
+
+async function copyLinkPreviewHref() {
+  const href = linkPreviewHref.value
+  if (!href || typeof window === 'undefined' || linkCopyState.value === 'copying') return
+
+  clearLinkPreviewHideTimer()
+  clearLinkCopyResetTimer()
+  linkCopyState.value = 'copying'
+  const copyStartedAt = Date.now()
+
+  try {
+    let copied = false
+
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(href)
+        copied = true
+      } catch {
+        copied = false
+      }
+    }
+
+    if (!copied) {
+      copyTextWithFallback(href)
+    }
+
+    const feedbackDelay = MIN_LINK_COPY_FEEDBACK_MS - (Date.now() - copyStartedAt)
+    if (feedbackDelay > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, feedbackDelay))
+    }
+
+    if (!linkPreviewVisible.value || linkPreviewHref.value !== href) return
+
+    linkCopyState.value = 'copied'
+    linkCopyResetTimer = setTimeout(() => {
+      if (linkPreviewHref.value === href) {
+        linkCopyState.value = 'idle'
+      }
+      linkCopyResetTimer = null
+    }, LINK_COPY_SUCCESS_MS)
+  } catch {
+    if (linkPreviewHref.value === href) {
+      linkCopyState.value = 'idle'
+    }
+    toast.error('复制失败，请手动复制链接')
+  }
+}
+
 function normalizeLinkHref(value: string): string {
   if (/^(https?:\/\/|mailto:|tel:)/i.test(value)) {
     return value
@@ -721,6 +991,8 @@ function finalizeLinkEditing(chain: ReturnType<TiptapEditor['chain']>, editor: T
 function editLink() {
   const editor = contentEditor.value
   if (!editor || disabledState.value) return
+
+  hideLinkPreview()
 
   const hasSelection = !editor.state.selection.empty
   const isActiveLink = editor.isActive('link')
@@ -995,6 +1267,7 @@ watch(
     if (value) {
       clearSaveTimer()
       closeHeadingMenu()
+      hideLinkPreview()
     }
   },
   { immediate: true },
@@ -1023,6 +1296,12 @@ watch(
 onMounted(async () => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeydown)
+  document.addEventListener('mouseover', handleEditorLinkMouseOver, true)
+  document.addEventListener('mouseout', handleEditorLinkMouseOut, true)
+  document.addEventListener('focusin', handleEditorLinkFocusIn, true)
+  document.addEventListener('focusout', handleEditorLinkFocusOut, true)
+  window.addEventListener('resize', handleLinkPreviewViewportChange)
+  window.addEventListener('scroll', handleLinkPreviewViewportChange, true)
 
   if (props.modelValue) {
     patchFormValues(props.modelValue)
@@ -1056,7 +1335,14 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   document.removeEventListener('keydown', handleDocumentKeydown)
+  document.removeEventListener('mouseover', handleEditorLinkMouseOver, true)
+  document.removeEventListener('mouseout', handleEditorLinkMouseOut, true)
+  document.removeEventListener('focusin', handleEditorLinkFocusIn, true)
+  document.removeEventListener('focusout', handleEditorLinkFocusOut, true)
+  window.removeEventListener('resize', handleLinkPreviewViewportChange)
+  window.removeEventListener('scroll', handleLinkPreviewViewportChange, true)
   clearSaveTimer()
+  hideLinkPreview()
   toolbarObserver?.disconnect()
   toolbarObserver = null
   contentEditor.value?.destroy()
@@ -1750,7 +2036,10 @@ defineExpose({
                 </button>
               </div>
 
-              <div class="editor-content-editor-shell" :class="{ 'is-disabled': disabledState }">
+              <div
+                class="editor-content-editor-shell"
+                :class="{ 'is-disabled': disabledState }"
+              >
                 <EditorContent v-if="contentEditor" :editor="contentEditor" class="editor-content-editor" />
               </div>
 
@@ -1836,6 +2125,55 @@ defineExpose({
         </Transition>
       </div>
     </div>
+    <Teleport to="body">
+      <div
+        v-if="linkPreviewVisible"
+        ref="linkPreviewRef"
+        class="editor-link-preview"
+        :class="{ 'is-positioned': linkPreviewPositioned }"
+        :style="{
+          top: `${linkPreviewPosition.top}px`,
+          left: `${linkPreviewPosition.left}px`,
+        }"
+        role="group"
+        aria-label="链接地址预览"
+        @mouseenter="clearLinkPreviewHideTimer"
+        @mouseleave="scheduleLinkPreviewHide"
+        @focusin="clearLinkPreviewHideTimer"
+        @focusout="scheduleLinkPreviewHide"
+      >
+        <span class="editor-link-preview__href">
+          {{ linkPreviewHref }}
+        </span>
+        <button
+          type="button"
+          class="editor-link-preview__copy"
+          :class="{
+            'is-copying': linkCopyState === 'copying',
+            'is-copied': linkCopyState === 'copied',
+          }"
+          :aria-label="
+            linkCopyState === 'copying'
+              ? '正在复制链接'
+              : linkCopyState === 'copied'
+                ? '链接已复制'
+                : '复制链接地址'
+          "
+          :aria-busy="linkCopyState === 'copying'"
+          :disabled="linkCopyState === 'copying'"
+          @click="copyLinkPreviewHref"
+        >
+          <LoaderCircle
+            v-if="linkCopyState === 'copying'"
+            class="editor-link-preview__spinner"
+            :size="14"
+            :stroke-width="1.8"
+          />
+          <Check v-else-if="linkCopyState === 'copied'" :size="15" :stroke-width="2" />
+          <Copy v-else :size="14" :stroke-width="1.8" />
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -2632,6 +2970,105 @@ defineExpose({
 .editor-content-editor :deep(.editor-content-surface b) {
   font-weight: 700;
   font-synthesis: weight;
+}
+
+.editor-link-preview {
+  position: fixed;
+  z-index: 250;
+  display: flex;
+  max-width: min(32rem, calc(100vw - 1.5rem));
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  padding: 0.35rem 0.4rem 0.35rem 0.7rem;
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.editor-link-preview.is-positioned {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.editor-link-preview__href {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-text) 84%, var(--color-text-faint));
+  font-family: var(--font-mono, "SFMono-Regular", Consolas, monospace);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-link-preview__copy {
+  display: inline-flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: calc(var(--radius-sm) + 1px);
+  background: transparent;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.editor-link-preview__copy:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.editor-link-preview__copy:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.editor-link-preview__copy:disabled {
+  cursor: default;
+}
+
+.editor-link-preview__copy.is-copied {
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+  color: var(--color-success);
+}
+
+.editor-link-preview__spinner {
+  animation: editor-link-preview-spin 640ms linear infinite;
+}
+
+@keyframes editor-link-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.editor-link-preview__copy:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-link-preview__spinner {
+    animation-duration: 1.2s;
+  }
 }
 
 .editor-content-editor :deep(.editor-content-surface a) {
