@@ -10,6 +10,8 @@ const props = withDefaults(
     inset?: 'default' | 'article'
     variant?: 'default' | 'full'
     scrollMode?: 'sheet' | 'content'
+    backgroundScrollX?: number
+    backgroundScrollY?: number
   }>(),
   {
     open: false,
@@ -25,15 +27,66 @@ const emit = defineEmits<{
 
 let previousBodyOverflow = ''
 let previousHtmlOverflow = ''
+let previousBodyPosition = ''
+let previousBodyTop = ''
+let previousBodyLeft = ''
+let previousBodyRight = ''
+let previousBodyWidth = ''
+let lockedScrollX = 0
+let lockedScrollY = 0
+let bodyLockActive = false
 let visualOpenFrame: number | null = null
+let scrollBehaviorRestoreFrame: number | null = null
+let previousHtmlScrollBehavior = ''
 
 const visualOpen = ref(false)
+
+function clearScrollBehaviorRestoreFrame(restoreStyle = true) {
+  if (scrollBehaviorRestoreFrame !== null && typeof window !== 'undefined') {
+    window.cancelAnimationFrame(scrollBehaviorRestoreFrame)
+    scrollBehaviorRestoreFrame = null
+  }
+
+  if (restoreStyle && typeof document !== 'undefined') {
+    document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior
+  }
+}
 
 function restoreBodyLock() {
   if (typeof document === 'undefined') return
 
+  if (bodyLockActive && typeof window !== 'undefined') {
+    clearScrollBehaviorRestoreFrame()
+    previousHtmlScrollBehavior = document.documentElement.style.scrollBehavior
+    document.documentElement.style.setProperty('scroll-behavior', 'auto', 'important')
+  }
+
   document.documentElement.style.overflow = previousHtmlOverflow
   document.body.style.overflow = previousBodyOverflow
+  document.body.style.position = previousBodyPosition
+  document.body.style.top = previousBodyTop
+  document.body.style.left = previousBodyLeft
+  document.body.style.right = previousBodyRight
+  document.body.style.width = previousBodyWidth
+
+  if (bodyLockActive && typeof window !== 'undefined') {
+    document.documentElement.scrollTop = lockedScrollY
+    document.documentElement.scrollLeft = lockedScrollX
+    document.body.scrollTop = lockedScrollY
+    document.body.scrollLeft = lockedScrollX
+    window.scrollTo({
+      left: lockedScrollX,
+      top: lockedScrollY,
+      behavior: 'auto',
+    })
+
+    scrollBehaviorRestoreFrame = window.requestAnimationFrame(() => {
+      document.documentElement.style.scrollBehavior = previousHtmlScrollBehavior
+      scrollBehaviorRestoreFrame = null
+    })
+  }
+
+  bodyLockActive = false
 }
 
 function syncBodyLock(locked: boolean) {
@@ -44,11 +97,31 @@ function syncBodyLock(locked: boolean) {
     return
   }
 
+  if (bodyLockActive) return
+
+  clearScrollBehaviorRestoreFrame()
   previousHtmlOverflow = document.documentElement.style.overflow
   previousBodyOverflow = document.body.style.overflow
+  previousBodyPosition = document.body.style.position
+  previousBodyTop = document.body.style.top
+  previousBodyLeft = document.body.style.left
+  previousBodyRight = document.body.style.right
+  previousBodyWidth = document.body.style.width
+  lockedScrollX = typeof props.backgroundScrollX === 'number' && Number.isFinite(props.backgroundScrollX)
+    ? props.backgroundScrollX
+    : window.scrollX
+  lockedScrollY = typeof props.backgroundScrollY === 'number' && Number.isFinite(props.backgroundScrollY)
+    ? props.backgroundScrollY
+    : window.scrollY
+  bodyLockActive = true
 
   document.documentElement.style.overflow = 'hidden'
   document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.top = `-${lockedScrollY}px`
+  document.body.style.left = `-${lockedScrollX}px`
+  document.body.style.right = '0'
+  document.body.style.width = '100%'
 }
 
 function onWindowKeydown(event: KeyboardEvent) {

@@ -1,4 +1,5 @@
 import request from '../request'
+import { normalizeBackendDateTime } from '@/shared/utils/dateTime'
 import {
     normalizePendingReviewListResp,
     normalizeReviewLogListResp,
@@ -26,7 +27,7 @@ export function submitReviewAction(
 ): Promise<ReviewActionRespDto> {
     return request.post<{ status?: string; updatedAt?: string }>(`${REVIEW_BASE}/${articleId}/decision`, payload).then((article) => ({
         status: article.status ?? payload.action,
-        reviewedAt: article.updatedAt ?? new Date().toISOString(),
+        reviewedAt: normalizeBackendDateTime(article.updatedAt) ?? new Date().toISOString(),
     }))
 }
 

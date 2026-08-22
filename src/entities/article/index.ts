@@ -22,6 +22,7 @@ export {
     mapArticleAuthorDtoToVm,
     mapArticleCardDtoToVm,
     mapArticleDetailDtoToVm,
+    mapArticleDetailVmToCardVm,
     mapArticleDraftDtoToVm,
     mapArticleCardListDtoToVm,
 } from './model/article.mapper'

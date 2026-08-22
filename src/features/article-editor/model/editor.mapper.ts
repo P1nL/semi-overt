@@ -8,7 +8,9 @@ import {
     calcWordCount,
     resolveDurationCategory,
 } from '@/shared/utils/article'
-import type { ArticleDetailVm } from '@/entities/article'
+import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
+import type { ArticleDetailVm } from '@/entities/article/model/article.types'
+import type { SaveDraftRespDto } from '@/shared/types/api'
 import type {
     EditorDraftPayload,
     EditorFormValues,
@@ -65,6 +67,38 @@ export function mapEditorFormToDraftPayload(form: EditorFormValues): EditorDraft
         coverColor: form.coverColor.trim(),
         clientWordCount: stats.wordCount,
     }
+}
+
+export function mapSavedEditorFormToArticleDetailVm(
+    current: ArticleDetailVm,
+    form: EditorFormValues,
+    response: SaveDraftRespDto,
+): ArticleDetailVm {
+    return mapArticleDetailDtoToVm({
+        id: current.id,
+        title: form.title.trim() || null,
+        content: form.content || '',
+        summary: form.summary.trim() || null,
+        coverUrl: form.coverUrl.trim() || null,
+        coverColor: form.coverColor.trim() || null,
+        wordCount: response.wordCount,
+        readMinutes: response.readMinutes,
+        durationCategory: response.durationCategory,
+        status: response.status,
+        author: {
+            id: current.author.id,
+            username: current.author.username,
+            nickname: current.author.displayName,
+            avatarUrl: current.author.avatarUrl,
+        },
+        assignedAdminId: current.assignedAdminId,
+        latestReviewReason: current.latestReviewReason,
+        submitCount: current.submitCount,
+        lastSubmittedAt: current.lastSubmittedAtRaw,
+        draftVisible: response.draftVisible,
+        publishedAt: null,
+        updatedAt: response.savedAt,
+    })
 }
 
 export function validateEditorForm(form: EditorFormValues): EditorValidationResult {

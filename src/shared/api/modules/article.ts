@@ -5,6 +5,7 @@ import {
     type BackendArticleDetailResp,
 } from '../adapters'
 import { ARTICLE_STATUS } from '@/shared/constants/article'
+import { normalizeBackendDateTime } from '@/shared/utils/dateTime'
 import type {
     AdminDeleteArticleRespDto,
     ArticleDetailRespDto,
@@ -40,7 +41,7 @@ export function createArticle(): Promise<CreateArticleRespDto> {
 
 export function saveDraft(articleId: number | string, payload: SaveDraftReqDto): Promise<SaveDraftRespDto> {
     return request.put<BackendArticleDetailResp>(`${ARTICLE_BASE}/${articleId}/draft`, payload).then((article) => ({
-        savedAt: article.updatedAt ?? new Date().toISOString(),
+        savedAt: normalizeBackendDateTime(article.updatedAt) ?? new Date().toISOString(),
         wordCount: article.wordCount ?? 0,
         readMinutes: Number(article.readMinutes ?? 0),
         durationCategory: article.durationCategory ?? 'SHORT',
@@ -58,7 +59,7 @@ export function getDraftList(): Promise<DraftItemRespDto[]> {
                 title: article.title ?? null,
                 status: article.status ?? 'DRAFT',
                 wordCount: article.wordCount ?? 0,
-                updatedAt: article.updatedAt ?? article.createdAt ?? new Date().toISOString(),
+                updatedAt: normalizeBackendDateTime(article.updatedAt ?? article.createdAt) ?? new Date().toISOString(),
                 latestReason: article.latestReason ?? article.rejectReason ?? null,
                 draftVisible: article.draftVisible ?? false,
             })),
@@ -79,7 +80,7 @@ export function submitArticle(articleId: number | string): Promise<SubmitArticle
     return request.post<BackendArticleDetailResp>(`${ARTICLE_BASE}/${articleId}/submit`).then((article) => ({
         status: article.status ?? 'PENDING',
         submitCount: article.submitCount ?? 0,
-        lastSubmittedAt: article.lastSubmittedAt ?? article.updatedAt ?? new Date().toISOString(),
+        lastSubmittedAt: normalizeBackendDateTime(article.lastSubmittedAt ?? article.updatedAt) ?? new Date().toISOString(),
     }))
 }
 

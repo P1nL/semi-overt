@@ -1,3 +1,4 @@
+import type { ArticleDetailVm } from '@/entities/article'
 import type { ArticleDurationCategory } from '@/shared/constants/article'
 import type { SaveDraftReqDto } from '@/shared/types/api'
 
@@ -28,6 +29,7 @@ export interface EditorDraftSavedPayload {
     readMinutes: number
     durationCategory: string
     status: string
+    article: ArticleDetailVm
 }
 
 export type EditorDraftPayload = SaveDraftReqDto

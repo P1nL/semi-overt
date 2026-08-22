@@ -247,6 +247,24 @@ export function mapArticleDetailDtoToVm(dto: ArticleDetailEntityDto): ArticleDet
     }
 }
 
+export function mapArticleDetailVmToCardVm(article: ArticleDetailVm): ArticleCardVm {
+    return {
+        id: article.id,
+        title: article.title,
+        titleText: article.title,
+        summary: createArticleSummaryVm(article.summary.rawText, article.content),
+        cover: article.cover,
+        meta: article.meta,
+        status: article.status,
+        author: article.author,
+        latestReason: article.latestReviewReason,
+        draftVisible: article.draftVisible,
+        articlePath: article.articlePath,
+        editPath: article.editPath,
+        reviewPath: article.reviewPath,
+    }
+}
+
 export function mapArticleDraftDtoToVm(dto: ArticleDraftEntityDto): ArticleDraftVm {
     const title = dto.title?.trim() || ARTICLE_DEFAULT_TITLE
 

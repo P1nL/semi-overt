@@ -41,6 +41,12 @@ export function createAppRouter() {
         history: createWebHistory(ENV.routerBase),
         routes,
         scrollBehavior(to, from, savedPosition) {
+            // Sheet 页面始终叠加在仍然挂载的背景页之上。打开或关闭 Sheet 时
+            // 不需要重新应用 history.savedPosition，否则会产生一次可见的滚动定位。
+            if (to.meta.presentation === 'sheet' || from.meta.presentation === 'sheet') {
+                return false
+            }
+
             if (savedPosition) return savedPosition
             if (to.hash) {
                 return {

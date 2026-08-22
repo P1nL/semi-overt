@@ -36,6 +36,7 @@ import {
   createEmptyEditorFormValues,
   mapArticleDetailVmToEditorFormValues,
   mapEditorFormToDraftPayload,
+  mapSavedEditorFormToArticleDetailVm,
   renderMarkdownToEditorHtml,
   serializeEditorToMarkdown,
   validateEditorForm,
@@ -123,6 +124,7 @@ const errors = reactive<{
 })
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let activeSavePromise: Promise<boolean> | null = null
 let toolbarObserver: IntersectionObserver | null = null
 const MIN_SAVE_FEEDBACK_MS = 560
 
@@ -475,51 +477,55 @@ function syncValidationErrors() {
   return validation.valid
 }
 
-async function saveDraft(showToast = false): Promise<boolean> {
-  saveError.value = ''
-
-  if (disabledState.value || loading.value || editorStore.submitting) {
-    clearSaveTimer()
-    return false
-  }
-
-  if (!syncValidationErrors()) {
-    return false
-  }
-
-  const { articleId, created } = await ensureArticleId()
-  editorStore.setSummaryIntentionallyEmpty(articleId, form.summary.trim().length === 0)
+async function persistDraft(
+  submittedValues: EditorFormValues,
+  showToast: boolean,
+): Promise<boolean> {
   const saveStartedAt = Date.now()
   editorStore.saving = true
 
   try {
+    const { articleId, created } = await ensureArticleId()
+    editorStore.setSummaryIntentionallyEmpty(articleId, submittedValues.summary.trim().length === 0)
+
     const response = await articleApi.saveDraft(
       articleId,
-      mapEditorFormToDraftPayload(snapshotFormValues()),
+      mapEditorFormToDraftPayload(submittedValues),
     )
+    const submittedStats = buildEditorStats(submittedValues.content, submittedValues.title)
+    const hasNewerChanges = hasFormDifferences(submittedValues)
 
-    const localStats = buildEditorStats(form.content, form.title)
-    form.wordCount = localStats.wordCount
-    form.readMinutes = localStats.readMinutes
-    form.durationCategory = localStats.durationCategory
-    editorStore.dirty = false
+    if (!hasNewerChanges) {
+      form.wordCount = submittedStats.wordCount
+      form.readMinutes = submittedStats.readMinutes
+      form.durationCategory = submittedStats.durationCategory
+    }
+    editorStore.dirty = hasNewerChanges
+
+    const currentArticle = editorStore.currentArticle
+    let savedArticle
+
+    if (currentArticle && String(currentArticle.id) === String(articleId)) {
+      savedArticle = mapSavedEditorFormToArticleDetailVm(
+        currentArticle,
+        submittedValues,
+        response,
+      )
+      editorStore.setCurrentArticle(savedArticle, response.savedAt)
+    } else {
+      savedArticle = await editorStore.loadArticleDetail(articleId, true)
+    }
 
     const payload: EditorDraftSavedPayload = {
       savedAt: response.savedAt,
-      wordCount: localStats.wordCount,
-      readMinutes: localStats.readMinutes,
-      durationCategory: localStats.durationCategory,
+      wordCount: submittedStats.wordCount,
+      readMinutes: submittedStats.readMinutes,
+      durationCategory: submittedStats.durationCategory,
       status: response.status,
+      article: savedArticle,
     }
 
     emit('draft-saved', payload)
-
-    if (
-      !editorStore.currentArticle ||
-      String(editorStore.currentArticle.id) !== String(articleId)
-    ) {
-      await editorStore.loadArticleDetail(articleId, true)
-    }
 
     if (created) {
       emit('created', articleId)
@@ -552,6 +558,38 @@ async function saveDraft(showToast = false): Promise<boolean> {
   }
 }
 
+async function saveDraft(showToast = false): Promise<boolean> {
+  saveError.value = ''
+  clearSaveTimer()
+
+  if (disabledState.value || loading.value || editorStore.submitting) {
+    return false
+  }
+
+  if (activeSavePromise) {
+    const previousSaved = await activeSavePromise
+    if (!previousSaved) return false
+    if (!editorStore.dirty) return true
+    return saveDraft(showToast)
+  }
+
+  if (!syncValidationErrors()) {
+    return false
+  }
+
+  const submittedValues = snapshotFormValues()
+  const request = persistDraft(submittedValues, showToast)
+  activeSavePromise = request
+
+  try {
+    return await request
+  } finally {
+    if (activeSavePromise === request) {
+      activeSavePromise = null
+    }
+  }
+}
+
 function scheduleAutoSave() {
   if (disabledState.value || editorStore.submitting) {
     clearSaveTimer()
@@ -560,6 +598,7 @@ function scheduleAutoSave() {
 
   clearSaveTimer()
   saveTimer = setTimeout(() => {
+    saveTimer = null
     void saveDraft(false)
   }, props.autoSaveDelay)
 }

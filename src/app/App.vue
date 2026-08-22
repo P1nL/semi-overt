@@ -57,6 +57,8 @@ const backgroundRoute = shallowRef<RouteLocationNormalizedLoaded | null>(null)
 const displayedSheetRoute = shallowRef<RouteLocationNormalizedLoaded | null>(null)
 const sheetVisible = ref(false)
 const sheetOpening = ref(false)
+const sheetBackgroundScrollX = ref(0)
+const sheetBackgroundScrollY = ref(0)
 const authDialogOpen = ref(false)
 
 const liveRoute = computed(() => router.currentRoute.value)
@@ -349,6 +351,13 @@ async function syncSheetRouteState(
   if (nextIsSheet) {
     const requestId = ++sheetOpenRequestId
 
+    if (!previousIsSheet && typeof window !== 'undefined') {
+      // 路由的滚动处理和 Sheet 内部组件挂载都可能改变 window.scrollY。
+      // 在同步路由 watcher 中先保存背景页位置，再交给 PageSheet 锁定和恢复。
+      sheetBackgroundScrollX.value = window.scrollX
+      sheetBackgroundScrollY.value = window.scrollY
+    }
+
     if (!previousIsSheet && isAuthRoute(previousRoute)) {
       backgroundRoute.value = consumeSavedSheetBackgroundRoute()
     } else if (!previousIsSheet && previousSnapshot) {
@@ -517,19 +526,17 @@ onBeforeUnmount(() => {
       />
 
       <RouterView v-if="shouldRenderBaseRoute" v-slot="{ Component, route: currentRoute }" :route="baseRenderRoute">
-        <Transition v-if="shouldAnimateBaseRoute" name="page-fade" mode="out-in">
+        <Transition
+          name="page-fade"
+          mode="out-in"
+          :css="shouldAnimateBaseRoute"
+        >
           <component
             :is="resolveRouteViewComponent(Component)"
             :key="getRouteViewKey(currentRoute)"
             v-bind="getRouteViewProps(currentRoute)"
           />
         </Transition>
-        <component
-          v-else
-          :is="resolveRouteViewComponent(Component)"
-          :key="getRouteViewKey(currentRoute)"
-          v-bind="getRouteViewProps(currentRoute)"
-        />
       </RouterView>
     </div>
 
@@ -563,6 +570,8 @@ onBeforeUnmount(() => {
       :inset="activeSheetInset"
       :variant="activeSheetVariant"
       :scroll-mode="activeSheetScroll"
+      :background-scroll-x="sheetBackgroundScrollX"
+      :background-scroll-y="sheetBackgroundScrollY"
       @close="closeSheet"
     >
       <RouterView

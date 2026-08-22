@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import { ARTICLE_STATUS_BADGE_VARIANT_MAP, ARTICLE_STATUS_LABEL_MAP } from '@/entities/article/model/article.constants'
-import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
+import { mapArticleDetailDtoToVm, mapArticleDetailVmToCardVm } from '@/entities/article/model/article.mapper'
+import type { ArticleCardVm } from '@/entities/article/model/article.types'
+import type { UserProfileVm } from '@/entities/user'
 import { cancelReviewByArticleId } from '@/features/article-cancel-review'
 import {
   ArticleEditorForm,
@@ -22,6 +24,7 @@ import { ROUTE_NAME } from '@/shared/constants/routes'
 import { STORAGE_KEY } from '@/shared/constants/storage'
 import { queryClient } from '@/shared/lib/queryClient'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
+import { normalizeBackendDateTime } from '@/shared/utils/dateTime'
 import { getErrorMessage } from '@/shared/utils/error'
 import { localStore } from '@/shared/utils/storage'
 import { calcWordCount, canCancelReview, canEditArticle, canSubmitArticle } from '@/shared/utils/article'
@@ -126,16 +129,11 @@ const showCancelAction = computed(
   () => Boolean(currentRouteArticle.value) && canCancelReview(currentStatus.value),
 )
 function parseLocalDateTime(value?: string | null): number {
-  if (!value) return 0
+  const normalized = normalizeBackendDateTime(value)
+  if (!normalized) return 0
 
-  const direct = new Date(value).getTime()
-  if (!Number.isNaN(direct)) {
-    return direct
-  }
-
-  const normalized = value.trim().replace(' ', 'T')
-  const local = new Date(normalized).getTime()
-  return Number.isNaN(local) ? 0 : local
+  const parsed = new Date(normalized).getTime()
+  return Number.isNaN(parsed) ? 0 : parsed
 }
 
 function parseCooldownUntilFromErrorDetails(error: unknown): number {
@@ -550,17 +548,40 @@ async function handleSaveDraft() {
   setSaveFeedback(saved ? 'saved' : 'error', saved ? 900 : 1400)
 }
 
+function patchProfilePageArticle(profile: UserProfileVm, article: ArticleCardVm): UserProfileVm {
+  let matched = false
+  const articles = profile.articles.map((current) => {
+    if (String(current.id) !== String(article.id)) return current
+    matched = true
+    return article
+  })
+
+  return matched ? { ...profile, articles } : profile
+}
+
+function patchProfileCaches(article: ArticleCardVm) {
+  queryClient.setQueriesData<{ pages?: UserProfileVm[] }>(
+    { queryKey: queryKeys.userProfileRoot },
+    (current) => {
+      if (!current?.pages) return current
+
+      const pages = current.pages.map((page) => patchProfilePageArticle(page, article))
+      return { ...current, pages }
+    },
+  )
+}
+
 function onDraftSaved(payload: EditorDraftSavedPayload) {
   pageError.value = ''
   submitError.value = ''
   editorStore.setLastSavedAt(payload.savedAt)
   draftStore.reset()
 
-  if (articleId.value) {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.articleDetail(articleId.value),
-    })
-  }
+  queryClient.setQueryData(
+    queryKeys.articleDetail(articleId.value || String(payload.article.id)),
+    payload.article,
+  )
+  patchProfileCaches(mapArticleDetailVmToCardVm(payload.article))
 
   void queryClient.invalidateQueries({
     queryKey: queryKeys.userProfileRoot,
@@ -746,6 +767,17 @@ async function onCanceled() {
   if (!articleId.value) return
   await editorStore.loadArticleDetail(articleId.value, true)
 }
+
+onBeforeRouteLeave(async () => {
+  if (!editorStore.dirty || isReadOnly.value) return true
+
+  const saved = await editorFormRef.value?.saveDraft(false)
+  if (saved) return true
+
+  const message = pageError.value || '草稿尚未保存，请重试后再关闭'
+  toast.error(message)
+  return false
+})
 
 watch(publishConfirming, (value) => {
   syncPublishConfirmListeners(value || cancelConfirming.value || publishCooldownRevealed.value)

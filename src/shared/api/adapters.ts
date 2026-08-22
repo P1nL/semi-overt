@@ -15,6 +15,7 @@ import type {
     UserSearchItemDto,
 } from '@/shared/types/api'
 import { resolveAssetUrl } from '@/shared/utils/asset'
+import { normalizeBackendDateTime } from '@/shared/utils/dateTime'
 
 export interface BackendAuthResp {
     token: string
@@ -238,8 +239,10 @@ function normalizeArticleCardDto(raw: BackendArticleResp): ArticleCardDto & { dr
         wordCount: raw.wordCount ?? undefined,
         status,
         author: normalizeAuthor(raw),
-        publishedAt: raw.publishedAt ?? (status === 'APPROVED' ? raw.updatedAt ?? raw.createdAt ?? null : null),
-        updatedAt: raw.updatedAt ?? null,
+        publishedAt: normalizeBackendDateTime(
+            raw.publishedAt ?? (status === 'APPROVED' ? raw.updatedAt ?? raw.createdAt ?? null : null),
+        ),
+        updatedAt: normalizeBackendDateTime(raw.updatedAt),
         rejectReason: raw.rejectReason ?? null,
         draftVisible: raw.draftVisible ?? false,
     }
@@ -301,9 +304,9 @@ export function normalizeArticleDetailDto(raw: BackendArticleDetailResp): Articl
         latestReviewReason: raw.latestReviewReason ?? raw.rejectReason ?? null,
         assignedAdminId: raw.assignedAdminId ?? null,
         submitCount: raw.submitCount ?? 0,
-        lastSubmittedAt: raw.lastSubmittedAt ?? null,
-        publishedAt: raw.publishedAt ?? null,
-        updatedAt: raw.updatedAt ?? null,
+        lastSubmittedAt: normalizeBackendDateTime(raw.lastSubmittedAt),
+        publishedAt: normalizeBackendDateTime(raw.publishedAt),
+        updatedAt: normalizeBackendDateTime(raw.updatedAt),
         draftVisible: raw.draftVisible ?? false,
     }
 }
@@ -422,7 +425,7 @@ export function normalizePendingReviewListResp(
                 id: item.id ?? item.articleId ?? 0,
                 title: item.title,
                 submitCount: item.submitCount,
-                submittedAt: item.submittedAt,
+                submittedAt: normalizeBackendDateTime(item.submittedAt) ?? item.submittedAt,
                 wordCount: item.wordCount,
                 assignedAdminId: item.assignedAdminId ?? null,
                 author: {
@@ -461,7 +464,7 @@ export function normalizeReviewLogListResp(raw: BackendReviewLogResp[]): ReviewL
                     avatarUrl: null,
                 }
                 : null,
-        createdAt: item.createdAt,
+        createdAt: normalizeBackendDateTime(item.createdAt) ?? item.createdAt,
     }))
 }
 

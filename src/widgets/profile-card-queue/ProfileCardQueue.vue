@@ -437,15 +437,53 @@ async function fadeInDeck() {
   })
 }
 
+function hasSameArticleSet(currentArticles: ArticleCardVm[], nextArticles: ArticleCardVm[]) {
+  if (currentArticles.length !== nextArticles.length) return false
+
+  const currentIds = new Set(currentArticles.map((article) => String(article.id)))
+  return nextArticles.every((article) => currentIds.has(String(article.id)))
+}
+
+async function syncArticlesInPlace(
+  nextArticles: ArticleCardVm[],
+  nextVisualOrder: number[],
+  token: number,
+) {
+  const currentTargets = getFadeTargets()
+  gsap.killTweensOf(currentTargets)
+
+  displayedArticles.value = [...nextArticles]
+  visualOrder.value = [...nextVisualOrder]
+  await nextTick()
+
+  if (token !== articleTransitionToken) return
+
+  const nextTargets = getFadeTargets()
+  gsap.killTweensOf(nextTargets)
+  gsap.set(nextTargets, { clearProps: 'opacity,transform' })
+
+  if (!isGridMode.value) {
+    applyStackPositions(false)
+  }
+}
+
 async function syncArticlesWithFade(nextArticles: ArticleCardVm[]) {
   const token = ++articleTransitionToken
+  const currentArticles = displayedArticles.value
   const nextVisualOrder = buildVisualOrderForArticles(
-    displayedArticles.value,
+    currentArticles,
     nextArticles,
     visualOrder.value,
   )
 
-  // 离场：只在有 cardsRef（堆叠模式）或平铺模式有可见卡片时淡出
+  // 保存草稿、审核状态同步等原位数据更新不应让整组卡片淡出。
+  // 即使后端按 updatedAt 调整了顺序，只要文章集合不变，也保留现有视觉堆叠。
+  if (hasSameArticleSet(currentArticles, nextArticles)) {
+    await syncArticlesInPlace(nextArticles, nextVisualOrder, token)
+    return
+  }
+
+  // 新增、删除或切换到不同文章集合时，保留完整离场/入场过渡。
   const leavingTargets = getFadeTargets()
   if (leavingTargets.length) {
     await waitForTween(leavingTargets, {
