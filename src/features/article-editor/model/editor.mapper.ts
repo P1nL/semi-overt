@@ -62,7 +62,8 @@ export function mapEditorFormToDraftPayload(form: EditorFormValues): EditorDraft
     return {
         title: form.title.trim(),
         summary: form.summary.trim(),
-        content: form.content || null,
+        // 空字符串表示用户明确清空正文；null 在后端 PATCH 语义中表示“不修改”。
+        content: form.content,
         coverUrl: form.coverUrl.trim(),
         coverColor: form.coverColor.trim(),
         clientWordCount: stats.wordCount,

@@ -531,11 +531,12 @@ onBeforeUnmount(() => {
           mode="out-in"
           :css="shouldAnimateBaseRoute"
         >
-          <component
-            :is="resolveRouteViewComponent(Component)"
-            :key="getRouteViewKey(currentRoute)"
-            v-bind="getRouteViewProps(currentRoute)"
-          />
+          <div :key="getRouteViewKey(currentRoute)" class="min-h-0">
+            <component
+              :is="resolveRouteViewComponent(Component)"
+              v-bind="getRouteViewProps(currentRoute)"
+            />
+          </div>
         </Transition>
       </RouterView>
     </div>
