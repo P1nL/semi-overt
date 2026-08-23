@@ -46,6 +46,14 @@ const MAX_DEVICE_PIXEL_RATIO = 1.35
 const DARK_TRAVEL_SCALE = 0.72
 const DARK_PULSE_SCALE = 0.78
 const DARK_GLOBAL_DRIFT_SCALE = 0.82
+const DARK_GLOW_GRAY_LIGHT: [number, number, number] = [50, 54, 56]
+const DARK_GLOW_GRAY_DARK: [number, number, number] = [39, 43, 44]
+const DARK_GLOW_BASE_ALPHA = 0.9
+const DARK_GLOW_MIN_ALPHA = 0.3
+const DARK_GLOW_SATURATION = 108
+const DARK_GLOW_BLUR = 44
+const DARK_GLOW_RADIUS_SCALE = 0.98
+const DARK_INTERACTIVE_ALPHA_MAX = 0.74
 
 const GRID_RADIUS = 150
 
@@ -76,16 +84,16 @@ const lightPoints: MeshPoint[] = [
 ]
 
 const darkPoints: MeshPoint[] = [
-  // color1: 18,113,255 — 亮蓝，主光晕，大范围漂移
-  { color: [18, 113, 255], x: 0.18, y: 0.17, r: 0.34, ax: 0.06, ay: 0.048, dx: 0.02, dy: 0.012, sx: 0.16, sy: 0.12, pulse: 0.42, ox: 0.4, oy: 1.1 },
-  // color2: 107,74,255 — 蓝紫，右上角
-  { color: [107, 74, 255], x: 0.79, y: 0.24, r: 0.31, ax: 0.034, ay: 0.026, dx: 0.012, dy: 0.011, sx: 0.11, sy: 0.14, pulse: 0.36, ox: 1.8, oy: 0.6 },
-  // color5: 80,47,122 — 深紫，中央大底色光晕
-  { color: [80, 47, 122], x: 0.5, y: 0.52, r: 0.48, ax: 0.02, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.09, sy: 0.1, pulse: 0.28, ox: 2.7, oy: 1.4 },
-  // color4: 50,160,220 — 天蓝，左下
-  { color: [50, 160, 220], x: 0.38, y: 0.7, r: 0.36, ax: 0.03, ay: 0.024, dx: 0.012, dy: 0.01, sx: 0.13, sy: 0.17, pulse: 0.39, ox: 3.6, oy: 1.8 },
-  // color3: 100,100,255 — 中蓝紫，右中，cluster 小光晕
-  { color: [100, 100, 255], x: 0.66, y: 0.5, r: 0.24, ax: 0.022, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.15, sy: 0.12, pulse: 0.52, ox: 4.1, oy: 2.4 },
+  // #323638 — 主光晕，大范围漂移
+  { color: DARK_GLOW_GRAY_LIGHT, x: 0.18, y: 0.17, r: 0.34, ax: 0.06, ay: 0.048, dx: 0.02, dy: 0.012, sx: 0.16, sy: 0.12, pulse: 0.42, ox: 0.4, oy: 1.1 },
+  // #272b2c — 右上角
+  { color: DARK_GLOW_GRAY_DARK, x: 0.79, y: 0.24, r: 0.31, ax: 0.034, ay: 0.026, dx: 0.012, dy: 0.011, sx: 0.11, sy: 0.14, pulse: 0.36, ox: 1.8, oy: 0.6 },
+  // #323638 — 中央大底色光晕
+  { color: DARK_GLOW_GRAY_LIGHT, x: 0.5, y: 0.52, r: 0.48, ax: 0.02, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.09, sy: 0.1, pulse: 0.28, ox: 2.7, oy: 1.4 },
+  // #272b2c — 左下
+  { color: DARK_GLOW_GRAY_DARK, x: 0.38, y: 0.7, r: 0.36, ax: 0.03, ay: 0.024, dx: 0.012, dy: 0.01, sx: 0.13, sy: 0.17, pulse: 0.39, ox: 3.6, oy: 1.8 },
+  // #323638 — 右中 cluster 小光晕
+  { color: DARK_GLOW_GRAY_LIGHT, x: 0.66, y: 0.5, r: 0.24, ax: 0.022, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.15, sy: 0.12, pulse: 0.52, ox: 4.1, oy: 2.4 },
 ]
 
 let frameId = 0
@@ -98,6 +106,7 @@ let themeObserver: MutationObserver | null = null
 let lastRenderedAt = 0
 let animationLoopEnabled = false
 let animationStartTimer: number | null = null
+let prefersReducedMotion = false
 
 function easeOutQuart(value: number) {
   return 1 - (1 - value) ** 4
@@ -204,6 +213,28 @@ function resizeCanvas() {
   canvas.height = Math.floor(window.innerHeight * dpr)
   canvas.style.width = `${window.innerWidth}px`
   canvas.style.height = `${window.innerHeight}px`
+}
+
+function handleResize() {
+  resizeCanvas()
+
+  if (prefersReducedMotion) {
+    renderFrame(performance.now())
+  }
+}
+
+function applyThemeFromDom() {
+  const nextTheme = resolveTheme()
+
+  if (!prefersReducedMotion) {
+    beginThemeTransition(nextTheme)
+    return
+  }
+
+  currentTheme = nextTheme
+  targetTheme = nextTheme
+  transitionFromTheme = null
+  renderFrame(performance.now())
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, theme: MeshTheme) {
@@ -413,9 +444,9 @@ function drawMeshLayer(
   time: number,
 ) {
   const points = theme === 'dark' ? darkPoints : lightPoints
-  const baseAlpha = theme === 'dark' ? 0.84 : 0.98
-  const blurAmount = theme === 'dark' ? 58 : 46
-  const saturation = theme === 'dark' ? 124 : 118
+  const baseAlpha = theme === 'dark' ? DARK_GLOW_BASE_ALPHA : 0.98
+  const blurAmount = theme === 'dark' ? DARK_GLOW_BLUR : 46
+  const saturation = theme === 'dark' ? DARK_GLOW_SATURATION : 118
   const samples: MeshSample[] = []
   const globalDriftX =
     (Math.sin(time * (theme === 'dark' ? 0.16 : 0.14) + 0.8) * (theme === 'dark' ? 0.092 : 0.032) +
@@ -429,7 +460,7 @@ function drawMeshLayer(
     (theme === 'dark' ? DARK_GLOBAL_DRIFT_SCALE : 1)
 
   ctx.save()
-  ctx.globalCompositeOperation = theme === 'dark' ? 'lighter' : 'source-over'
+  ctx.globalCompositeOperation = 'source-over'
   ctx.filter = `blur(${blurAmount}px) saturate(${saturation}%)`
 
   points.forEach((point, index) => {
@@ -488,7 +519,12 @@ function drawMeshLayer(
       1 +
       Math.sin(time * point.pulse + point.ox) * (theme === 'dark' ? 0.09 * DARK_PULSE_SCALE : 0.065) +
       Math.cos(time * (point.pulse * 0.56 + 0.08) + point.oy) * (theme === 'dark' ? 0.028 * DARK_PULSE_SCALE : 0.02)
-    const radius = Math.min(width, height) * point.r * pulse * 1.12
+    const radius =
+      Math.min(width, height) *
+      point.r *
+      pulse *
+      1.12 *
+      (theme === 'dark' ? DARK_GLOW_RADIUS_SCALE : 1)
 
     let alpha = baseAlpha
 
@@ -512,7 +548,7 @@ function drawMeshLayer(
       x,
       y,
       radius,
-      alpha: Math.max(0.22, Math.min(alpha, 1)),
+      alpha: Math.max(theme === 'dark' ? DARK_GLOW_MIN_ALPHA : 0.22, Math.min(alpha, 1)),
     }
   })
 
@@ -557,11 +593,7 @@ function drawMeshLayer(
   }
 
   samples.forEach((sample, index) => {
-    const useCluster =
-      (theme === 'light' && index === 3) ||
-      (theme === 'dark' && (index === 0 || index === 4))
-
-    if (useCluster) {
+    if (theme === 'light' && index === 3) {
       drawCluster(ctx, sample, points[index].color, time, points[index].ox)
       return
     }
@@ -569,40 +601,13 @@ function drawMeshLayer(
     drawPoint(ctx, sample.x, sample.y, sample.radius, points[index].color, sample.alpha)
   })
 
-  // interactive 鼠标跟随光晕：color-interactive = 140,100,255（仅暗色）
+  // interactive 鼠标跟随光晕：#323638（仅暗色）
   if (theme === 'dark' && pointer.active) {
-    const interactiveRadius = Math.min(width, height) * 0.46
-    const interactiveAlpha = Math.min(0.7, pointer.wakeEnergy * 0.12 + 0.28)
-    drawPoint(ctx, pointer.wakeX, pointer.wakeY, interactiveRadius, [140, 100, 255], interactiveAlpha)
+    const interactiveRadius = Math.min(width, height) * 0.46 * DARK_GLOW_RADIUS_SCALE
+    const interactiveAlpha = Math.min(DARK_INTERACTIVE_ALPHA_MAX, pointer.wakeEnergy * 0.1 + 0.24)
+    drawPoint(ctx, pointer.wakeX, pointer.wakeY, interactiveRadius, DARK_GLOW_GRAY_LIGHT, interactiveAlpha)
   }
 
-  ctx.restore()
-}
-
-function drawThemeGlow(ctx: CanvasRenderingContext2D, width: number, height: number, theme: MeshTheme) {
-  ctx.save()
-  ctx.globalCompositeOperation = theme === 'dark' ? 'soft-light' : 'source-over'
-
-  const glow = ctx.createRadialGradient(
-    width * 0.5,
-    height * (theme === 'dark' ? 0.48 : 0.44),
-    0,
-    width * 0.5,
-    height * (theme === 'dark' ? 0.48 : 0.44),
-    Math.max(width, height) * (theme === 'dark' ? 0.72 : 0.76),
-  )
-
-  if (theme === 'dark') {
-    glow.addColorStop(0, 'rgba(255,255,255,0.07)')
-    glow.addColorStop(1, 'rgba(255,255,255,0)')
-  } else {
-    glow.addColorStop(0, 'rgba(255,255,255,0.3)')
-    glow.addColorStop(0.42, 'rgba(214,234,255,0.2)')
-    glow.addColorStop(1, 'rgba(255,255,255,0)')
-  }
-
-  ctx.fillStyle = glow
-  ctx.fillRect(0, 0, width, height)
   ctx.restore()
 }
 
@@ -626,7 +631,6 @@ function drawScene(
     drawInteractiveGrid(ctx, width, height, time)
   } else {
     drawMeshLayer(ctx, width, height, theme, time)
-    drawThemeGlow(ctx, width, height, theme)
   }
 
   ctx.restore()
@@ -647,7 +651,7 @@ function renderFrame(now: number) {
 
   const width = window.innerWidth
   const height = window.innerHeight
-  const time = now * 0.00136
+  const time = prefersReducedMotion ? 0 : now * 0.00136
 
   const prevX = pointer.x
   const prevY = pointer.y
@@ -708,25 +712,27 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+  prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   currentTheme = resolveTheme()
   targetTheme = currentTheme
   resizeCanvas()
 
-  themeObserver = new MutationObserver(() => {
-    beginThemeTransition(resolveTheme())
-  })
+  themeObserver = new MutationObserver(applyThemeFromDom)
 
   themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class'],
   })
 
-  window.addEventListener('resize', resizeCanvas)
+  window.addEventListener('resize', handleResize)
   window.addEventListener('mousemove', handlePointerMove)
   window.addEventListener('mouseleave', handlePointerLeave)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   renderFrame(performance.now())
-  scheduleAnimationLoopStart()
+
+  if (!prefersReducedMotion) {
+    scheduleAnimationLoopStart()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -735,7 +741,7 @@ onBeforeUnmount(() => {
     window.clearTimeout(animationStartTimer)
     animationStartTimer = null
   }
-  window.removeEventListener('resize', resizeCanvas)
+  window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handlePointerMove)
   window.removeEventListener('mouseleave', handlePointerLeave)
   document.removeEventListener('visibilitychange', handleVisibilityChange)

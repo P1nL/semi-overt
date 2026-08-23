@@ -119,14 +119,14 @@ html.dark {
     --color-selection-bg: rgb(41 151 255 / 0.42);
     --color-selection-text: #f5f5f7;
 
-    /* 光晕渐变颜色（来自参考文件 gradient-bg） */
-    --glow-color1: 18, 113, 255;
-    --glow-color2: 107, 74, 255;
-    --glow-color3: 100, 100, 255;
-    --glow-color4: 50, 160, 220;
-    --glow-color5: 80, 47, 122;
-    --glow-color-interactive: 140, 100, 255;
-    --glow-blending: hard-light;
+    /* 暗色背景光团：截图实际呈现的 #323638 / #272b2c */
+    --glow-color1: 50, 54, 56;
+    --glow-color2: 39, 43, 44;
+    --glow-color3: 50, 54, 56;
+    --glow-color4: 39, 43, 44;
+    --glow-color5: 50, 54, 56;
+    --glow-color-interactive: 50, 54, 56;
+    --glow-blending: normal;
 
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.22);
     --shadow-sm: 0 12px 32px rgb(0 0 0 / 0.28);

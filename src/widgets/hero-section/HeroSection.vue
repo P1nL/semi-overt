@@ -22,6 +22,8 @@ const props = withDefaults(
   },
 )
 
+const HOME_SHOWCASE_PREVIEW_COUNT = 11
+
 const heroItems = computed(() => {
   const list: ArticleCardVm[] = []
 
@@ -29,10 +31,23 @@ const heroItems = computed(() => {
     list.push(props.primary)
   }
 
-  return list.concat(props.secondary.slice(0, 10))
+  return list.concat(props.secondary.slice(0, HOME_SHOWCASE_PREVIEW_COUNT - 1))
 })
 
-const hasCards = computed(() => heroItems.value.length > 0)
+const showcaseItems = computed(() => {
+  const items = heroItems.value
+
+  if (!import.meta.env.DEV || items.length === 0 || items.length >= HOME_SHOWCASE_PREVIEW_COUNT) {
+    return items
+  }
+
+  return Array.from(
+    { length: HOME_SHOWCASE_PREVIEW_COUNT },
+    (_, index) => items[index % items.length],
+  )
+})
+
+const hasCards = computed(() => showcaseItems.value.length > 0)
 </script>
 
 <template>
@@ -51,13 +66,13 @@ const hasCards = computed(() => heroItems.value.length > 0)
       class="hero-section__rail"
     >
       <HomeShowcaseRail
-        :items="heroItems"
+        :items="showcaseItems"
         category-label="day"
         featured
         :revealed="revealed"
         :animate-reveal="animateReveal"
         :delay-base="40"
-        :max-visible="11"
+        :max-visible="HOME_SHOWCASE_PREVIEW_COUNT"
       />
     </div>
   </section>

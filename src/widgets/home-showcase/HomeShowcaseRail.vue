@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
       <div class="home-showcase-rail__track">
         <div
             v-for="(item, index) in visibleItems"
-            :key="`${item.id}-${layoutVersion}`"
+            :key="`${item.id}-${index}-${layoutVersion}`"
             class="home-showcase-rail__item"
             :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
@@ -227,6 +227,7 @@ onBeforeUnmount(() => {
               :article="item"
               :category-label="categoryLabel"
               :emphasis="featured && index === 0 ? 'hero' : 'regular'"
+              :tone-index="index"
               :cropped="featured"
               :revealed="revealed"
               :animate-reveal="animateReveal"
