@@ -19,6 +19,8 @@ const props = withDefaults(
       compact?: boolean
       fillHeight?: boolean
       coverEager?: boolean
+      coverFallback?: 'title' | 'emoji'
+      coverEmoji?: string
     }>(),
     {
       clickable: true,
@@ -28,6 +30,8 @@ const props = withDefaults(
       compact: false,
       fillHeight: false,
       coverEager: false,
+      coverFallback: 'title',
+      coverEmoji: '📖',
     },
 )
 
@@ -66,6 +70,8 @@ const latestReasonLabel = computed(() =>
         :compact="compact"
         :fill-height="fillHeight"
         :eager="coverEager"
+        :fallback="coverFallback"
+        :emoji="coverEmoji"
     />
 
     <div
@@ -75,8 +81,9 @@ const latestReasonLabel = computed(() =>
       <div class="article-card__default-content flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex items-start justify-between gap-3">
           <h3
-              class="line-clamp-2 font-semibold tracking-[-0.025em] text-[var(--color-text)]"
+              class="min-w-0 flex-1 truncate font-semibold tracking-[-0.025em] text-[var(--color-text)]"
               :class="compact ? 'text-[0.95rem] leading-6' : 'text-[1.05rem] leading-[1.65] md:text-[1.12rem]'"
+              :title="article.titleText"
           >
             {{ article.titleText }}
           </h3>

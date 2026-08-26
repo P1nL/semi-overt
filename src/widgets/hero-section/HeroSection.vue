@@ -53,7 +53,7 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
 <template>
   <section class="hero-section relative isolate overflow-visible pt-6 md:pt-8 lg:pt-10">
     <div class="page-container hero-section__intro relative mb-3 space-y-4 md:mb-4">
-      <h1 class="max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-[var(--color-text)] md:text-5xl lg:text-[3.5rem]">
+      <h1 class="hero-section__title max-w-3xl text-4xl text-[var(--color-text)] md:text-5xl lg:text-[3.5rem]">
         {{ title }}
       </h1>
       <p class="max-w-2xl text-sm leading-[1.65] text-[var(--color-text-muted)] md:text-[1rem]">
@@ -79,6 +79,13 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
 </template>
 
 <style scoped>
+.hero-section__title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
 @media (min-width: 1024px) {
   .hero-section {
     --hero-rail-visible-height: clamp(15rem, 17vw, 19rem);

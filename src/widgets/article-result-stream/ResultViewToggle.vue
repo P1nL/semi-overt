@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Grid2x2, PanelsTopLeft, Rows3 } from 'lucide-vue-next'
+import { Orbit, Rows3 } from 'lucide-vue-next'
 
 import { RESULT_VIEW_MODE, type ResultViewMode } from './result-view'
 
@@ -14,19 +14,14 @@ const emit = defineEmits<{
 
 const options = [
   {
-    value: RESULT_VIEW_MODE.GALLERY,
-    label: '画廊视图',
-    icon: PanelsTopLeft,
+    value: RESULT_VIEW_MODE.INFINITE,
+    label: '无限菜单视图',
+    icon: Orbit,
   },
   {
     value: RESULT_VIEW_MODE.LIST,
     label: '列表视图',
     icon: Rows3,
-  },
-  {
-    value: RESULT_VIEW_MODE.GRID,
-    label: '网格视图',
-    icon: Grid2x2,
   },
 ] as const
 
@@ -122,10 +117,6 @@ function updateValue(value: ResultViewMode) {
     box-shadow 180ms ease;
 }
 
-.result-view-toggle__button:hover {
-  color: var(--color-text);
-}
-
 .result-view-toggle__button:focus-visible {
   outline: none;
   box-shadow:
@@ -140,5 +131,4 @@ function updateValue(value: ResultViewMode) {
 .result-view-toggle__button:active {
   transform: scale(0.97);
 }
-
 </style>

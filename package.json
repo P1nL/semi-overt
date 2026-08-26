@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "generate:api": "node ./scripts/generate-api-types.mjs"
+    "generate:api": "node ./scripts/generate-api-types.mjs",
+    "font:subset": "python ./scripts/subset-zhaohua-font.py"
   },
   "dependencies": {
-    "@lordicon/element": "^1.0.4",
     "@headlessui/vue": "^1.7.23",
+    "@lordicon/element": "^1.0.4",
     "@tanstack/vue-query": "^5.92.9",
     "@tiptap/extension-highlight": "^3.20.4",
     "@tiptap/extension-image": "^3.20.4",
@@ -30,6 +31,7 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
     "dompurify": "^3.3.3",
+    "gl-matrix": "^3.4.4",
     "gsap": "^3.14.2",
     "highlight.js": "^11.11.1",
     "lodash-es": "^4.17.23",

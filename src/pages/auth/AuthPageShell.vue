@@ -31,6 +31,7 @@ const authPageMeta = computed(() => {
       return {
         eyebrow: '加入 Now',
         title: '注册账号',
+        displayTitle: true,
         description: '创建新账户后，系统会自动帮你登录。',
         glowClass:
           'pointer-events-none absolute left-[-4rem] top-24 h-52 w-52 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
@@ -39,6 +40,7 @@ const authPageMeta = computed(() => {
       return {
         eyebrow: '找回密码',
         title: '重置密码',
+        displayTitle: true,
         description: '输入注册邮箱，如果账号存在，我们会向你发送 6 位验证码。',
         glowClass:
           'pointer-events-none absolute right-[-5rem] top-28 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
@@ -47,6 +49,7 @@ const authPageMeta = computed(() => {
       return {
         eyebrow: '设置新密码',
         title: '选择新的密码',
+        displayTitle: false,
         description: '为你的账户设置一个新密码，然后返回登录。',
         glowClass:
           'pointer-events-none absolute left-[-4rem] top-28 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
@@ -56,6 +59,7 @@ const authPageMeta = computed(() => {
       return {
         eyebrow: 'Now',
         title: '登录',
+        displayTitle: true,
         description: '登录后即可继续写作、编辑和管理你的文章。',
         glowClass:
           'pointer-events-none absolute right-[-5rem] top-24 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
@@ -136,7 +140,10 @@ onBeforeUnmount(() => {
               <div class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-primary)]">
                 {{ authPageMeta.eyebrow }}
               </div>
-              <h1 class="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-text)]">
+              <h1
+                class="text-3xl text-[var(--color-text)]"
+                :class="authPageMeta.displayTitle ? 'auth-page-title' : 'font-semibold tracking-[-0.04em]'"
+              >
                 {{ authPageMeta.title }}
               </h1>
               <p class="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">
@@ -153,3 +160,12 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.auth-page-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.16;
+  letter-spacing: 0;
+}
+</style>

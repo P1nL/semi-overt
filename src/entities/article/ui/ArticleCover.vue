@@ -10,12 +10,16 @@ const props = withDefaults(
       compact?: boolean
       fillHeight?: boolean
       eager?: boolean
+      fallback?: 'title' | 'emoji'
+      emoji?: string
     }>(),
     {
       title: '',
       compact: false,
       fillHeight: false,
       eager: false,
+      fallback: 'title',
+      emoji: '📖',
     },
 )
 
@@ -47,9 +51,11 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
     />
     <div
         v-else
-        class="flex h-full w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.2))] px-4 text-center text-sm font-medium text-[var(--color-text-muted)]"
+        class="article-cover__placeholder flex h-full w-full items-center justify-center px-4 text-center"
+        :class="fallback === 'emoji' ? 'article-cover__placeholder--emoji' : 'article-cover__placeholder--title'"
     >
-      {{ title || '暂无封面' }}
+      <span v-if="fallback === 'emoji'" class="article-cover__emoji" aria-hidden="true">{{ emoji }}</span>
+      <span v-else>{{ title || '暂无封面' }}</span>
     </div>
   </div>
 </template>
@@ -60,5 +66,35 @@ const imageFetchPriority = computed<'high' | 'auto'>(() => (props.eager ? 'high'
   min-height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+.article-cover__placeholder--title {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.2));
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.article-cover__placeholder--emoji {
+  background: transparent;
+}
+
+.article-cover__emoji {
+  display: inline-grid;
+  place-items: center;
+  font-size: clamp(3.25rem, 7vw, 5.4rem);
+  line-height: 1;
+  filter: drop-shadow(0 10px 18px rgb(15 23 42 / 0.12));
+  transform: translateY(-0.04em);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .article-cover__emoji {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .article-cover:hover .article-cover__emoji {
+    transform: translateY(-0.08em) scale(1.04) rotate(-2deg);
+  }
 }
 </style>

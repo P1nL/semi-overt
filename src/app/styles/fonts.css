@@ -1,0 +1,17 @@
+@font-face {
+    font-family: "Zhaohua Display";
+    src: url("../../shared/assets/fonts/ZhaohuaMinB-Black-common.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 900;
+    font-display: swap;
+}
+
+:root {
+    --font-display:
+            "Zhaohua Display",
+            "Noto Serif SC",
+            "Songti SC",
+            "STSong",
+            "SimSun",
+            serif;
+}

@@ -42,6 +42,33 @@ const cardTone = computed(() => {
   return homeShowcaseCardTones[normalizedIndex]
 })
 
+const titleTypography = computed(() => {
+  const titleLength = Array.from(props.article.titleText.trim()).length
+
+  if (titleLength <= 14) {
+    return {
+      fontSize: '3rem',
+      letterSpacing: props.cropped ? '0.11em' : '0.095em',
+      lineHeight: '1.08',
+      maxWidth: props.cropped ? '12ch' : '14ch',
+    }
+  }
+
+  if (titleLength <= 24) {
+    return { fontSize: '2.4rem', letterSpacing: '0.075em', lineHeight: '1.1', maxWidth: '100%' }
+  }
+
+  if (titleLength <= 40) {
+    return { fontSize: '1.9rem', letterSpacing: '0.055em', lineHeight: '1.14', maxWidth: '100%' }
+  }
+
+  if (titleLength <= 64) {
+    return { fontSize: '1.45rem', letterSpacing: '0.04em', lineHeight: '1.18', maxWidth: '100%' }
+  }
+
+  return { fontSize: '1.1rem', letterSpacing: '0.025em', lineHeight: '1.22', maxWidth: '100%' }
+})
+
 const cardStyle = computed(() => ({
   '--card-background': cardTone.value.background,
   '--card-foreground': cardTone.value.foreground,
@@ -49,6 +76,10 @@ const cardStyle = computed(() => ({
     ? '0 1px 1px rgb(15 23 42 / 0.18)'
     : 'none',
   '--card-delay': `${props.delay}ms`,
+  '--card-title-font-size': titleTypography.value.fontSize,
+  '--card-title-letter-spacing': titleTypography.value.letterSpacing,
+  '--card-title-line-height': titleTypography.value.lineHeight,
+  '--card-title-max-width': titleTypography.value.maxWidth,
 }))
 </script>
 
@@ -71,7 +102,7 @@ const cardStyle = computed(() => ({
     <div class="home-showcase-card__media-shell">
       <div class="home-showcase-card__media">
         <div class="home-showcase-card__title-wrap">
-          <h3 class="home-showcase-card__title line-clamp-3">
+          <h3 class="home-showcase-card__title">
             {{ article.titleText }}
           </h3>
         </div>
@@ -144,22 +175,34 @@ const cardStyle = computed(() => ({
 
 .home-showcase-card__title-wrap {
   position: absolute;
-  left: clamp(0.95rem, 3vw, 1.3rem);
-  right: clamp(0.95rem, 3vw, 1.3rem);
-  bottom: clamp(1rem, 3vw, 1.35rem);
+  top: clamp(1.5rem, 6%, 4rem);
+  left: 50%;
+  bottom: auto;
   z-index: 1;
-  min-block-size: clamp(5.8rem, 28%, 7.8rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(72%, 34rem);
+  min-block-size: clamp(7rem, 14%, 9rem);
+  text-align: center;
+  transform: translateX(-50%);
 }
 
 .home-showcase-card__title {
   margin: 0;
-  max-width: min(100%, 22ch);
-  padding-bottom: 0.14em;
+  max-width: min(100%, var(--card-title-max-width, 14ch));
+  padding: 0.16em 0 0.22em;
   color: var(--card-foreground);
-  font-size: clamp(1.3rem, 2.9vw, 2.08rem);
-  font-weight: 650;
-  line-height: 1.18;
-  letter-spacing: -0.05em;
+  font-family: var(--font-display);
+  font-size: var(--card-title-font-size, 3rem);
+  font-weight: 900;
+  font-kerning: normal;
+  line-height: var(--card-title-line-height, 1.08);
+  letter-spacing: var(--card-title-letter-spacing, 0.095em);
+  text-align: center;
+  text-indent: var(--card-title-letter-spacing, 0.095em);
+  overflow-wrap: anywhere;
+  word-break: break-word;
   text-wrap: balance;
   text-shadow: var(--card-title-shadow);
   transition: transform 240ms ease;
@@ -172,19 +215,6 @@ const cardStyle = computed(() => ({
 
 .home-showcase-card--cropped .home-showcase-card__media {
   border-radius: clamp(1.2rem, 3vw, 1.8rem);
-}
-
-.home-showcase-card--cropped .home-showcase-card__title-wrap {
-  top: clamp(0.9rem, 2.2vw, 1.2rem);
-  bottom: auto;
-  min-block-size: clamp(5.1rem, 24%, 6.8rem);
-}
-
-.home-showcase-card--cropped .home-showcase-card__title {
-  max-width: min(100%, 18ch);
-  padding-bottom: 0.14em;
-  font-size: clamp(1.02rem, 1.8vw, 1.42rem);
-  line-height: 1.16;
 }
 
 .home-showcase-card:focus-visible {
@@ -208,7 +238,7 @@ const cardStyle = computed(() => ({
   }
 
   .home-showcase-card__title {
-    max-width: calc(100% - 0.5rem);
+    max-width: min(calc(100% - 0.5rem), var(--card-title-max-width, 12ch));
   }
 }
 

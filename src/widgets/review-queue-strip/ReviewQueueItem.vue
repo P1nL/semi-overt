@@ -12,7 +12,7 @@ defineProps<{
     class="surface-1 block min-w-0 rounded-[var(--radius-xl)] p-4 transition-all duration-300]"
   >
     <div class="flex items-start justify-between gap-3">
-      <h4 class="line-clamp-2 flex-1 text-base font-semibold tracking-[-0.02em] text-[var(--color-text)]">
+      <h4 class="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.02em] text-[var(--color-text)]" :title="item.title">
         {{ item.title }}
       </h4>
       <span class="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--color-border)_86%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-muted)]">

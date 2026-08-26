@@ -4,14 +4,18 @@ import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-rou
 import { useIntersectionObserver } from '@vueuse/core'
 
 import { CATEGORY_TAB } from '@/entities/category'
-import { mapCategoryDtoToSectionVm, mapCategoryValueToVm } from '@/entities/category'
+import { mapCategoryValueToVm } from '@/entities/category'
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
-import { SectionHeader } from '@/shared/components/layout'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
-import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
+import {
+  ArticleResultStream,
+  RESULT_VIEW_MODE,
+  isResultViewMode,
+  normalizeResultViewMode,
+} from '@/widgets/article-result-stream'
 
 const props = withDefaults(
   defineProps<{
@@ -35,7 +39,7 @@ const activeCategory = computed(() => {
 
 const resultView = computed(() => {
   const queryView = currentRoute.value.query.view
-  return isResultViewMode(queryView) ? queryView : RESULT_VIEW_MODE.GALLERY
+  return normalizeResultViewMode(queryView)
 })
 const categoryQuery = useInfiniteCategoryArticlesQuery(activeCategory, 10)
 const sectionMeta = computed(() => mapCategoryValueToVm(activeCategory.value, activeCategory.value))
@@ -59,6 +63,7 @@ const list = computed(() => {
       return true
     })
 })
+const total = computed(() => Number(categoryPages.value[0]?.total ?? list.value.length))
 const contentState = computed(() => {
   if (loading.value) return 'loading'
   if (list.value.length) return 'content'
@@ -79,7 +84,7 @@ async function onViewChange(nextView: string) {
   await router.replace({
     query: {
       ...currentRoute.value.query,
-      view: nextView === RESULT_VIEW_MODE.GALLERY ? undefined : nextView,
+      view: nextView === RESULT_VIEW_MODE.INFINITE ? undefined : nextView,
     },
   })
 }
@@ -100,23 +105,7 @@ useIntersectionObserver(
 
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
-    <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <section class="px-1 py-2 md:px-2 md:py-3">
-        <div class="category-page-heading">
-          <SectionHeader
-            class="category-page-header"
-            :title="`${sectionMeta.label}`"
-            :description="sectionMeta.description"
-            align="center"
-            compact
-          />
-
-          <div class="category-page-heading__actions">
-            <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
-          </div>
-        </div>
-      </section>
-
+    <main class="page-container space-y-5 pb-0 pt-0">
       <Transition name="content-fade" mode="out-in">
         <div
           v-if="contentState === 'loading'"
@@ -129,19 +118,26 @@ useIntersectionObserver(
           key="category-content"
           class="space-y-5"
         >
-          <ArticleResultStream :items="list" :view="resultView" />
+          <ArticleResultStream
+            :items="list"
+            :view="resultView"
+            :center-label="sectionMeta.label"
+            :result-count="total"
+            fullscreen
+            @update:view="onViewChange"
+          />
 
           <div ref="loadMoreRef" class="category-page-load-sentinel" aria-hidden="true" />
 
           <section
-            v-if="resultView !== RESULT_VIEW_MODE.GALLERY"
+            v-if="resultView !== RESULT_VIEW_MODE.INFINITE"
             class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
           >
             <p v-if="categoryQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
               正在续接更多栏目文章…
             </p>
             <p v-else-if="categoryQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
-              继续下滑，画廊会自动向后展开
+              继续下滑，列表会自动载入更多文章
             </p>
             <p v-else class="text-sm text-[var(--color-text-muted)]">
               END
@@ -162,30 +158,6 @@ useIntersectionObserver(
 </template>
 
 <style scoped>
-.category-page-header :deep(h2) {
-  font-size: clamp(2.35rem, 5vw, 3.8rem);
-  line-height: 1.08;
-  letter-spacing: -0.06em;
-}
-
-.category-page-header :deep(p) {
-  margin-inline: auto;
-  text-align: center;
-}
-
-.category-page-heading {
-  position: relative;
-  padding-bottom: 3.25rem;
-}
-
-.category-page-heading__actions {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .category-page-load-sentinel {
   width: 100%;
   height: 1px;

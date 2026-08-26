@@ -10,7 +10,13 @@ import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
-import { ArticleResultStream, RESULT_VIEW_MODE, ResultViewToggle, isResultViewMode } from '@/widgets/article-result-stream'
+import {
+  ArticleResultStream,
+  RESULT_VIEW_MODE,
+  ResultViewToggle,
+  isResultViewMode,
+  normalizeResultViewMode,
+} from '@/widgets/article-result-stream'
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +43,7 @@ const isUserSearch = computed(() => routeType.value === 'users')
 const routeKeyword = computed(() => normalizeSearchKeyword(currentRoute.value.query.keyword || currentRoute.value.query.q))
 const resultView = computed(() => {
   const queryView = currentRoute.value.query.view
-  return isResultViewMode(queryView) ? queryView : RESULT_VIEW_MODE.GALLERY
+  return normalizeResultViewMode(queryView)
 })
 const articleSearchQuery = useInfiniteSearchArticlesQuery(routeKeyword, pageSize, computed(() => !isUserSearch.value))
 const userSearchQuery = useInfiniteSearchUsersQuery(routeKeyword, userSearchLimit, isUserSearch)
@@ -99,6 +105,9 @@ const searchTitle = computed(() => {
   return isUserSearch.value ? `作者：${activeKeyword.value}` : activeKeyword.value
 })
 const documentTitle = computed(() => activeKeyword.value || searchTitle.value)
+const isArticleInfiniteView = computed(
+  () => !isUserSearch.value && resultView.value === RESULT_VIEW_MODE.INFINITE,
+)
 const resultSummary = computed(() => {
   if (!activeKeyword.value) return ''
   if (isUserSearch.value) {
@@ -109,7 +118,7 @@ const resultSummary = computed(() => {
 })
 const showArticleFooter = computed(
   () =>
-    resultView.value !== RESULT_VIEW_MODE.GALLERY ||
+    resultView.value !== RESULT_VIEW_MODE.INFINITE ||
     articleSearchQuery.isFetchingNextPage.value ||
     articleSearchQuery.hasNextPage.value,
 )
@@ -143,7 +152,7 @@ function resolveSearchLocation(keywordValue: string, nextPage = 1) {
     query: {
       ...(keywordValue ? { keyword: keywordValue } : {}),
       ...(isUserSearch.value ? { type: 'users' } : {}),
-      view: !isUserSearch.value && resultView.value !== RESULT_VIEW_MODE.GALLERY ? resultView.value : undefined,
+      view: !isUserSearch.value && resultView.value !== RESULT_VIEW_MODE.INFINITE ? resultView.value : undefined,
     },
   }
 }
@@ -156,7 +165,7 @@ async function onViewChange(nextView: string) {
     query: {
       ...(routeKeyword.value ? { keyword: routeKeyword.value } : {}),
       ...(isUserSearch.value ? { type: 'users' } : {}),
-      view: nextView === RESULT_VIEW_MODE.GALLERY ? undefined : nextView,
+      view: nextView === RESULT_VIEW_MODE.INFINITE ? undefined : nextView,
     },
   }
 
@@ -187,8 +196,18 @@ useIntersectionObserver(
 
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
-    <main class="page-container space-y-8 py-8 md:space-y-10 md:py-10">
-      <section class="px-1 py-2 md:px-2 md:py-3">
+    <main
+      class="page-container search-page-main"
+      :class="isArticleInfiniteView ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'"
+    >
+      <div
+        v-if="!isUserSearch && contentState === 'content'"
+        class="search-page-view-toggle"
+      >
+        <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
+      </div>
+
+      <section v-if="!isArticleInfiniteView" class="px-1 py-2 md:px-2 md:py-3">
         <div class="search-page-heading">
           <SectionHeader
             class="search-page-header"
@@ -198,9 +217,6 @@ useIntersectionObserver(
             compact
           />
 
-          <div v-if="!isUserSearch" class="search-page-heading__actions">
-            <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
-          </div>
         </div>
       </section>
 
@@ -255,7 +271,15 @@ useIntersectionObserver(
             </template>
 
             <template v-else>
-              <ArticleResultStream :items="articleList" :view="resultView" />
+              <ArticleResultStream
+                :items="articleList"
+                :view="resultView"
+                fullscreen
+                :center-label="isArticleInfiniteView ? activeKeyword : ''"
+                :result-count="total"
+                :show-view-toggle="false"
+                @update:view="onViewChange"
+              />
 
               <section
                 v-if="showArticleFooter"
@@ -270,7 +294,7 @@ useIntersectionObserver(
                 <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
                   继续滚动，自动载入
                 </p>
-                <p v-else-if="resultView !== RESULT_VIEW_MODE.GALLERY" class="text-sm text-[var(--color-text-muted)]">
+                <p v-else-if="resultView !== RESULT_VIEW_MODE.INFINITE" class="text-sm text-[var(--color-text-muted)]">
                   END
                 </p>
               </section>
@@ -290,6 +314,19 @@ useIntersectionObserver(
 </template>
 
 <style scoped>
+.search-page-main {
+  position: relative;
+}
+
+.search-page-view-toggle {
+  position: absolute;
+  top: 1.25rem;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .search-page-header :deep(h2) {
   font-size: clamp(2.35rem, 5vw, 3.8rem);
   line-height: 1.08;
@@ -301,21 +338,15 @@ useIntersectionObserver(
   text-align: center;
 }
 
-.search-page-heading {
-  position: relative;
-  padding-bottom: 3.25rem;
-}
-
-.search-page-heading__actions {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .search-page-load-sentinel {
   width: 100%;
   height: 1px;
+}
+
+@media (max-width: 640px) {
+  .search-page-view-toggle {
+    top: 0.85rem;
+    right: 0.25rem;
+  }
 }
 </style>

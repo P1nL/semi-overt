@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
                   :leave-to-class="slideDirection === 'forward' ? '-translate-x-6 opacity-0' : 'translate-x-6 opacity-0'"
                 >
                   <div :key="`${mode}-header`">
-                    <h2 class="mt-2 text-[1.75rem] font-semibold tracking-[-0.04em] text-[var(--color-text)]">
+                    <h2 class="auth-dialog__title mt-2 text-[1.75rem] text-[var(--color-text)]">
                       {{ dialogTitle }}
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
@@ -276,3 +276,12 @@ onBeforeUnmount(() => {
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+.auth-dialog__title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.16;
+  letter-spacing: 0;
+}
+</style>

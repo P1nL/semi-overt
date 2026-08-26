@@ -278,6 +278,7 @@ onBeforeUnmount(() => {
 
     <div class="flex justify-center">
       <AuthActionButton
+        class="forgot-password-form__submit"
         type="submit"
         :loading="submitting || sendingCode"
         :disabled="submitting || sendingCode"
@@ -318,3 +319,11 @@ onBeforeUnmount(() => {
     </div>
   </form>
 </template>
+
+<style scoped>
+:deep(.forgot-password-form__submit .auth-action-button__label) {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+</style>
