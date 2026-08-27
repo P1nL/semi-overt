@@ -106,6 +106,7 @@ let themeObserver: MutationObserver | null = null
 let lastRenderedAt = 0
 let animationLoopEnabled = false
 let animationStartTimer: number | null = null
+let darkModePauseTimer: number | null = null
 let prefersReducedMotion = false
 
 function easeOutQuart(value: number) {
@@ -147,6 +148,33 @@ function startAnimationLoop(forceRender = true) {
   syncAnimationLoop(forceRender)
 }
 
+function pauseAnimationLoop() {
+  animationLoopEnabled = false
+  stopAnimation()
+}
+
+function cancelAnimationLoopStart() {
+  if (animationStartTimer === null) return
+  window.clearTimeout(animationStartTimer)
+  animationStartTimer = null
+}
+
+function cancelDarkModePause() {
+  if (darkModePauseTimer === null) return
+  window.clearTimeout(darkModePauseTimer)
+  darkModePauseTimer = null
+}
+
+function scheduleDarkModePause() {
+  cancelDarkModePause()
+  darkModePauseTimer = window.setTimeout(() => {
+    darkModePauseTimer = null
+    if (targetTheme === 'dark') {
+      pauseAnimationLoop()
+    }
+  }, THEME_TRANSITION_DURATION + 80)
+}
+
 function scheduleAnimationLoopStart() {
   if (animationStartTimer !== null) {
     return
@@ -155,13 +183,19 @@ function scheduleAnimationLoopStart() {
   animationStartTimer = window.setTimeout(() => {
     animationStartTimer = null
 
+    const startWhenLight = () => {
+      if (targetTheme === 'light') {
+        startAnimationLoop()
+      }
+    }
+
     const schedule = window.requestIdleCallback
     if (schedule) {
-      schedule(() => startAnimationLoop(), { timeout: 1200 })
+      schedule(startWhenLight, { timeout: 1200 })
       return
     }
 
-    startAnimationLoop()
+    startWhenLight()
   }, INITIAL_ANIMATION_DELAY_MS)
 }
 
@@ -226,8 +260,22 @@ function handleResize() {
 function applyThemeFromDom() {
   const nextTheme = resolveTheme()
 
+  if (nextTheme === targetTheme) return
+
+  cancelDarkModePause()
+
   if (!prefersReducedMotion) {
+    if (nextTheme === 'light') {
+      startAnimationLoop(false)
+    } else {
+      cancelAnimationLoopStart()
+    }
+
     beginThemeTransition(nextTheme)
+
+    if (nextTheme === 'dark') {
+      scheduleDarkModePause()
+    }
     return
   }
 
@@ -730,17 +778,15 @@ onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   renderFrame(performance.now())
 
-  if (!prefersReducedMotion) {
+  if (!prefersReducedMotion && currentTheme === 'light') {
     scheduleAnimationLoopStart()
   }
 })
 
 onBeforeUnmount(() => {
-  stopAnimation()
-  if (animationStartTimer !== null) {
-    window.clearTimeout(animationStartTimer)
-    animationStartTimer = null
-  }
+  pauseAnimationLoop()
+  cancelDarkModePause()
+  cancelAnimationLoopStart()
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mousemove', handlePointerMove)
   window.removeEventListener('mouseleave', handlePointerLeave)

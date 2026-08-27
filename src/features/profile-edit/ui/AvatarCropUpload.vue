@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 
-import { Avatar, Button } from '@/shared/components/base'
+import { Avatar, Button, ElasticSlider, Tooltip } from '@/shared/components/base'
 import { useToast } from '@/shared/composables/useToast'
 import {
   uploadImageFile,
@@ -162,10 +162,6 @@ function handleWheel(event: WheelEvent) {
   setZoom(crop.zoom + (event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP))
 }
 
-function handleZoomInput(event: Event) {
-  setZoom(Number((event.target as HTMLInputElement).value))
-}
-
 function createCroppedFile(): Promise<File> {
   return new Promise((resolve, reject) => {
     const source = new Image()
@@ -242,17 +238,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem] md:items-start">
-    <div class="space-y-3">
-      <input
-        ref="inputRef"
-        type="file"
-        class="hidden"
-        accept="image/jpeg,image/png,image/webp"
-        :disabled="buttonDisabled"
-        @change="handleInputChange"
-      />
+  <div class="flex w-full flex-col items-center gap-4">
+    <input
+      ref="inputRef"
+      type="file"
+      class="hidden"
+      accept="image/jpeg,image/png,image/webp"
+      :disabled="buttonDisabled"
+      @change="handleInputChange"
+    />
 
+    <div class="avatar-cropper-shell">
       <div
         class="avatar-cropper"
         :class="{ 'avatar-cropper--dragging': dragging }"
@@ -285,61 +281,72 @@ onBeforeUnmount(() => {
         <span class="avatar-cropper__ring" aria-hidden="true" />
       </div>
 
-      <div v-if="hasDraft" class="space-y-3">
-        <label class="block text-xs font-medium text-[var(--color-text-muted)]">
-          缩放
-          <input
-            class="avatar-cropper__range mt-2"
-            type="range"
-            :min="MIN_ZOOM"
-            :max="MAX_ZOOM"
-            step="0.01"
-            :value="crop.zoom"
-            :disabled="buttonDisabled"
-            @input="handleZoomInput"
-          />
-        </label>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" variant="primary" :loading="uploading" :disabled="buttonDisabled" @click="uploadCroppedAvatar">
-            使用此头像
-          </Button>
-          <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="resetCropPosition">
-            复位
-          </Button>
-          <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="cancelDraft">
-            取消
-          </Button>
-        </div>
-      </div>
-
-      <Button
-        v-else
-        type="button"
-        variant="secondary"
-        :disabled="buttonDisabled"
-        @click="triggerPick"
+      <Tooltip
+        class="avatar-cropper__help"
+        text="上传后拖拽图片调整位置，滚轮或滑杆缩放；点击“使用此头像”后再保存资料。"
+        placement="top"
+        content-class="w-72 max-w-[min(18rem,calc(100vw-2rem))] whitespace-normal text-left leading-5"
+        :open-delay="100"
       >
-        上传头像
-      </Button>
+        <button
+          type="button"
+          class="avatar-cropper__help-trigger"
+          aria-label="查看头像取景说明"
+        >
+          ?
+        </button>
+      </Tooltip>
     </div>
 
-    <div class="surface-2 flex flex-col items-center gap-3 rounded-[var(--radius-lg)] p-4 text-center">
-      <p class="text-xs font-medium tracking-[0.08em] text-[var(--color-text-faint)]">
-        头像取景
-      </p>
-      <p class="text-xs leading-5 text-[var(--color-text-muted)]">
-        上传后拖拽图片调整位置，滚轮或滑杆缩放。点击“使用此头像”后再保存资料。
-      </p>
+    <div v-if="hasDraft" class="flex w-full max-w-sm flex-col items-center gap-3">
+      <ElasticSlider
+        :default-value="crop.zoom"
+        :starting-value="MIN_ZOOM"
+        :max-value="MAX_ZOOM"
+        :step-size="0.01"
+        :is-stepped="true"
+        :disabled="buttonDisabled"
+        aria-label="头像缩放"
+        class-name="mx-auto"
+        @update:model-value="setZoom"
+      />
+
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <Button type="button" size="sm" variant="primary" :loading="uploading" :disabled="buttonDisabled" @click="uploadCroppedAvatar">
+          使用此头像
+        </Button>
+        <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="resetCropPosition">
+          复位
+        </Button>
+        <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="cancelDraft">
+          取消
+        </Button>
+      </div>
     </div>
+
+    <Button
+      v-else
+      type="button"
+      variant="secondary"
+      :disabled="buttonDisabled"
+      @click="triggerPick"
+    >
+      上传头像
+    </Button>
   </div>
 </template>
 
 <style scoped>
-.avatar-cropper {
+.avatar-cropper-shell {
   position: relative;
   width: 11rem;
   height: 11rem;
+}
+
+.avatar-cropper {
+  position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -349,6 +356,45 @@ onBeforeUnmount(() => {
   box-shadow:
     0 18px 36px rgb(15 23 42 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.avatar-cropper__help {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  z-index: 5;
+}
+
+.avatar-cropper__help-trigger {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 84%, white 16%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 96%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  box-shadow: var(--shadow-xs);
+  transition:
+    color 160ms cubic-bezier(0.25, 1, 0.5, 1),
+    border-color 160ms cubic-bezier(0.25, 1, 0.5, 1),
+    transform 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.avatar-cropper__help-trigger:hover,
+.avatar-cropper__help-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--color-primary) 36%, var(--color-border-strong));
+  color: var(--color-primary);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.avatar-cropper__help-trigger:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .avatar-cropper--dragging {
@@ -376,8 +422,4 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.avatar-cropper__range {
-  width: min(100%, 16rem);
-  accent-color: var(--color-primary);
-}
 </style>

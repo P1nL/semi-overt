@@ -116,3 +116,18 @@ function onClear() {
     </div>
   </label>
 </template>
+
+<style scoped>
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+input[type='password']::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+</style>

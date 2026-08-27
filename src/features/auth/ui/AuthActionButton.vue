@@ -60,7 +60,7 @@ withDefaults(
 }
 
 .auth-action-button--icon-only {
-  width: 5.5rem;
+  width: 15rem;
   border-color: transparent;
   border-radius: var(--radius-lg);
   background: transparent;

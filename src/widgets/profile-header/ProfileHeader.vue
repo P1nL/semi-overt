@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import type { UserProfileVm } from '@/entities/user'
 import { UserRoleBadge } from '@/entities/user/ui'
 import { ProfileEditButton } from '@/features/profile-edit'
-import { Avatar } from '@/shared/components'
+import { Avatar, TiltedCard } from '@/shared/components'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -17,133 +17,336 @@ defineEmits<{
 
 const authStore = useAuthStore()
 
-const isOwner = computed(
-  () => authStore.user?.username === props.profile.username,
-)
+const isOwner = computed(() => {
+  const currentUser = authStore.user
+  if (!currentUser) return false
 
+  if (String(currentUser.id) === String(props.profile.id)) return true
 
+  return currentUser.username.trim().toLowerCase()
+    === props.profile.username.trim().toLowerCase()
+})
 </script>
 
 <template>
-  <section
-    class="profile-header-reveal relative overflow-hidden rounded-[var(--radius-xl)]"
+  <TiltedCard
+    :rotate-amplitude="5.5"
+    :scale-on-hover="1"
+    perspective="1400px"
+    class="profile-header-tilt profile-header-reveal"
   >
-    <!-- 有封面图 -->
-    <div v-if="profile.coverUrl" class="absolute inset-0">
-      <img
-        :src="profile.coverUrl"
-        :alt="`${profile.displayName} cover`"
-        loading="eager"
-        decoding="async"
-        fetchpriority="high"
-        class="size-full object-cover"
-        style="mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 65%, transparent 100%); -webkit-mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 65%, transparent 100%);"
-      />
-    </div>
+    <section
+      class="profile-card"
+      :class="profile.coverUrl ? 'profile-card--cover' : 'profile-card--plain'"
+    >
+      <div class="profile-card__media" aria-hidden="true">
+        <img
+          v-if="profile.coverUrl"
+          :src="profile.coverUrl"
+          alt=""
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+          class="profile-card__cover-image"
+        />
+      </div>
 
-    <div class="relative px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 md:px-8 md:pb-8 md:pt-8">
       <div
-        v-if="profile.coverUrl"
-        class="relative min-h-[22rem] sm:min-h-[26rem] md:min-h-[30rem]"
+        v-if="isOwner"
+        class="profile-card__edit"
       >
-        <div class="absolute bottom-3 right-3 z-20 md:bottom-4 md:right-4">
-          <ProfileEditButton
-            v-if="isOwner"
-            :profile="profile"
-            @updated="$emit('updated', $event)"
+        <ProfileEditButton
+          :profile="profile"
+          @updated="$emit('updated', $event)"
+        />
+      </div>
+
+      <div class="profile-card__content">
+        <div class="profile-card__avatar-layer">
+          <Avatar
+            :src="profile.avatarUrl ?? undefined"
+            :alt="profile.displayName"
+            :name="profile.displayName"
+            :fallback="profile.displayName.slice(0, 1)"
+            size="xl"
+            rounded
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+            class="profile-card__avatar"
           />
         </div>
 
-        <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center px-4 pb-10 pt-8 text-center sm:px-6 sm:pb-12 sm:pt-10 md:px-8 md:pb-14">
-          <div class="inline-flex">
-            <Avatar
-              :src="profile.avatarUrl ?? undefined"
-              :alt="profile.displayName"
-              :name="profile.displayName"
-              :fallback="profile.displayName.slice(0, 1)"
-              size="xl"
-              rounded
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-              class="size-[4.5rem] border-white/70 bg-white/15 text-xl text-white shadow-[0_18px_40px_rgb(15_23_42_/_0.3)] ring-4 ring-white/35 backdrop-blur-sm sm:size-20 sm:text-2xl md:size-24 md:text-3xl"
-            />
-          </div>
-
-          <div class="mt-3 space-y-2">
-            <div>
-              <h1 class="text-[1.55rem] font-semibold tracking-[-0.04em] text-white drop-shadow-[0_4px_20px_rgb(8_15_34_/_0.35)] sm:text-2xl md:text-3xl">
-                {{ profile.displayName }}
-              </h1>
-            </div>
-
-            <div class="flex justify-center">
-              <UserRoleBadge v-if="profile.role" :role="profile.role" />
-            </div>
-
-            <p
-              v-if="profile.signature"
-              class="mx-auto max-w-2xl text-sm leading-6 text-white/82 md:text-base"
-            >
-              {{ profile.signature }}
-            </p>
-          </div>
+        <div class="profile-card__identity-layer">
+          <h1 class="profile-card__name">
+            {{ profile.displayName }}
+          </h1>
+          <p class="profile-card__username">
+            @{{ profile.username }}
+          </p>
         </div>
+
+        <div
+          v-if="profile.role"
+          class="profile-card__role-layer"
+        >
+          <UserRoleBadge :role="profile.role" />
+        </div>
+
+        <p
+          v-if="profile.signature"
+          class="profile-card__signature"
+        >
+          {{ profile.signature }}
+        </p>
       </div>
-
-      <!-- 无封面图 -->
-      <div v-else class="relative">
-        <div class="absolute bottom-0.5 right-0.5 z-20 md:bottom-1 md:right-1">
-          <ProfileEditButton
-            v-if="isOwner"
-            :profile="profile"
-            @updated="$emit('updated', $event)"
-          />
-        </div>
-
-        <div class="mt-10 flex min-h-[18rem] flex-col items-center justify-end pb-8 text-center sm:mt-12 sm:min-h-[20rem] sm:pb-10 md:mt-14 md:min-h-[22rem] md:pb-12">
-          <div class="inline-flex">
-            <Avatar
-              :src="profile.avatarUrl ?? undefined"
-              :alt="profile.displayName"
-              :name="profile.displayName"
-              :fallback="profile.displayName.slice(0, 1)"
-              size="xl"
-              rounded
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-              class="size-24 border-white/50 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-2xl text-[var(--color-text)] shadow-[0_18px_40px_rgb(15_23_42_/_0.16)] ring-4 ring-white/40 sm:size-28 sm:text-3xl md:size-36 md:text-4xl"
-            />
-          </div>
-
-          <div class="mt-4 space-y-3 sm:mt-5">
-            <div>
-              <h1 class="text-[1.9rem] font-semibold tracking-[-0.04em] text-[var(--color-text)] sm:text-3xl md:text-4xl">
-                {{ profile.displayName }}
-              </h1>
-              <p class="mt-2 text-sm text-[var(--color-text-muted)] md:text-base">
-                @{{ profile.username }}
-              </p>
-            </div>
-
-            <div class="flex justify-center">
-              <UserRoleBadge v-if="profile.role" :role="profile.role" />
-            </div>
-
-            <p
-              v-if="profile.signature"
-              class="mx-auto max-w-2xl text-sm leading-7 text-[var(--color-text-muted)] md:text-base"
-            >
-              {{ profile.signature }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-
-  </section>
+    </section>
+  </TiltedCard>
 </template>
 
+<style scoped>
+.profile-header-tilt {
+  border-radius: var(--radius-xl);
+}
+
+.profile-card {
+  position: relative;
+  min-height: 22rem;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 72%, white 28%);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-elevated);
+  box-shadow:
+    0 34px 80px rgb(15 23 42 / 0.16),
+    0 10px 28px rgb(15 23 42 / 0.08);
+  transform-style: preserve-3d;
+}
+
+.profile-card__media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-surface-elevated) 96%, var(--color-bg) 4%);
+  transform: translateZ(0);
+}
+
+.profile-card--cover .profile-card__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(8 15 34 / 0.08) 0%, rgb(8 15 34 / 0.12) 36%, rgb(8 15 34 / 0.72) 100%),
+    linear-gradient(90deg, rgb(8 15 34 / 0.12), transparent 28%, transparent 72%, rgb(8 15 34 / 0.12));
+  pointer-events: none;
+}
+
+.profile-card__cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.profile-card__content {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 2rem 1.25rem 2.25rem;
+  text-align: center;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.profile-card__avatar-layer {
+  display: inline-flex;
+  transform: translateZ(76px);
+}
+
+.profile-card__avatar {
+  width: 5rem;
+  height: 5rem;
+  border-color: rgb(255 255 255 / 0.7);
+  background: rgb(255 255 255 / 0.16);
+  color: white;
+  font-size: 1.5rem;
+  box-shadow:
+    0 22px 48px rgb(8 15 34 / 0.34),
+    0 0 0 5px rgb(255 255 255 / 0.24);
+  backdrop-filter: blur(10px) saturate(140%);
+}
+
+.profile-card--plain .profile-card__avatar {
+  border-color: color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
+  background: color-mix(in srgb, var(--color-surface-glass-strong) 92%, transparent);
+  color: var(--color-text);
+  box-shadow:
+    0 22px 48px rgb(15 23 42 / 0.14),
+    0 0 0 5px color-mix(in srgb, var(--color-surface) 66%, transparent);
+}
+
+.profile-card__identity-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  transform: translateZ(58px);
+}
+
+.profile-card__name {
+  margin: 0;
+  color: white;
+  font-size: clamp(1.75rem, 4vw, 2.55rem);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  text-wrap: balance;
+  text-shadow: 0 5px 24px rgb(8 15 34 / 0.48);
+}
+
+.profile-card__username {
+  margin: 0;
+  color: rgb(255 255 255 / 0.74);
+  font-size: 0.86rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-shadow: 0 3px 16px rgb(8 15 34 / 0.38);
+}
+
+.profile-card--plain .profile-card__name {
+  color: var(--color-text);
+  text-shadow: none;
+}
+
+.profile-card--plain .profile-card__username {
+  color: var(--color-text-muted);
+  text-shadow: none;
+}
+
+.profile-card__role-layer {
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+  transform: translateZ(48px);
+}
+
+.profile-card__signature {
+  max-width: min(42rem, 92%);
+  margin: 0.15rem 0 0;
+  color: rgb(255 255 255 / 0.84);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  text-wrap: balance;
+  text-shadow: 0 3px 18px rgb(8 15 34 / 0.5);
+  transform: translateZ(34px);
+}
+
+.profile-card--plain .profile-card__signature {
+  color: var(--color-text-muted);
+  text-shadow: none;
+}
+
+.profile-card__edit {
+  position: absolute;
+  right: 1.75rem;
+  bottom: 1rem;
+  z-index: 40;
+  display: flex;
+  color: rgb(255 255 255 / 0.86);
+  filter: drop-shadow(0 2px 8px rgb(8 15 34 / 0.46));
+  pointer-events: auto;
+  transform: translateZ(82px);
+}
+
+.profile-card--plain .profile-card__edit {
+  color: var(--color-text-muted);
+  filter: none;
+}
+
+html.dark .profile-card--plain {
+  border-color: rgb(255 255 255 / 0.08);
+  background: var(--color-surface);
+  box-shadow:
+    0 34px 80px rgb(0 0 0 / 0.36),
+    0 10px 28px rgb(0 0 0 / 0.22);
+}
+
+@media (min-width: 640px) {
+  .profile-card {
+    min-height: 26rem;
+  }
+
+  .profile-card__content {
+    gap: 0.75rem;
+    padding: 2.5rem 2rem 2.75rem;
+  }
+
+  .profile-card__avatar {
+    width: 5.75rem;
+    height: 5.75rem;
+    font-size: 1.75rem;
+  }
+
+  .profile-card__signature {
+    font-size: 0.9375rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .profile-card {
+    min-height: 30rem;
+  }
+
+  .profile-card__content {
+    gap: 0.85rem;
+    padding-bottom: 3.25rem;
+  }
+
+  .profile-card__avatar {
+    width: 6.5rem;
+    height: 6.5rem;
+    font-size: 2rem;
+  }
+
+  .profile-card__edit {
+    right: 2.5rem;
+    bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+  .profile-card,
+  .profile-card__content {
+    transform-style: flat;
+  }
+
+  .profile-card__avatar-layer,
+  .profile-card__identity-layer,
+  .profile-card__role-layer,
+  .profile-card__signature,
+  .profile-card__edit {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-card,
+  .profile-card__content {
+    transform-style: flat;
+  }
+
+  .profile-card__avatar-layer,
+  .profile-card__identity-layer,
+  .profile-card__role-layer,
+  .profile-card__signature,
+  .profile-card__edit {
+    transform: none;
+  }
+}
+</style>

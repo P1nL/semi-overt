@@ -2,18 +2,17 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { Input } from '@/shared/components/base'
-import AnimatedDisabledIcon from '@/shared/components/base/AnimatedDisabledIcon.vue'
+import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
+import { createMinimumDuration } from '@/shared/utils/minimumDuration'
 import { useAuthStore } from '@/stores/auth'
 
 import { authApi } from '@/features/auth/api'
 import { mapAuthRespToSession, mapRegisterFormToDto } from '@/features/auth/model'
 import type { AuthFieldErrors, RegisterFormValues } from '@/features/auth/model'
-import AuthActionButton from './AuthActionButton.vue'
 import TurnstileWidget from './TurnstileWidget.vue'
 
 const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '').trim()
@@ -113,9 +112,11 @@ const hasErrors = computed(() =>
   Boolean(errors.email || errors.username || errors.password || errors.confirmPassword || errors.emailCode),
 )
 const turnstileEnabled = computed(() => Boolean(TURNSTILE_SITE_KEY))
-const resendButtonLabel = computed(() =>
-  resendSeconds.value > 0 ? `重新发送（${resendSeconds.value}s）` : '重新发送验证码',
-)
+const resendButtonLabel = computed(() => {
+  if (!codeSent.value) return '发送验证码'
+  if (resendSeconds.value > 0) return `已发送（${resendSeconds.value}s）`
+  return '重新发送'
+})
 
 function stopResendCountdown() {
   if (!resendTimer) return
@@ -154,10 +155,6 @@ function validateAll(): boolean {
   return nextErrors.every((item) => !item)
 }
 
-function delay(ms: number) {
-  return new Promise<void>(resolve => setTimeout(resolve, ms))
-}
-
 async function handleSubmit() {
   submitError.value = ''
   successMessage.value = ''
@@ -174,12 +171,13 @@ async function handleSubmit() {
   }
 
   submitting.value = true
+  const finishLoadingAnimation = createMinimumDuration()
 
   try {
     const result = await authApi.register(mapRegisterFormToDto(form, turnstileToken.value))
     authStore.setAuth(mapAuthRespToSession(result))
 
-    await delay(900)
+    await finishLoadingAnimation()
 
     toast.success('注册成功，已自动登录')
     await router.push({ name: ROUTE_NAME.HOME })
@@ -347,15 +345,16 @@ onBeforeUnmount(() => {
     />
 
     <div class="flex justify-center">
-      <AuthActionButton
+      <GooeyActionButton
         type="submit"
+        width="18rem"
+        height="3.5rem"
         :loading="submitting"
         :disabled="submitting || sendingCode || hasErrors"
-        icon-only
         aria-label="注册"
       >
-        <AnimatedDisabledIcon size="1.5rem" title="注册" :decorative="false" />
-      </AuthActionButton>
+        <AnimatedPersonCyclingIcon size="1.65rem" title="注册" :decorative="false" />
+      </GooeyActionButton>
     </div>
 
     <div class="text-center text-sm text-[var(--color-text-muted)]">

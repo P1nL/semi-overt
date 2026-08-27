@@ -46,6 +46,7 @@ import {
 import { ImageUploadButton, ImageUploadPreview, uploadImageFile } from '@/shared/image-upload'
 import { articleApi } from '@/shared/api/modules/article'
 import { ContentLinkPreview } from '@/shared/components'
+import AnimatedUploadFileIcon from '@/shared/components/base/AnimatedUploadFileIcon.vue'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
 import {
@@ -1190,11 +1191,7 @@ defineExpose({
             @click="triggerBodyImagePicker"
           >
             <span class="editor-insert-icon">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="12" height="10" rx="2" />
-                <circle cx="5.5" cy="6.5" r="1" />
-                <path d="M2 10l3-3 2 2 2-2 3 3" />
-              </svg>
+              <AnimatedUploadFileIcon size="1rem" :decorative="true" />
             </span>
             <span class="editor-insert-label">{{ bodyImageUploading ? '上传中' : '图片<5MB' }}</span>
           </button>
@@ -1250,11 +1247,7 @@ defineExpose({
               @click="triggerBodyImagePicker"
             >
               <span class="editor-insert-icon">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="3" width="12" height="10" rx="2" />
-                  <circle cx="5.5" cy="6.5" r="1" />
-                  <path d="M2 10l3-3 2 2 2-2 3 3" />
-                </svg>
+                <AnimatedUploadFileIcon size="1rem" :decorative="true" />
               </span>
               <span class="editor-insert-label">{{ bodyImageUploading ? '上传中' : '图片<5MB' }}</span>
             </button>

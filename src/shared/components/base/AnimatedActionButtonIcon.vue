@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import uploadFileAnimationUrl from '@/shared/assets/lottie/upload-file.json?url'
+import actionButtonAnimationUrl from '@/shared/assets/lottie/action-button.json?url'
 
 withDefaults(
   defineProps<{
     size?: number | string
+    color?: string
     decorative?: boolean
     title?: string
   }>(),
   {
     size: 18,
+    color: 'currentColor',
     decorative: true,
     title: '',
   },
@@ -17,17 +19,18 @@ withDefaults(
 
 <template>
   <span
-    class="animated-upload-file-icon"
+    class="animated-action-button-icon"
     :style="{
       width: typeof size === 'number' ? `${size}px` : size,
       height: typeof size === 'number' ? `${size}px` : size,
+      color,
     }"
     :aria-hidden="decorative ? 'true' : undefined"
     :role="decorative ? undefined : 'img'"
   >
     <lord-icon
-      class="animated-upload-file-icon__player current-color"
-      :src="uploadFileAnimationUrl"
+      class="animated-action-button-icon__player current-color"
+      :src="actionButtonAnimationUrl"
       trigger="hover"
       state="hover-pinch"
       :title="!decorative && title ? title : undefined"
@@ -36,7 +39,7 @@ withDefaults(
 </template>
 
 <style scoped>
-.animated-upload-file-icon {
+.animated-action-button-icon {
   position: relative;
   display: inline-block;
   line-height: 0;
@@ -44,7 +47,7 @@ withDefaults(
   vertical-align: middle;
 }
 
-.animated-upload-file-icon__player {
+.animated-action-button-icon__player {
   position: absolute;
   inset: 50% auto auto 50%;
   width: 138%;
@@ -52,7 +55,7 @@ withDefaults(
   transform: translate(-50%, -50%);
 }
 
-.animated-upload-file-icon__player.current-color {
+.animated-action-button-icon__player.current-color {
   --lord-icon-primary: currentColor;
   --lord-icon-secondary: currentColor;
 }

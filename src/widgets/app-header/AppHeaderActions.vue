@@ -12,7 +12,7 @@ import { authApi } from '@/shared/api/modules/auth'
 import { reviewApi } from '@/shared/api/modules/review'
 import { userApi } from '@/shared/api/modules/user'
 import { queryKeys } from '@/shared/api/queryKeys'
-import { Avatar } from '@/shared/components/base'
+import { AnimatedPersonExitIcon, Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
 import { useToast } from '@/shared/composables/useToast'
@@ -464,10 +464,12 @@ async function handleLogout() {
               type="button"
               class="menu-item menu-item-danger"
               role="menuitem"
+              :aria-label="loggingOut ? '退出中' : '退出登录'"
+              :title="loggingOut ? '退出中' : '退出登录'"
               :disabled="loggingOut"
               @click="handleLogout"
             >
-              {{ loggingOut ? '退出中...' : '退出' }}
+              <AnimatedPersonExitIcon size="1.35rem" :decorative="true" />
             </button>
           </div>
         </Transition>

@@ -29,6 +29,10 @@ export default defineConfig({
             return 'icon-player-v2'
           }
 
+          if (id.includes('/ogl/')) {
+            return 'silk-webgl-v2'
+          }
+
           if (id.includes('gsap')) {
             return 'motion-stack-v2'
           }

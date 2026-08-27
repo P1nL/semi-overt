@@ -199,7 +199,7 @@ function loadMoreArticles() {
         <div
           v-else-if="profile"
           key="profile-page-content"
-          class="space-y-8 md:space-y-10"
+          class="flex flex-col gap-8 md:gap-10"
         >
           <ProfileHeader :profile="profile" />
 

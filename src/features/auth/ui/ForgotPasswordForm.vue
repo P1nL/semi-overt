@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 
-import { Input } from '@/shared/components/base'
+import { AnimatedActionButtonIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
+import { createMinimumDuration } from '@/shared/utils/minimumDuration'
 
 import { authApi } from '@/features/auth/api'
 import { mapForgotPasswordFormToDto, mapResetPasswordFormToDto } from '@/features/auth/model'
 import type { AuthFieldErrors, ForgotPasswordFormValues } from '@/features/auth/model'
-import AuthActionButton from './AuthActionButton.vue'
 
 const emit = defineEmits<{
   success: []
@@ -157,9 +157,11 @@ async function sendCode() {
   if (!validateEmailStep()) return
 
   sendingCode.value = true
+  const finishLoadingAnimation = createMinimumDuration()
 
   try {
     await authApi.forgotPassword(mapForgotPasswordFormToDto(form))
+    await finishLoadingAnimation()
     codeSent.value = true
     successMessage.value = '验证码已发送，请查看邮箱'
     toast.success('验证码已发送，请查看邮箱')
@@ -183,9 +185,11 @@ async function handleSubmit() {
   if (!validateResetStep()) return
 
   submitting.value = true
+  const finishLoadingAnimation = createMinimumDuration()
 
   try {
     await authApi.resetPassword(mapResetPasswordFormToDto(form))
+    await finishLoadingAnimation()
     successMessage.value = '密码已重置，请使用新密码登录'
     toast.success('密码已重置，请使用新密码登录')
     emit('success')
@@ -277,14 +281,23 @@ onBeforeUnmount(() => {
     />
 
     <div class="flex justify-center">
-      <AuthActionButton
-        class="forgot-password-form__submit"
+      <GooeyActionButton
         type="submit"
+        width="14rem"
+        height="3.5rem"
+        :aria-label="codeSent ? '重置密码' : '发送验证码'"
+        :title="codeSent ? '重置密码' : '发送验证码'"
         :loading="submitting || sendingCode"
         :disabled="submitting || sendingCode"
       >
-        {{ codeSent ? '重置密码' : '发送验证码' }}
-      </AuthActionButton>
+        <template v-if="codeSent">重置密码</template>
+        <AnimatedActionButtonIcon
+          v-else
+          size="1.5rem"
+          color="currentColor"
+          :decorative="true"
+        />
+      </GooeyActionButton>
     </div>
 
     <div v-if="codeSent" class="flex justify-center">
@@ -319,11 +332,3 @@ onBeforeUnmount(() => {
     </div>
   </form>
 </template>
-
-<style scoped>
-:deep(.forgot-password-form__submit .auth-action-button__label) {
-  font-family: var(--font-display);
-  font-weight: 900;
-  letter-spacing: 0;
-}
-</style>

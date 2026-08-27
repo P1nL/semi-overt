@@ -2,8 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-import { Checkbox, Input } from '@/shared/components/base'
-import AnimatedDisabledIcon from '@/shared/components/base/AnimatedDisabledIcon.vue'
+import { AnimatedPersonCyclingIcon, Checkbox, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -14,7 +13,6 @@ import { useSessionStore } from '@/stores/session'
 import { authApi } from '@/features/auth/api'
 import { mapAuthRespToSession, mapLoginFormToDto } from '@/features/auth/model'
 import type { AuthFieldErrors, LoginFormValues } from '@/features/auth/model'
-import AuthActionButton from './AuthActionButton.vue'
 import PasswordToggleButton from './PasswordToggleButton.vue'
 
 const emit = defineEmits<{
@@ -44,6 +42,18 @@ const errors = reactive<AuthFieldErrors<LoginFormValues>>({})
 const submitting = ref(false)
 const submitError = ref('')
 const passwordVisible = ref(false)
+let resolveLoadingEffect: (() => void) | null = null
+
+function waitForLoadingEffect() {
+  return new Promise<void>((resolve) => {
+    resolveLoadingEffect = resolve
+  })
+}
+
+function handleLoadingEffectComplete() {
+  resolveLoadingEffect?.()
+  resolveLoadingEffect = null
+}
 
 function validateAccount(value: string): string {
   if (!value.trim()) return '请输入邮箱或用户名'
@@ -82,15 +92,12 @@ function validateAll(): boolean {
   return nextErrors.every((item) => !item)
 }
 
-function delay(ms: number) {
-  return new Promise<void>(resolve => setTimeout(resolve, ms))
-}
-
 async function handleSubmit() {
   submitError.value = ''
 
   if (!validateAll()) return
 
+  const finishLoadingAnimation = waitForLoadingEffect()
   submitting.value = true
 
   try {
@@ -99,8 +106,7 @@ async function handleSubmit() {
       persistence: form.rememberMe ? 'local' : 'session',
     })
 
-    // 让转圈动效多转一会儿再跳转
-    await delay(600)
+    await finishLoadingAnimation
 
     toast.success('登录成功')
 
@@ -124,8 +130,10 @@ async function handleSubmit() {
 
     emit('success')
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : '登录失败，请稍后重试'
-    toast.error(submitError.value)
+    const message = error instanceof Error ? error.message : '登录失败，请稍后重试'
+    await finishLoadingAnimation
+    submitError.value = message
+    toast.error(message)
     submitting.value = false
   }
 }
@@ -190,16 +198,17 @@ async function handleSubmit() {
     />
 
     <div class="flex justify-center">
-      <AuthActionButton
-        class="login-form__submit"
+      <GooeyActionButton
         type="submit"
+        width="18rem"
+        height="3.5rem"
         :loading="submitting"
         :disabled="submitting || hasErrors"
-        icon-only
         aria-label="登录"
+        @effect-complete="handleLoadingEffectComplete"
       >
-        <AnimatedDisabledIcon size="1.5rem" title="登录" :decorative="false" />
-      </AuthActionButton>
+        <AnimatedPersonCyclingIcon size="1.65rem" title="登录" :decorative="false" />
+      </GooeyActionButton>
     </div>
 
     <div class="text-center text-sm text-[var(--color-text-muted)]">
@@ -214,9 +223,3 @@ async function handleSubmit() {
     </div>
   </form>
 </template>
-
-<style scoped>
-:deep(.login-form__submit.auth-action-button--icon-only) {
-  width: 15rem;
-}
-</style>

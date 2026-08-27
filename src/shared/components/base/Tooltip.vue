@@ -10,12 +10,14 @@ const props = withDefaults(
       placement?: TooltipPlacement
       disabled?: boolean
       openDelay?: number
+      contentClass?: string
     }>(),
     {
       text: '',
       placement: 'top',
       disabled: false,
       openDelay: 120,
+      contentClass: '',
     },
 )
 
@@ -78,6 +80,7 @@ onBeforeUnmount(hide)
           cn(
             'pointer-events-none absolute z-50 max-w-xs rounded-[var(--radius-sm)] bg-[var(--color-text)] px-2.5 py-1.5 text-xs text-[var(--color-surface)] shadow-[var(--shadow-sm)]',
             placementClass,
+            props.contentClass,
           )
         "
       >

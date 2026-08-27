@@ -35,6 +35,7 @@ const toast = useToast()
 const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
+const SilkBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Silk.vue'))
 
 const PAGE_SHEET_LEAVE = 360
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
@@ -519,6 +520,20 @@ onBeforeUnmount(() => {
   <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
     <AppBackground />
 
+    <Transition name="app-background-fade">
+      <div v-if="uiStore.darkMode" aria-hidden="true" class="app-silk-background">
+        <SilkBackground
+          class="app-silk-background__canvas"
+          :speed="3"
+          :scale="1.15"
+          color="#7B7481"
+          :noise-intensity="1.2"
+          :rotation="0.12"
+        />
+        <div class="app-silk-background__overlay" />
+      </div>
+    </Transition>
+
     <div class="relative z-10">
       <AppHeader
         v-if="shouldShowAppHeader"
@@ -591,3 +606,37 @@ onBeforeUnmount(() => {
     <ToastStack />
   </div>
 </template>
+
+<style scoped>
+.app-silk-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #0b0b0f;
+}
+
+.app-silk-background__canvas,
+.app-silk-background__overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.app-silk-background__overlay {
+  z-index: 2;
+  background:
+    radial-gradient(circle at 50% 42%, transparent 22%, rgb(5 6 10 / 0.18) 72%, rgb(3 4 8 / 0.46) 100%),
+    linear-gradient(180deg, rgb(8 10 15 / 0.08), rgb(8 10 15 / 0.24));
+}
+
+.app-background-fade-enter-active,
+.app-background-fade-leave-active {
+  transition: opacity 540ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-background-fade-enter-from,
+.app-background-fade-leave-to {
+  opacity: 0;
+}
+</style>

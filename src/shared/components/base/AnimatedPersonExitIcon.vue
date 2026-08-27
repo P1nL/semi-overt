@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import uploadFileAnimationUrl from '@/shared/assets/lottie/upload-file.json?url'
+import personExitAnimationUrl from '@/shared/assets/lottie/person-exit.json?url'
 
 withDefaults(
   defineProps<{
@@ -17,7 +17,7 @@ withDefaults(
 
 <template>
   <span
-    class="animated-upload-file-icon"
+    class="animated-person-exit-icon"
     :style="{
       width: typeof size === 'number' ? `${size}px` : size,
       height: typeof size === 'number' ? `${size}px` : size,
@@ -26,8 +26,8 @@ withDefaults(
     :role="decorative ? undefined : 'img'"
   >
     <lord-icon
-      class="animated-upload-file-icon__player current-color"
-      :src="uploadFileAnimationUrl"
+      class="animated-person-exit-icon__player current-color"
+      :src="personExitAnimationUrl"
       trigger="hover"
       state="hover-pinch"
       :title="!decorative && title ? title : undefined"
@@ -36,7 +36,7 @@ withDefaults(
 </template>
 
 <style scoped>
-.animated-upload-file-icon {
+.animated-person-exit-icon {
   position: relative;
   display: inline-block;
   line-height: 0;
@@ -44,7 +44,7 @@ withDefaults(
   vertical-align: middle;
 }
 
-.animated-upload-file-icon__player {
+.animated-person-exit-icon__player {
   position: absolute;
   inset: 50% auto auto 50%;
   width: 138%;
@@ -52,7 +52,7 @@ withDefaults(
   transform: translate(-50%, -50%);
 }
 
-.animated-upload-file-icon__player.current-color {
+.animated-person-exit-icon__player.current-color {
   --lord-icon-primary: currentColor;
   --lord-icon-secondary: currentColor;
 }

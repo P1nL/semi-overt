@@ -13,10 +13,11 @@ import {
 import { queryKeys } from '@/shared/api/queryKeys'
 import { queryClient } from '@/shared/lib/queryClient'
 import { userApi } from '@/shared/api/modules/user'
-import { Button, Icon, IconButton } from '@/shared/components/base'
+import { AnimatedActionButtonIcon, Button, GooeyActionButton, Icon, IconButton } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { useToast } from '@/shared/composables/useToast'
 import { getErrorMessage } from '@/shared/utils/error'
+import { createMinimumDuration } from '@/shared/utils/minimumDuration'
 import { useAuthStore } from '@/stores/auth'
 import ProfileEditForm from './ProfileEditForm.vue'
 
@@ -64,6 +65,7 @@ async function handleSubmit() {
   if (!validation.valid) return
 
   submitting.value = true
+  const finishLoadingAnimation = createMinimumDuration()
 
   try {
     const response = await userApi.updateMyProfile(mapProfileEditFormToPayload(form.value))
@@ -73,6 +75,7 @@ async function handleSubmit() {
     await queryClient.invalidateQueries({
       queryKey: [queryKeys.userProfile('', '', 0, 0)[0]],
     })
+    await finishLoadingAnimation()
 
     toast.success('资料更新成功')
     emit('updated', profile)
@@ -182,11 +185,20 @@ watch(
           <Button type="button" variant="ghost" :disabled="submitting" @click="closeDialog">
             取消
           </Button>
-          <Button type="button" :loading="submitting" :disabled="submitting" @click="handleSubmit">
-            <span class="bg-[linear-gradient(135deg,#ff7b72_0%,#ffb86b_22%,#ffe08a_42%,#79d7ff_68%,#8b8dff_100%)] bg-clip-text text-transparent">
-              保存资料
-            </span>
-          </Button>
+          <GooeyActionButton
+            type="button"
+            variant="primary"
+            width="5rem"
+            height="3rem"
+            aria-label="保存资料"
+            title="保存资料"
+            loading-label="正在保存资料"
+            :loading="submitting"
+            :disabled="submitting"
+            @click="handleSubmit"
+          >
+            <AnimatedActionButtonIcon size="1.5rem" color="currentColor" :decorative="true" />
+          </GooeyActionButton>
         </div>
       </section>
     </Transition>

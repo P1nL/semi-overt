@@ -32,7 +32,7 @@ const open = ref(false)
       variant="ghost"
       :disabled="disabled"
       :aria-label="text"
-      class="group !size-8 rounded-full !border-0 !bg-transparent !p-0 !shadow-none hover:!bg-transparent"
+      class="group !size-10 rounded-full !border-0 !bg-transparent !p-0 !text-inherit !shadow-none hover:!bg-transparent"
       @click="open = true"
     >
       <svg
@@ -40,8 +40,8 @@ const open = ref(false)
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
         class="size-4 transition-transform duration-300 ease-out group-hover:rotate-90"
-        fill="#6b7280"
-        stroke="#6b7280"
+        fill="currentColor"
+        stroke="currentColor"
         stroke-width="20"
         stroke-linejoin="round"
       >
