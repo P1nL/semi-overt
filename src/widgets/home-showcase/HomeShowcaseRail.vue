@@ -37,26 +37,13 @@ const isDesktopRail = useMediaQuery('(min-width: 1024px)')
 const HOVER_SETTLE_BEFORE_NAVIGATE_MS = 280
 const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
-const regularRotatePattern = ['-1.8deg', '1.2deg', '-0.9deg', '2.4deg', '-1.4deg', '0.8deg'] as const
-const featuredRotatePattern = ['-2.2deg', '1.4deg', '-1deg', '2.6deg', '-1.5deg', '0.9deg'] as const
 let navigationSettleTimer: number | null = null
-
-const getStaticRotate = (index: number) => {
-  if (!isDesktopRail.value) {
-    return '0deg'
-  }
-
-  return (props.featured ? featuredRotatePattern : regularRotatePattern)[
-    index % (props.featured ? featuredRotatePattern.length : regularRotatePattern.length)
-  ]
-}
 
 const getItemStyle = (index: number) => ({
   '--item-index': index,
   '--showcase-item-lift': (props.featured ? featuredLiftPattern : regularLiftPattern)[
     index % (props.featured ? featuredLiftPattern.length : regularLiftPattern.length)
   ],
-  '--showcase-item-rotate': getStaticRotate(index),
 })
 
 // --- 🌟 动画核心逻辑开始 ---
@@ -65,14 +52,12 @@ const hoveredIndex = ref<number | null>(null)
 const getMotionKey = (index: number) => `${motionIdPrefix}-${layoutVersion.value}-${index}`
 
 const getMotionState = (index: number): Variant => {
-  const staticRotate = parseFloat(getStaticRotate(index))
-
-  // 1. 无悬停时：全部归位
+  // 1. 无悬停时：保持端正，仅由纵向错层区分卡片高度
   if (hoveredIndex.value === null) {
     return {
       y: 0,
       x: 0,
-      rotate: staticRotate,
+      rotate: 0,
       opacity: 1,
       transition: {
         type: 'spring',
@@ -136,7 +121,7 @@ const getMotionState = (index: number): Variant => {
   return {
     y: 0,
     x: 0,
-    rotate: staticRotate,
+    rotate: 0,
     opacity: 1,
     transition: {
       type: 'spring',

@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
+
 import type { DraftBoxItem } from '@/features/draft-box/model'
 import { Button, Icon } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import DraftListItem from './DraftListItem.vue'
+
+const AnimatedList = defineAsyncComponent(() => import('@/shared/components/AnimatedList.vue'))
 
 withDefaults(
   defineProps<{
@@ -28,39 +32,37 @@ const emit = defineEmits<{
   create: []
   retry: []
 }>()
+
+const DRAFT_LIST_VISIBLE_COUNT = 3
+
+function getDraftItemKey(item: DraftBoxItem) {
+  return item.id
+}
 </script>
 
 <template>
-  <section class="draft-list-shell space-y-3">
+  <section class="draft-list-shell space-y-3" :aria-busy="loading">
     <InlineMessage v-if="error" tone="error" :message="error" />
     <InlineMessage v-else-if="warning" tone="warning" :message="warning" />
 
-    <div v-if="loading" class="space-y-2">
-      <div
-        v-for="index in 3"
-        :key="index"
-        class="surface-2 min-h-[5.75rem] animate-pulse rounded-[var(--radius-lg)]"
-      />
-    </div>
-
-    <div v-else class="draft-list-content space-y-3">
-      <div
+    <div class="draft-list-content space-y-3">
+      <AnimatedList
         v-if="items.length"
+        :items="items"
+        :active="!loading"
+        :visible-count="DRAFT_LIST_VISIBLE_COUNT"
+        :get-key="getDraftItemKey"
         class="draft-list"
       >
-        <div
-          v-for="item in items"
-          :key="item.id"
-          class="draft-list__item"
-        >
+        <template #default="{ item }">
           <DraftListItem
             :item="item"
             :deleting="item.canDelete && String(deletingId) === String(item.id)"
             @open="emit('open', $event)"
             @delete="emit('delete', $event)"
           />
-        </div>
-      </div>
+        </template>
+      </AnimatedList>
 
       <Button
         type="button"
@@ -90,7 +92,7 @@ const emit = defineEmits<{
 
 .draft-list {
   display: flex;
-  max-height: min(24rem, calc(100vh - var(--header-height, 4rem) - 10rem));
+  max-height: min(25.25rem, calc(100vh - var(--header-height, 4rem) - 10rem));
   flex-direction: column;
   gap: 0.75rem;
   min-height: 0;
@@ -98,10 +100,6 @@ const emit = defineEmits<{
   overscroll-behavior: contain;
   padding-right: 0.25rem;
   scrollbar-gutter: stable;
-}
-
-.draft-list__item {
-  position: relative;
 }
 
 .draft-create-card,

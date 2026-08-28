@@ -1,35 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-
-type MeshTheme = 'light' | 'dark'
-
-type MeshPoint = {
-  color: [number, number, number]
-  x: number
-  y: number
-  r: number
-  ax: number
-  ay: number
-  dx: number
-  dy: number
-  sx: number
-  sy: number
-  pulse: number
-  ox: number
-  oy: number
-}
-
-type MeshSample = {
-  x: number
-  y: number
-  radius: number
-  alpha: number
-}
-
-type GridVertex = {
-  x: number
-  y: number
-}
+import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
+import type { Geometry, Mesh, Program, Renderer, Transform } from 'ogl'
 
 type LightArtboard = {
   x: number
@@ -38,268 +9,175 @@ type LightArtboard = {
   height: number
 }
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
+const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef')
+
 const THEME_TRANSITION_DURATION = 540
 const INITIAL_ANIMATION_DELAY_MS = 900
 const BACKGROUND_FRAME_INTERVAL_MS = 1000 / 45
 const MAX_DEVICE_PIXEL_RATIO = 1.35
-const DARK_TRAVEL_SCALE = 0.72
-const DARK_PULSE_SCALE = 0.78
-const DARK_GLOBAL_DRIFT_SCALE = 0.82
-const DARK_GLOW_GRAY_LIGHT: [number, number, number] = [50, 54, 56]
-const DARK_GLOW_GRAY_DARK: [number, number, number] = [39, 43, 44]
-const DARK_GLOW_BASE_ALPHA = 0.9
-const DARK_GLOW_MIN_ALPHA = 0.3
-const DARK_GLOW_SATURATION = 108
-const DARK_GLOW_BLUR = 44
-const DARK_GLOW_RADIUS_SCALE = 0.98
-const DARK_INTERACTIVE_ALPHA_MAX = 0.74
-
-const GRID_RADIUS = 150
-
-const LIGHT_WAKE_MAX_DISTANCE = 74
 const LIGHT_ARTBOARD_RATIO = 420 / 250
 const LIGHT_ARTBOARD_MARGIN_X = 0
 const LIGHT_ARTBOARD_MARGIN_Y = 5
+const LINE_GAP_PX = 15
+const POINT_GAP_PX = 90
+const CURVE_SUBDIVISIONS = 10
 
-const pointer = {
-  x: -1000,
-  y: -1000,
-  targetX: -1000,
-  targetY: -1000,
-  vx: 0,
-  vy: 0,
-  wakeX: -1000,
-  wakeY: -1000,
-  wakeEnergy: 0,
-  active: false,
+const lineCurveVertexShader = `
+precision highp float;
+
+attribute vec3 curve;
+
+uniform vec2 uResolution;
+uniform vec4 uArtboard;
+uniform float uGapX;
+uniform float uPointCount;
+uniform float uTime;
+
+vec2 resolveGridPoint(float lineX, float pointIndex) {
+  float pointDenominator = max(uPointCount - 1.0, 1.0);
+  float baseX = lineX * uArtboard.z;
+  float baseY = pointIndex / pointDenominator * uArtboard.w;
+  float interior = step(0.5, pointIndex) * step(pointIndex, uPointCount - 1.5);
+  float offsetY = cos(baseX * 0.025 + uTime * 0.25) * 40.0 * interior;
+  float offsetX = sin((baseY + offsetY) * 0.02 + uTime * 0.125) * uGapX * 2.5 * interior;
+  return vec2(baseX + offsetX, baseY + offsetY);
 }
 
-const lightPoints: MeshPoint[] = [
-  { color: [255, 255, 255], x: 0.22, y: 0.18, r: 0.46, ax: 0.05, ay: 0.032, dx: 0.018, dy: 0.014, sx: 0.17, sy: 0.14, pulse: 0.46, ox: 0.6, oy: 1.4 },
-  { color: [196, 236, 255], x: 0.12, y: 0.34, r: 0.31, ax: 0.055, ay: 0.042, dx: 0.016, dy: 0.012, sx: 0.2, sy: 0.16, pulse: 0.54, ox: 2.2, oy: 0.7 },
-  { color: [228, 238, 252], x: 0.74, y: 0.22, r: 0.36, ax: 0.034, ay: 0.026, dx: 0.013, dy: 0.012, sx: 0.14, sy: 0.18, pulse: 0.42, ox: 1.7, oy: 2.1 },
-  { color: [182, 226, 255], x: 0.55, y: 0.76, r: 0.39, ax: 0.042, ay: 0.034, dx: 0.015, dy: 0.013, sx: 0.18, sy: 0.2, pulse: 0.51, ox: 3.1, oy: 0.9 },
-  { color: [244, 249, 255], x: 0.86, y: 0.82, r: 0.3, ax: 0.032, ay: 0.028, dx: 0.012, dy: 0.01, sx: 0.16, sy: 0.15, pulse: 0.48, ox: 4.4, oy: 1.2 },
-]
+void main() {
+  float lineX = curve.x;
+  float endPointIndex = curve.y;
+  float progress = curve.z;
+  float startPointIndex = endPointIndex - 1.0;
+  float pointDenominator = max(uPointCount - 1.0, 1.0);
 
-const darkPoints: MeshPoint[] = [
-  // #323638 — 主光晕，大范围漂移
-  { color: DARK_GLOW_GRAY_LIGHT, x: 0.18, y: 0.17, r: 0.34, ax: 0.06, ay: 0.048, dx: 0.02, dy: 0.012, sx: 0.16, sy: 0.12, pulse: 0.42, ox: 0.4, oy: 1.1 },
-  // #272b2c — 右上角
-  { color: DARK_GLOW_GRAY_DARK, x: 0.79, y: 0.24, r: 0.31, ax: 0.034, ay: 0.026, dx: 0.012, dy: 0.011, sx: 0.11, sy: 0.14, pulse: 0.36, ox: 1.8, oy: 0.6 },
-  // #323638 — 中央大底色光晕
-  { color: DARK_GLOW_GRAY_LIGHT, x: 0.5, y: 0.52, r: 0.48, ax: 0.02, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.09, sy: 0.1, pulse: 0.28, ox: 2.7, oy: 1.4 },
-  // #272b2c — 左下
-  { color: DARK_GLOW_GRAY_DARK, x: 0.38, y: 0.7, r: 0.36, ax: 0.03, ay: 0.024, dx: 0.012, dy: 0.01, sx: 0.13, sy: 0.17, pulse: 0.39, ox: 3.6, oy: 1.8 },
-  // #323638 — 右中 cluster 小光晕
-  { color: DARK_GLOW_GRAY_LIGHT, x: 0.66, y: 0.5, r: 0.24, ax: 0.022, ay: 0.018, dx: 0.01, dy: 0.008, sx: 0.15, sy: 0.12, pulse: 0.52, ox: 4.1, oy: 2.4 },
-]
+  vec2 startPoint = resolveGridPoint(lineX, startPointIndex);
+  vec2 endPoint = resolveGridPoint(lineX, endPointIndex);
+
+  float baseX = lineX * uArtboard.z;
+  float startBaseY = startPointIndex / pointDenominator * uArtboard.w;
+  float endBaseY = endPointIndex / pointDenominator * uArtboard.w;
+  float previousBaseY = endPointIndex < uPointCount - 1.0 ? startBaseY : endBaseY;
+  vec2 controlPoint = vec2(baseX, (endPoint.y + previousBaseY) * 0.5);
+
+  vec2 firstHalf = mix(startPoint, controlPoint, progress);
+  vec2 secondHalf = mix(controlPoint, endPoint, progress);
+  vec2 curvePoint = mix(firstHalf, secondHalf, progress);
+  vec2 pixelPosition = uArtboard.xy + curvePoint;
+  vec2 clipPosition = vec2(
+    pixelPosition.x / uResolution.x * 2.0 - 1.0,
+    1.0 - pixelPosition.y / uResolution.y * 2.0
+  );
+
+  gl_Position = vec4(clipPosition, 0.0, 1.0);
+}
+`
+
+const gridPointVertexShader = `
+precision highp float;
+
+attribute vec2 gridPoint;
+
+uniform vec2 uResolution;
+uniform vec4 uArtboard;
+uniform float uGapX;
+uniform float uPointCount;
+uniform float uTime;
+uniform float uPointSize;
+
+void main() {
+  float lineX = gridPoint.x;
+  float pointIndex = gridPoint.y;
+  float pointDenominator = max(uPointCount - 1.0, 1.0);
+  float baseX = lineX * uArtboard.z;
+  float baseY = pointIndex / pointDenominator * uArtboard.w;
+  float interior = step(0.5, pointIndex) * step(pointIndex, uPointCount - 1.5);
+  float offsetY = cos(baseX * 0.025 + uTime * 0.25) * 40.0 * interior;
+  float offsetX = sin((baseY + offsetY) * 0.02 + uTime * 0.125) * uGapX * 2.5 * interior;
+  vec2 pixelPosition = uArtboard.xy + vec2(baseX + offsetX, baseY + offsetY);
+  vec2 clipPosition = vec2(
+    pixelPosition.x / uResolution.x * 2.0 - 1.0,
+    1.0 - pixelPosition.y / uResolution.y * 2.0
+  );
+
+  gl_Position = vec4(clipPosition, 0.0, 1.0);
+  gl_PointSize = uPointSize;
+}
+`
+
+const borderVertexShader = `
+precision highp float;
+
+attribute vec2 position;
+
+uniform vec2 uResolution;
+uniform vec4 uArtboard;
+
+void main() {
+  vec2 pixelPosition = uArtboard.xy + position * uArtboard.zw;
+  vec2 clipPosition = vec2(
+    pixelPosition.x / uResolution.x * 2.0 - 1.0,
+    1.0 - pixelPosition.y / uResolution.y * 2.0
+  );
+
+  gl_Position = vec4(clipPosition, 0.0, 1.0);
+}
+`
+
+const lineFragmentShader = `
+precision highp float;
+
+void main() {
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+}
+`
+
+const pointFragmentShader = `
+precision highp float;
+
+void main() {
+  vec2 centeredPoint = gl_PointCoord - vec2(0.5);
+  if (dot(centeredPoint, centeredPoint) > 0.25) {
+    discard;
+  }
+
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+}
+`
+
+let oglModule: typeof import('ogl') | null = null
+let renderer: Renderer | null = null
+let scene: Transform | null = null
+let lineProgram: Program | null = null
+let pointProgram: Program | null = null
+let borderProgram: Program | null = null
+let lineMesh: Mesh | null = null
+let pointMesh: Mesh | null = null
+let borderMesh: Mesh | null = null
+let lineGeometry: Geometry | null = null
+let pointGeometry: Geometry | null = null
+let borderGeometry: Geometry | null = null
 
 let frameId = 0
-let dpr = 1
-let currentTheme: MeshTheme = 'light'
-let targetTheme: MeshTheme = 'light'
-let transitionFromTheme: MeshTheme | null = null
-let themeTransitionStart = 0
-let themeObserver: MutationObserver | null = null
+let resizeFrameId = 0
 let lastRenderedAt = 0
 let animationLoopEnabled = false
 let animationStartTimer: number | null = null
 let darkModePauseTimer: number | null = null
+let themeObserver: MutationObserver | null = null
+let reducedMotionQuery: MediaQueryList | null = null
 let prefersReducedMotion = false
 
-function easeOutQuart(value: number) {
-  return 1 - (1 - value) ** 4
+const sharedUniforms = {
+  uResolution: { value: [1, 1] },
+  uArtboard: { value: [0, 0, 1, 1] },
+  uGapX: { value: 1 },
+  uPointCount: { value: 2 },
+  uTime: { value: 0 },
+  uPointSize: { value: 2 },
 }
 
-function queueFrame() {
-  if (!animationLoopEnabled || frameId !== 0 || document.hidden) {
-    return
-  }
-
-  frameId = requestAnimationFrame(render)
-}
-
-function stopAnimation() {
-  if (frameId === 0) {
-    return
-  }
-
-  cancelAnimationFrame(frameId)
-  frameId = 0
-}
-
-function syncAnimationLoop(forceRender = false) {
-  if (document.hidden) {
-    stopAnimation()
-    return
-  }
-
-  if (forceRender) {
-    renderFrame(performance.now())
-  }
-
-  queueFrame()
-}
-
-function startAnimationLoop(forceRender = true) {
-  animationLoopEnabled = true
-  syncAnimationLoop(forceRender)
-}
-
-function pauseAnimationLoop() {
-  animationLoopEnabled = false
-  stopAnimation()
-}
-
-function cancelAnimationLoopStart() {
-  if (animationStartTimer === null) return
-  window.clearTimeout(animationStartTimer)
-  animationStartTimer = null
-}
-
-function cancelDarkModePause() {
-  if (darkModePauseTimer === null) return
-  window.clearTimeout(darkModePauseTimer)
-  darkModePauseTimer = null
-}
-
-function scheduleDarkModePause() {
-  cancelDarkModePause()
-  darkModePauseTimer = window.setTimeout(() => {
-    darkModePauseTimer = null
-    if (targetTheme === 'dark') {
-      pauseAnimationLoop()
-    }
-  }, THEME_TRANSITION_DURATION + 80)
-}
-
-function scheduleAnimationLoopStart() {
-  if (animationStartTimer !== null) {
-    return
-  }
-
-  animationStartTimer = window.setTimeout(() => {
-    animationStartTimer = null
-
-    const startWhenLight = () => {
-      if (targetTheme === 'light') {
-        startAnimationLoop()
-      }
-    }
-
-    const schedule = window.requestIdleCallback
-    if (schedule) {
-      schedule(startWhenLight, { timeout: 1200 })
-      return
-    }
-
-    startWhenLight()
-  }, INITIAL_ANIMATION_DELAY_MS)
-}
-
-function handlePointerMove(event: MouseEvent) {
-  pointer.active = true
-
-  if (pointer.x < -500 || pointer.y < -500) {
-    pointer.x = event.clientX
-    pointer.y = event.clientY
-    pointer.wakeX = event.clientX
-    pointer.wakeY = event.clientY
-  }
-
-  pointer.targetX = event.clientX
-  pointer.targetY = event.clientY
-}
-
-function handlePointerLeave() {
-  pointer.active = false
-  pointer.targetX = pointer.x
-  pointer.targetY = pointer.y
-}
-
-function resolveTheme(): MeshTheme {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-}
-
-function beginThemeTransition(nextTheme: MeshTheme, now = performance.now()) {
-  if (nextTheme === targetTheme) {
-    return
-  }
-
-  transitionFromTheme = targetTheme
-  currentTheme = nextTheme
-  targetTheme = nextTheme
-  themeTransitionStart = now
-  queueFrame()
-}
-
-function resizeCanvas() {
-  const canvas = canvasRef.value
-
-  if (!canvas) {
-    return
-  }
-
-  dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
-  canvas.width = Math.floor(window.innerWidth * dpr)
-  canvas.height = Math.floor(window.innerHeight * dpr)
-  canvas.style.width = `${window.innerWidth}px`
-  canvas.style.height = `${window.innerHeight}px`
-}
-
-function handleResize() {
-  resizeCanvas()
-
-  if (prefersReducedMotion) {
-    renderFrame(performance.now())
-  }
-}
-
-function applyThemeFromDom() {
-  const nextTheme = resolveTheme()
-
-  if (nextTheme === targetTheme) return
-
-  cancelDarkModePause()
-
-  if (!prefersReducedMotion) {
-    if (nextTheme === 'light') {
-      startAnimationLoop(false)
-    } else {
-      cancelAnimationLoopStart()
-    }
-
-    beginThemeTransition(nextTheme)
-
-    if (nextTheme === 'dark') {
-      scheduleDarkModePause()
-    }
-    return
-  }
-
-  currentTheme = nextTheme
-  targetTheme = nextTheme
-  transitionFromTheme = null
-  renderFrame(performance.now())
-}
-
-function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, theme: MeshTheme) {
-  if (theme === 'dark') {
-    // 对齐参考文件：--color-bg1: rgb(8,10,15)  --color-bg2: rgb(0,17,32)
-    const gradient = ctx.createLinearGradient(0, 0, width * 0.6, height)
-    gradient.addColorStop(0, 'rgb(0, 17, 32)')
-    gradient.addColorStop(0.52, 'rgb(5, 12, 22)')
-    gradient.addColorStop(1, 'rgb(8, 10, 15)')
-
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, width, height)
-    return
-  }
-
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, width, height)
+function resolveThemeIsDark() {
+  return document.documentElement.classList.contains('dark')
 }
 
 function resolveLightArtboard(width: number, height: number): LightArtboard {
@@ -322,429 +200,153 @@ function resolveLightArtboard(width: number, height: number): LightArtboard {
   }
 }
 
-function drawInteractiveGrid(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  time: number,
-) {
-  const artboard = resolveLightArtboard(width, height)
-  const maxLines = Math.max(2, Math.floor(artboard.width / 15))
-  const maxPoints = Math.max(2, Math.floor(artboard.height / 90))
-  const gapX = artboard.width / Math.max(maxLines - 1, 1)
-  const gapY = artboard.height / Math.max(maxPoints - 1, 1)
-  const animationTime = time / 0.00136
-
-  ctx.save()
-  ctx.lineWidth = 1
-  ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = '#000000'
-
-  for (let lineIndex = 0; lineIndex < maxLines; lineIndex += 1) {
-    const points: Array<GridVertex & { offsetX: number; offsetY: number }> = []
-    const baseX = lineIndex * gapX
-
-    for (let pointIndex = 0; pointIndex < maxPoints; pointIndex += 1) {
-      const baseY = pointIndex * gapY
-      let offsetY = Math.cos(baseX * 0.025 + animationTime * 0.00025) * 40
-      let offsetX = Math.sin((baseY + offsetY) * 0.02 + animationTime * 0.000125) * gapX * 2.5
-
-      if (pointIndex === 0 || pointIndex === maxPoints - 1) {
-        offsetX = 0
-        offsetY = 0
-      }
-
-      points.push({ x: baseX, y: baseY, offsetX, offsetY })
-    }
-
-    ctx.beginPath()
-
-    points.forEach((point, pointIndex) => {
-      const x = artboard.x + point.x + point.offsetX
-      const y = artboard.y + point.y + point.offsetY
-
-      if (pointIndex === 0) {
-        ctx.moveTo(x, y)
-      } else {
-        const previousBasePoint =
-          pointIndex > 0 && pointIndex < points.length - 1
-            ? points[pointIndex - 1]
-            : point
-
-        const controlX = artboard.x + point.x
-        const controlY = artboard.y + (y - artboard.y + previousBasePoint.y) * 0.5
-
-        ctx.quadraticCurveTo(controlX, controlY, x, y)
-      }
-    })
-
-    ctx.stroke()
-
-    points.forEach((point) => {
-      const x = artboard.x + point.x + point.offsetX
-      const y = artboard.y + point.y + point.offsetY
-
-      ctx.beginPath()
-      ctx.arc(x, y, 1, 0, Math.PI * 2)
-      ctx.stroke()
-    })
-  }
-
-  ctx.beginPath()
-  ctx.moveTo(artboard.x, artboard.y)
-  ctx.lineTo(artboard.x + artboard.width, artboard.y)
-  ctx.moveTo(artboard.x + artboard.width, artboard.y + artboard.height)
-  ctx.lineTo(artboard.x, artboard.y + artboard.height)
-  ctx.stroke()
-  ctx.restore()
-}
-
-function drawPoint(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  radius: number,
-  color: [number, number, number],
-  alpha: number,
-) {
-  drawBlob(ctx, px, py, radius, radius, 0, color, alpha)
-}
-
-function drawBlob(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  radiusX: number,
-  radiusY: number,
-  rotation: number,
-  color: [number, number, number],
-  alpha: number,
-) {
-  ctx.save()
-  ctx.translate(px, py)
-  ctx.rotate(rotation)
-  ctx.scale(radiusX, radiusY)
-
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1)
-  gradient.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`)
-  gradient.addColorStop(0.34, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha * 0.46})`)
-  gradient.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`)
-
-  ctx.fillStyle = gradient
-  ctx.beginPath()
-  ctx.arc(0, 0, 1, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-}
-
-function drawCluster(
-  ctx: CanvasRenderingContext2D,
-  sample: MeshSample,
-  color: [number, number, number],
-  time: number,
-  phase: number,
-) {
-  const parts = [
-    { ox: -0.34, oy: -0.08, rx: 0.84, ry: 0.52, rotation: -0.44, alpha: 0.88 },
-    { ox: 0.24, oy: 0.2, rx: 0.56, ry: 0.86, rotation: 0.36, alpha: 0.72 },
-    { ox: 0.06, oy: -0.32, rx: 0.44, ry: 0.34, rotation: 0.96, alpha: 0.58 },
-    { ox: 0.28, oy: -0.14, rx: 0.38, ry: 0.54, rotation: -1.02, alpha: 0.42 },
-    { ox: -0.08, oy: 0.3, rx: 0.46, ry: 0.28, rotation: 0.18, alpha: 0.4 },
-  ]
-
-  parts.forEach((part, index) => {
-    const driftX = Math.sin(time * (0.42 + index * 0.08) + phase + index) * sample.radius * 0.08
-    const driftY = Math.cos(time * (0.36 + index * 0.07) + phase * 0.8 + index) * sample.radius * 0.06
-
-    drawBlob(
-      ctx,
-      sample.x + sample.radius * part.ox + driftX,
-      sample.y + sample.radius * part.oy + driftY,
-      sample.radius * part.rx,
-      sample.radius * part.ry,
-      part.rotation + Math.sin(time * 0.18 + phase + index) * 0.08,
-      color,
-      sample.alpha * part.alpha,
-    )
-  })
-
-  ctx.save()
-  ctx.globalCompositeOperation = 'destination-out'
-  drawBlob(
-    ctx,
-    sample.x + sample.radius * 0.26 + Math.sin(time * 0.31 + phase) * sample.radius * 0.05,
-    sample.y - sample.radius * 0.18 + Math.cos(time * 0.27 + phase) * sample.radius * 0.04,
-    sample.radius * 0.22,
-    sample.radius * 0.16,
-    -0.58,
-    color,
-    Math.min(sample.alpha * 0.22, 0.18),
+function createLineCurveData(lineCount: number, pointCount: number) {
+  const segmentCount = Math.max(pointCount - 1, 1)
+  const valuesPerSubdivision = 6
+  const curveData = new Float32Array(
+    lineCount * segmentCount * CURVE_SUBDIVISIONS * valuesPerSubdivision,
   )
-  ctx.restore()
+  let offset = 0
+
+  for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
+    const lineX = lineCount === 1 ? 0 : lineIndex / (lineCount - 1)
+
+    for (let endPointIndex = 1; endPointIndex < pointCount; endPointIndex += 1) {
+      for (let subdivision = 0; subdivision < CURVE_SUBDIVISIONS; subdivision += 1) {
+        const startProgress = subdivision / CURVE_SUBDIVISIONS
+        const endProgress = (subdivision + 1) / CURVE_SUBDIVISIONS
+
+        curveData[offset] = lineX
+        curveData[offset + 1] = endPointIndex
+        curveData[offset + 2] = startProgress
+        curveData[offset + 3] = lineX
+        curveData[offset + 4] = endPointIndex
+        curveData[offset + 5] = endProgress
+        offset += valuesPerSubdivision
+      }
+    }
+  }
+
+  return curveData
 }
 
-function drawMeshLayer(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  theme: MeshTheme,
-  time: number,
-) {
-  const points = theme === 'dark' ? darkPoints : lightPoints
-  const baseAlpha = theme === 'dark' ? DARK_GLOW_BASE_ALPHA : 0.98
-  const blurAmount = theme === 'dark' ? DARK_GLOW_BLUR : 46
-  const saturation = theme === 'dark' ? DARK_GLOW_SATURATION : 118
-  const samples: MeshSample[] = []
-  const globalDriftX =
-    (Math.sin(time * (theme === 'dark' ? 0.16 : 0.14) + 0.8) * (theme === 'dark' ? 0.092 : 0.032) +
-      Math.cos(time * (theme === 'dark' ? 0.11 : 0.1) + 2.1) * (theme === 'dark' ? 0.04 : 0.014)) *
-    width *
-    (theme === 'dark' ? DARK_GLOBAL_DRIFT_SCALE : 1)
-  const globalDriftY =
-    (Math.cos(time * (theme === 'dark' ? 0.13 : 0.12) + 1.4) * (theme === 'dark' ? 0.068 : 0.022) +
-      Math.sin(time * (theme === 'dark' ? 0.09 : 0.08) + 0.2) * (theme === 'dark' ? 0.026 : 0.01)) *
-    height *
-    (theme === 'dark' ? DARK_GLOBAL_DRIFT_SCALE : 1)
+function createPointData(lineCount: number, pointCount: number) {
+  const pointData = new Float32Array(lineCount * pointCount * 2)
+  let offset = 0
 
-  ctx.save()
-  ctx.globalCompositeOperation = 'source-over'
-  ctx.filter = `blur(${blurAmount}px) saturate(${saturation}%)`
+  for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
+    const lineX = lineCount === 1 ? 0 : lineIndex / (lineCount - 1)
 
-  points.forEach((point, index) => {
-    const wobbleX =
-      Math.sin(time * (point.sx * 0.63 + 0.03) + point.ox * 1.7) * (point.ax * 0.46) +
-      Math.cos(time * (point.sy * 1.14 + 0.06) + point.oy * 1.3) * (point.dx * 0.92) +
-      Math.sin(time * (point.sx * 0.41 + point.sy * 0.52) + point.ox * 0.7) * (point.ax * 0.22)
-
-    const wobbleY =
-      Math.cos(time * (point.sy * 0.58 + 0.04) + point.oy * 1.6) * (point.ay * 0.44) +
-      Math.sin(time * (point.sx * 1.08 + 0.05) + point.ox * 1.15) * (point.dy * 0.96) +
-      Math.cos(time * (point.sy * 0.43 + point.sx * 0.38) + point.oy * 0.65) * (point.ay * 0.2)
-
-    let travelX = 0
-    let travelY = 0
-
-    if (theme === 'light' && index === 0) {
-      travelX = Math.sin(time * 0.12 + point.ox) * width * 0.62
-      travelY = Math.cos(time * 0.1 + point.oy) * height * 0.14
+    for (let pointIndex = 0; pointIndex < pointCount; pointIndex += 1) {
+      pointData[offset] = lineX
+      pointData[offset + 1] = pointIndex
+      offset += 2
     }
+  }
 
-    if (theme === 'light' && index === 3) {
-      travelX = Math.cos(time * 0.1 + point.ox) * width * 0.1
-      travelY = Math.sin(time * 0.12 + point.oy) * height * 0.06
-    }
+  return pointData
+}
 
-    if (theme === 'dark' && index === 0) {
-      travelX = Math.sin(time * 0.11 + point.ox) * width * 0.68 * DARK_TRAVEL_SCALE
-      travelY = Math.cos(time * 0.09 + point.oy) * height * 0.18 * DARK_TRAVEL_SCALE
-    }
+function replaceGridGeometry(artboard: LightArtboard) {
+  if (!renderer || !oglModule || !lineMesh || !pointMesh || !borderMesh) return
 
-    if (theme === 'dark' && index === 4) {
-      travelX = Math.cos(time * 0.1 + point.ox) * width * 0.34 * DARK_TRAVEL_SCALE
-      travelY = Math.sin(time * 0.08 + point.oy) * height * 0.1 * DARK_TRAVEL_SCALE
-    }
+  const gl = renderer.gl
+  const lineCount = Math.max(2, Math.floor(artboard.width / LINE_GAP_PX))
+  const pointCount = Math.max(2, Math.floor(artboard.height / POINT_GAP_PX))
 
-    const x =
-      (point.x +
-        Math.sin(time * point.sx + point.ox) * point.ax +
-        Math.cos(time * point.sy * 0.7 + point.oy) * point.dx +
-        wobbleX) *
-        width +
-      globalDriftX +
-      travelX
+  lineGeometry?.remove()
+  pointGeometry?.remove()
+  borderGeometry?.remove()
 
-    const y =
-      (point.y +
-        Math.cos(time * point.sy + point.oy) * point.ay +
-        Math.sin(time * point.sx * 0.82 + point.ox) * point.dy +
-        wobbleY) *
-        height +
-      globalDriftY +
-      travelY
-
-    const pulse =
-      1 +
-      Math.sin(time * point.pulse + point.ox) * (theme === 'dark' ? 0.09 * DARK_PULSE_SCALE : 0.065) +
-      Math.cos(time * (point.pulse * 0.56 + 0.08) + point.oy) * (theme === 'dark' ? 0.028 * DARK_PULSE_SCALE : 0.02)
-    const radius =
-      Math.min(width, height) *
-      point.r *
-      pulse *
-      1.12 *
-      (theme === 'dark' ? DARK_GLOW_RADIUS_SCALE : 1)
-
-    let alpha = baseAlpha
-
-    if (theme === 'light' && point === lightPoints[1]) {
-      alpha += Math.sin(time * 0.82) * 0.1
-    }
-
-    if (theme === 'light' && point === lightPoints[3]) {
-      alpha += Math.cos(time * 0.74 + 0.8) * 0.08
-    }
-
-    if (theme === 'dark' && point === darkPoints[4]) {
-      alpha += Math.sin(time * 1.3 + 1.2) * 0.11
-    }
-
-    if (theme === 'dark' && point === darkPoints[0]) {
-      alpha += Math.cos(time * 1.08 + 0.4) * 0.05
-    }
-
-    samples[index] = {
-      x,
-      y,
-      radius,
-      alpha: Math.max(theme === 'dark' ? DARK_GLOW_MIN_ALPHA : 0.22, Math.min(alpha, 1)),
-    }
+  lineGeometry = new oglModule.Geometry(gl, {
+    curve: {
+      size: 3,
+      data: createLineCurveData(lineCount, pointCount),
+    },
   })
 
-  const primaryBlend = theme === 'dark'
-    ? Math.sin(time * 0.44 + 0.7)
-    : Math.sin(time * 0.48 + 0.4)
-  const secondaryBlend = theme === 'dark'
-    ? Math.cos(time * 0.37 + 2.1)
-    : Math.cos(time * 0.42 + 1.6)
-
-  function blendPair(aIndex: number, bIndex: number, amount: number, radiusBoost: number, alphaBoost: number) {
-    const a = samples[aIndex]
-    const b = samples[bIndex]
-
-    if (!a || !b) {
-      return
-    }
-
-    const mix = amount * 0.16
-    const deltaX = b.x - a.x
-    const deltaY = b.y - a.y
-    const mergeAmount = Math.max(amount, 0)
-    const splitAmount = Math.max(-amount, 0)
-
-    a.x += deltaX * mix
-    a.y += deltaY * mix
-    b.x -= deltaX * mix
-    b.y -= deltaY * mix
-
-    a.radius *= 1 + mergeAmount * radiusBoost - splitAmount * radiusBoost * 0.42
-    b.radius *= 1 + mergeAmount * radiusBoost - splitAmount * radiusBoost * 0.42
-    a.alpha = Math.max(0.2, Math.min(1, a.alpha + mergeAmount * alphaBoost - splitAmount * alphaBoost * 0.3))
-    b.alpha = Math.max(0.2, Math.min(1, b.alpha + mergeAmount * alphaBoost - splitAmount * alphaBoost * 0.3))
-  }
-
-  if (theme === 'light') {
-    blendPair(0, 1, primaryBlend, 0.07, 0.04)
-    blendPair(2, 3, secondaryBlend, 0.05, 0.03)
-  } else {
-    blendPair(0, 4, primaryBlend, 0.16, 0.12)
-    blendPair(1, 3, secondaryBlend, 0.09, 0.06)
-  }
-
-  samples.forEach((sample, index) => {
-    if (theme === 'light' && index === 3) {
-      drawCluster(ctx, sample, points[index].color, time, points[index].ox)
-      return
-    }
-
-    drawPoint(ctx, sample.x, sample.y, sample.radius, points[index].color, sample.alpha)
+  pointGeometry = new oglModule.Geometry(gl, {
+    gridPoint: {
+      size: 2,
+      data: createPointData(lineCount, pointCount),
+    },
   })
 
-  // interactive 鼠标跟随光晕：#323638（仅暗色）
-  if (theme === 'dark' && pointer.active) {
-    const interactiveRadius = Math.min(width, height) * 0.46 * DARK_GLOW_RADIUS_SCALE
-    const interactiveAlpha = Math.min(DARK_INTERACTIVE_ALPHA_MAX, pointer.wakeEnergy * 0.1 + 0.24)
-    drawPoint(ctx, pointer.wakeX, pointer.wakeY, interactiveRadius, DARK_GLOW_GRAY_LIGHT, interactiveAlpha)
-  }
+  borderGeometry = new oglModule.Geometry(gl, {
+    position: {
+      size: 2,
+      data: new Float32Array([
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 1,
+      ]),
+    },
+  })
 
-  ctx.restore()
+  lineMesh.geometry = lineGeometry
+  pointMesh.geometry = pointGeometry
+  borderMesh.geometry = borderGeometry
+
+  sharedUniforms.uGapX.value = artboard.width / Math.max(lineCount - 1, 1)
+  sharedUniforms.uPointCount.value = pointCount
 }
 
-function drawScene(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  theme: MeshTheme,
-  time: number,
-  opacity = 1,
-) {
-  if (opacity <= 0.001) {
-    return
-  }
-
-  ctx.save()
-  ctx.globalAlpha = opacity
-  drawBackground(ctx, width, height, theme)
-
-  if (theme === 'light') {
-    drawInteractiveGrid(ctx, width, height, time)
-  } else {
-    drawMeshLayer(ctx, width, height, theme, time)
-  }
-
-  ctx.restore()
-}
-
-function renderFrame(now: number) {
-  const canvas = canvasRef.value
-
-  if (!canvas) {
-    return
-  }
-
-  const ctx = canvas.getContext('2d')
-
-  if (!ctx) {
-    return
-  }
+function resizeRenderer() {
+  if (!renderer) return
 
   const width = window.innerWidth
   const height = window.innerHeight
-  const time = prefersReducedMotion ? 0 : now * 0.00136
+  const dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
+  const artboard = resolveLightArtboard(width, height)
 
-  const prevX = pointer.x
-  const prevY = pointer.y
-  const pointerLerp = pointer.active ? 0.16 : 0.08
-  pointer.x += (pointer.targetX - pointer.x) * pointerLerp
-  pointer.y += (pointer.targetY - pointer.y) * pointerLerp
-  pointer.vx += (pointer.x - prevX - pointer.vx) * 0.24
-  pointer.vy += (pointer.y - prevY - pointer.vy) * 0.24
+  renderer.dpr = dpr
+  renderer.setSize(width, height)
 
-  const speed = Math.hypot(pointer.vx, pointer.vy)
-  const wakeTarget = pointer.active ? speed : 0
-  pointer.wakeEnergy += (wakeTarget - pointer.wakeEnergy) * 0.026
-  const directionX = speed > 0.001 ? pointer.vx / speed : 0
-  const directionY = speed > 0.001 ? pointer.vy / speed : 0
-  const wakeDistance =
-    targetTheme === 'light'
-      ? Math.min(LIGHT_WAKE_MAX_DISTANCE, pointer.wakeEnergy * 5.8)
-      : Math.min(138, pointer.wakeEnergy * 14)
-  const wakeTargetX = pointer.x - directionX * wakeDistance
-  const wakeTargetY = pointer.y - directionY * wakeDistance
+  sharedUniforms.uResolution.value = [width, height]
+  sharedUniforms.uArtboard.value = [
+    artboard.x,
+    artboard.y,
+    artboard.width,
+    artboard.height,
+  ]
+  sharedUniforms.uPointSize.value = Math.max(1.5, 2 * dpr)
 
-  const wakeLerp = targetTheme === 'light' ? 0.028 : 0.05
-  pointer.wakeX += (wakeTargetX - pointer.wakeX) * wakeLerp
-  pointer.wakeY += (wakeTargetY - pointer.wakeY) * wakeLerp
+  replaceGridGeometry(artboard)
+  renderFrame(performance.now())
+}
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, width, height)
+function scheduleResize() {
+  if (resizeFrameId !== 0) return
 
-  if (transitionFromTheme) {
-    const progress = Math.min((now - themeTransitionStart) / THEME_TRANSITION_DURATION, 1)
-    const easedProgress = easeOutQuart(progress)
+  resizeFrameId = requestAnimationFrame(() => {
+    resizeFrameId = 0
+    resizeRenderer()
+  })
+}
 
-    drawScene(ctx, width, height, transitionFromTheme, time, 1)
-    drawScene(ctx, width, height, targetTheme, time, easedProgress)
+function renderFrame(now: number) {
+  if (!renderer || !scene) return
 
-    if (progress >= 1) {
-      transitionFromTheme = null
-    }
-  } else {
-    drawScene(ctx, width, height, targetTheme, time)
+  sharedUniforms.uTime.value = prefersReducedMotion ? 0 : now * 0.001
+  renderer.render({
+    scene,
+    sort: false,
+    frustumCull: false,
+  })
+}
+
+function queueFrame() {
+  if (!animationLoopEnabled || frameId !== 0 || document.hidden || resolveThemeIsDark()) {
+    return
   }
+
+  frameId = requestAnimationFrame(render)
 }
 
 function render(now: number) {
   frameId = 0
+
   if (now - lastRenderedAt < BACKGROUND_FRAME_INTERVAL_MS) {
     queueFrame()
     return
@@ -755,44 +357,271 @@ function render(now: number) {
   queueFrame()
 }
 
-function handleVisibilityChange() {
-  syncAnimationLoop(true)
+function stopAnimationFrame() {
+  if (frameId === 0) return
+
+  cancelAnimationFrame(frameId)
+  frameId = 0
 }
 
-onMounted(() => {
-  prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  currentTheme = resolveTheme()
-  targetTheme = currentTheme
-  resizeCanvas()
+function startAnimationLoop(forceRender = true) {
+  if (prefersReducedMotion || resolveThemeIsDark()) {
+    animationLoopEnabled = false
+    stopAnimationFrame()
+    if (forceRender) renderFrame(performance.now())
+    return
+  }
 
-  themeObserver = new MutationObserver(applyThemeFromDom)
+  animationLoopEnabled = true
+  if (forceRender) renderFrame(performance.now())
+  queueFrame()
+}
 
+function pauseAnimationLoop() {
+  animationLoopEnabled = false
+  stopAnimationFrame()
+}
+
+function cancelAnimationLoopStart() {
+  if (animationStartTimer === null) return
+
+  window.clearTimeout(animationStartTimer)
+  animationStartTimer = null
+}
+
+function scheduleAnimationLoopStart() {
+  if (animationStartTimer !== null || prefersReducedMotion || resolveThemeIsDark()) return
+
+  animationStartTimer = window.setTimeout(() => {
+    animationStartTimer = null
+
+    const startWhenIdle = () => {
+      if (!resolveThemeIsDark()) {
+        startAnimationLoop()
+      }
+    }
+
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(startWhenIdle, { timeout: 1200 })
+      return
+    }
+
+    startWhenIdle()
+  }, INITIAL_ANIMATION_DELAY_MS)
+}
+
+function cancelDarkModePause() {
+  if (darkModePauseTimer === null) return
+
+  window.clearTimeout(darkModePauseTimer)
+  darkModePauseTimer = null
+}
+
+function scheduleDarkModePause() {
+  cancelDarkModePause()
+  darkModePauseTimer = window.setTimeout(() => {
+    darkModePauseTimer = null
+    if (resolveThemeIsDark()) {
+      pauseAnimationLoop()
+    }
+  }, THEME_TRANSITION_DURATION + 80)
+}
+
+function syncThemeAnimation() {
+  cancelDarkModePause()
+
+  if (resolveThemeIsDark()) {
+    cancelAnimationLoopStart()
+    scheduleDarkModePause()
+    return
+  }
+
+  startAnimationLoop(false)
+}
+
+function syncReducedMotionPreference() {
+  prefersReducedMotion = reducedMotionQuery?.matches ?? false
+
+  if (prefersReducedMotion) {
+    cancelAnimationLoopStart()
+    pauseAnimationLoop()
+    renderFrame(0)
+    return
+  }
+
+  if (!resolveThemeIsDark()) {
+    startAnimationLoop()
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.hidden) {
+    stopAnimationFrame()
+    return
+  }
+
+  if (animationLoopEnabled && !resolveThemeIsDark()) {
+    renderFrame(performance.now())
+    queueFrame()
+  }
+}
+
+async function initRenderer() {
+  const canvas = canvasRef.value
+  if (!canvas) return false
+
+  try {
+    oglModule = await import('ogl')
+    renderer = new oglModule.Renderer({
+      canvas,
+      dpr: Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO),
+      alpha: true,
+      antialias: true,
+      depth: false,
+      powerPreference: 'high-performance',
+    })
+  } catch (error) {
+    console.warn('Unable to initialize the light background WebGL renderer.', error)
+    renderer = null
+    return false
+  }
+
+  const gl = renderer.gl
+  gl.clearColor(0, 0, 0, 0)
+
+  lineProgram = new oglModule.Program(gl, {
+    vertex: lineCurveVertexShader,
+    fragment: lineFragmentShader,
+    uniforms: sharedUniforms,
+    transparent: true,
+    cullFace: null,
+    depthTest: false,
+    depthWrite: false,
+  })
+
+  pointProgram = new oglModule.Program(gl, {
+    vertex: gridPointVertexShader,
+    fragment: pointFragmentShader,
+    uniforms: sharedUniforms,
+    transparent: true,
+    cullFace: null,
+    depthTest: false,
+    depthWrite: false,
+  })
+
+  borderProgram = new oglModule.Program(gl, {
+    vertex: borderVertexShader,
+    fragment: lineFragmentShader,
+    uniforms: sharedUniforms,
+    transparent: true,
+    cullFace: null,
+    depthTest: false,
+    depthWrite: false,
+  })
+
+  scene = new oglModule.Transform()
+  lineGeometry = new oglModule.Geometry(gl, {
+    curve: { size: 3, data: new Float32Array([0, 1, 0, 0, 1, 1]) },
+  })
+  pointGeometry = new oglModule.Geometry(gl, {
+    gridPoint: { size: 2, data: new Float32Array([0, 0]) },
+  })
+  borderGeometry = new oglModule.Geometry(gl, {
+    position: { size: 2, data: new Float32Array([0, 0, 1, 0]) },
+  })
+
+  lineMesh = new oglModule.Mesh(gl, {
+    geometry: lineGeometry,
+    program: lineProgram,
+    mode: gl.LINES,
+    frustumCulled: false,
+  })
+  pointMesh = new oglModule.Mesh(gl, {
+    geometry: pointGeometry,
+    program: pointProgram,
+    mode: gl.POINTS,
+    frustumCulled: false,
+  })
+  borderMesh = new oglModule.Mesh(gl, {
+    geometry: borderGeometry,
+    program: borderProgram,
+    mode: gl.LINES,
+    frustumCulled: false,
+  })
+
+  lineMesh.setParent(scene)
+  pointMesh.setParent(scene)
+  borderMesh.setParent(scene)
+
+  return true
+}
+
+function cleanupRenderer() {
+  pauseAnimationLoop()
+  cancelAnimationLoopStart()
+  cancelDarkModePause()
+
+  if (resizeFrameId !== 0) {
+    cancelAnimationFrame(resizeFrameId)
+    resizeFrameId = 0
+  }
+
+  lineGeometry?.remove()
+  pointGeometry?.remove()
+  borderGeometry?.remove()
+  lineProgram?.remove()
+  pointProgram?.remove()
+  borderProgram?.remove()
+
+  if (renderer) {
+    renderer.gl.getExtension('WEBGL_lose_context')?.loseContext()
+  }
+
+  renderer = null
+  oglModule = null
+  scene = null
+  lineProgram = null
+  pointProgram = null
+  borderProgram = null
+  lineMesh = null
+  pointMesh = null
+  borderMesh = null
+  lineGeometry = null
+  pointGeometry = null
+  borderGeometry = null
+}
+
+onMounted(async () => {
+  reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  prefersReducedMotion = reducedMotionQuery.matches
+
+  if (!(await initRenderer())) return
+
+  resizeRenderer()
+
+  themeObserver = new MutationObserver(syncThemeAnimation)
   themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class'],
   })
 
-  window.addEventListener('resize', handleResize)
-  window.addEventListener('mousemove', handlePointerMove)
-  window.addEventListener('mouseleave', handlePointerLeave)
+  reducedMotionQuery.addEventListener('change', syncReducedMotionPreference)
+  window.addEventListener('resize', scheduleResize)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  renderFrame(performance.now())
 
-  if (!prefersReducedMotion && currentTheme === 'light') {
+  if (!prefersReducedMotion && !resolveThemeIsDark()) {
     scheduleAnimationLoopStart()
   }
 })
 
 onBeforeUnmount(() => {
-  pauseAnimationLoop()
-  cancelDarkModePause()
-  cancelAnimationLoopStart()
-  window.removeEventListener('resize', handleResize)
-  window.removeEventListener('mousemove', handlePointerMove)
-  window.removeEventListener('mouseleave', handlePointerLeave)
+  window.removeEventListener('resize', scheduleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  reducedMotionQuery?.removeEventListener('change', syncReducedMotionPreference)
+  reducedMotionQuery = null
   themeObserver?.disconnect()
   themeObserver = null
+  cleanupRenderer()
 })
 </script>
 
@@ -812,6 +641,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   pointer-events: none;
   isolation: isolate;
+  background: #fff;
 }
 
 .app-background__mesh,
@@ -837,21 +667,20 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
+html.dark .app-background {
+  background: #0b0b0f;
+}
+
 html.dark .app-background__overlay {
   background:
     radial-gradient(circle at center, transparent 34%, rgb(0 0 0 / 0.15) 100%),
     linear-gradient(180deg, rgb(255 255 255 / 0.02), rgb(0 0 0 / 0.12));
 }
 
-/* 主题切换期间禁用 overlay 的 backdrop-filter，
-   避免底层 canvas 过渡时触发逐帧 GPU 重合成导致闪烁 */
 html.theme-switching .app-background__overlay {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-
-/* settling 阶段（无 backdrop-filter，保留规则占位供后续扩展） */
-html.theme-settling .app-background__overlay {}
 
 html.dark .app-background__noise {
   opacity: 0.032;

@@ -1,3 +1,4 @@
+export { default as AnimatedList } from './AnimatedList.vue'
 export * from './base'
 export * from './content'
 export * from './feedback'

@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+} from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
 import { mapPendingReviewItemDtoToVm } from '@/entities/review'
 import { mapUserProfilePageDtoToVm } from '@/entities/user/model/user.mapper'
-import { DraftBoxDrawer } from '@/features/draft-box'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { authApi } from '@/shared/api/modules/auth'
 import { reviewApi } from '@/shared/api/modules/review'
@@ -23,6 +30,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { AuthDialog } from '@/widgets/auth-dialog'
 
+const AsyncDraftBoxDrawer = defineAsyncComponent(
+  () => import('@/features/draft-box/ui/DraftBoxDrawer.vue'),
+)
+
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
@@ -31,6 +42,7 @@ const queryClient = useQueryClient()
 
 const authDialogOpen = ref(false)
 const draftMenuOpen = ref(false)
+const draftDrawerLoaded = ref(false)
 const userMenuOpen = ref(false)
 const draftTriggerRef = ref<HTMLButtonElement | null>(null)
 const draftMenuRef = ref<HTMLElement | null>(null)
@@ -90,6 +102,7 @@ function closeUserMenu(options: { restoreFocus?: boolean } = {}) {
   }
 }
 
+const showAuthenticatedActions = computed(() => authStore.isAuthenticated && !authDialogOpen.value)
 const userLabel = computed(() => authStore.displayName || (authStore.isAdmin ? '管理员' : '个人中心'))
 const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')
 const themeMenuLabel = computed(() => (uiStore.darkMode ? '切换到浅色模式' : '切换到深色模式'))
@@ -214,8 +227,11 @@ function toggleThemeMode() {
 }
 
 function toggleDraftMenu() {
-  draftMenuOpen.value = !draftMenuOpen.value
-  if (draftMenuOpen.value) {
+  const nextOpen = !draftMenuOpen.value
+  draftMenuOpen.value = nextOpen
+
+  if (nextOpen) {
+    draftDrawerLoaded.value = true
     userMenuOpen.value = false
   }
 }
@@ -317,6 +333,16 @@ onClickOutside(userMenuRef, () => {
   }
 })
 
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) return
+
+    draftMenuOpen.value = false
+    userMenuOpen.value = false
+  },
+)
+
 watch(userMenuOpen, async (open) => {
   if (!open) {
     userMenuItemRefs.value = []
@@ -368,9 +394,11 @@ async function handleLogout() {
   <div class="relative z-10 flex shrink-0 items-center gap-2">
     <ThemeSwitch :show-label="false" class="hidden md:inline-flex" />
 
-    <template v-if="authStore.isAuthenticated">
-      <div class="flex items-center gap-1">
-
+    <Transition name="header-draft-state" :appear="authStore.isAuthenticated">
+      <div
+        v-if="showAuthenticatedActions"
+        class="header-draft-entry"
+      >
         <div ref="draftMenuRef" class="relative">
           <button
             ref="draftTriggerRef"
@@ -388,18 +416,31 @@ async function handleLogout() {
 
           </button>
 
-          <DraftBoxDrawer
+          <AsyncDraftBoxDrawer
+            v-if="draftDrawerLoaded"
             :id="draftMenuId"
             v-model="draftMenuOpen"
             @open-editor="openDraftEditor"
             @keydown="onDraftPanelKeydown"
           />
         </div>
+
+        <div class="header-auth-divider h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_55%,transparent)]" />
       </div>
+    </Transition>
 
-      <div class="h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_55%,transparent)]" />
-
-      <div ref="userMenuRef" class="relative">
+    <div class="header-auth-identity-slot">
+      <Transition
+        name="header-auth-identity"
+        mode="out-in"
+        :appear="authStore.isAuthenticated"
+      >
+        <div
+          v-if="showAuthenticatedActions"
+          key="authenticated"
+          ref="userMenuRef"
+          class="relative"
+        >
         <button
           ref="userTriggerRef"
           type="button"
@@ -473,25 +514,89 @@ async function handleLogout() {
             </button>
           </div>
         </Transition>
-      </div>
-    </template>
+        </div>
 
-    <template v-else>
-      <button
-        type="button"
-        class="tool-icon-button auth-trigger-button"
-        aria-label="登录 / 注册"
-        @click="authDialogOpen = true"
-      >
-        <AnimatedAttributionIcon size="1.45rem" title="登录 / 注册" :decorative="false" />
-      </button>
-    </template>
+        <button
+          v-else
+          key="anonymous"
+          type="button"
+          class="tool-icon-button auth-trigger-button"
+          aria-label="登录 / 注册"
+          @click="authDialogOpen = true"
+        >
+          <AnimatedAttributionIcon size="1.45rem" title="登录 / 注册" :decorative="false" />
+        </button>
+      </Transition>
+    </div>
 
     <AuthDialog v-model="authDialogOpen" initial-mode="login" />
   </div>
 </template>
 
 <style scoped>
+.header-draft-entry {
+  display: flex;
+  flex: 0 0 auto;
+  width: calc(2.85rem + 0.5rem + 1px);
+  align-items: center;
+  gap: 0.5rem;
+  transform-origin: right center;
+}
+
+.header-auth-divider {
+  flex: 0 0 auto;
+}
+
+.header-draft-state-enter-active {
+  overflow: hidden;
+  transition:
+    width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-draft-state-leave-active {
+  overflow: hidden;
+  transition:
+    width 180ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 140ms cubic-bezier(0.4, 0, 1, 1),
+    transform 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.header-draft-state-enter-from,
+.header-draft-state-leave-to {
+  width: 0;
+  opacity: 0;
+  transform: translateX(0.35rem) scale(0.94);
+}
+
+.header-auth-identity-slot {
+  display: flex;
+  width: 2.85rem;
+  height: 2.85rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-auth-identity-enter-active {
+  transition:
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-auth-identity-leave-active {
+  transition:
+    opacity 140ms cubic-bezier(0.4, 0, 1, 1),
+    transform 160ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+.header-auth-identity-enter-from,
+.header-auth-identity-leave-to {
+  opacity: 0;
+  transform: translateY(0.15rem) scale(0.94);
+}
+
 .tool-icon-button,
 .user-trigger {
   display: inline-flex;
@@ -572,5 +677,21 @@ async function handleLogout() {
   border-color: var(--color-border-panel);
   -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
   backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-draft-state-enter-active,
+  .header-draft-state-leave-active,
+  .header-auth-identity-enter-active,
+  .header-auth-identity-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .header-draft-state-enter-from,
+  .header-draft-state-leave-to,
+  .header-auth-identity-enter-from,
+  .header-auth-identity-leave-to {
+    transform: none;
+  }
 }
 </style>

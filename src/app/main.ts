@@ -10,6 +10,8 @@ import { useUiStore } from '@/stores'
 import '@/app/styles/index.css'
 
 let animatedIconRegistrationStarted = false
+const ANIMATED_ICON_REGISTER_DELAY_MS = 900
+const ANIMATED_ICON_IDLE_TIMEOUT_MS = 900
 
 function registerAnimatedIconElement() {
   if (typeof window === 'undefined' || window.customElements.get('lord-icon')) return
@@ -28,10 +30,18 @@ function registerAnimatedIconElement() {
     }
   }
 
-  const schedule = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(callback, 1))
-  window.setTimeout(() => schedule(() => {
-    void register()
-  }), 1800)
+  window.setTimeout(() => {
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(() => {
+        void register()
+      }, { timeout: ANIMATED_ICON_IDLE_TIMEOUT_MS })
+      return
+    }
+
+    window.setTimeout(() => {
+      void register()
+    }, 1)
+  }, ANIMATED_ICON_REGISTER_DELAY_MS)
 }
 
 const app = createApp(App)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
@@ -29,6 +29,82 @@ const searchButtonRef = ref<HTMLButtonElement | null>(null)
 const searchOpen = ref(false)
 const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
+const headerRef = ref<HTMLElement | null>(null)
+const navigationReady = ref(false)
+
+const NAVIGATION_REVEAL_TIMEOUT_MS = 4200
+type ReadyLordIconElement = HTMLElement & { isReady?: boolean }
+
+let navigationRevealTimer: number | null = null
+let navigationRevealFrame: number | null = null
+let navigationRevealScheduled = false
+let iconReadyCleanups: Array<() => void> = []
+
+function clearNavigationReadyWaiters() {
+  if (navigationRevealTimer !== null) {
+    window.clearTimeout(navigationRevealTimer)
+    navigationRevealTimer = null
+  }
+
+  for (const cleanup of iconReadyCleanups) {
+    cleanup()
+  }
+  iconReadyCleanups = []
+}
+
+function revealNavigation() {
+  if (navigationReady.value || navigationRevealScheduled) return
+
+  navigationRevealScheduled = true
+  clearNavigationReadyWaiters()
+  navigationRevealFrame = window.requestAnimationFrame(() => {
+    navigationRevealFrame = null
+    navigationReady.value = true
+  })
+}
+
+function waitForNavigationIcons() {
+  const icons = Array.from(
+    headerRef.value?.querySelectorAll<ReadyLordIconElement>('lord-icon') ?? [],
+  )
+
+  if (!icons.length) {
+    revealNavigation()
+    return
+  }
+
+  const pendingIcons = new Set(icons)
+  navigationRevealTimer = window.setTimeout(revealNavigation, NAVIGATION_REVEAL_TIMEOUT_MS)
+
+  for (const icon of icons) {
+    const handleReady = () => {
+      pendingIcons.delete(icon)
+      if (!pendingIcons.size) {
+        revealNavigation()
+      }
+    }
+
+    icon.addEventListener('ready', handleReady, { once: true })
+    iconReadyCleanups.push(() => icon.removeEventListener('ready', handleReady))
+
+    if (icon.isReady) {
+      handleReady()
+    }
+  }
+}
+
+onMounted(() => {
+  void nextTick(waitForNavigationIcons)
+})
+
+onBeforeUnmount(() => {
+  clearNavigationReadyWaiters()
+
+  if (navigationRevealFrame !== null) {
+    window.cancelAnimationFrame(navigationRevealFrame)
+    navigationRevealFrame = null
+  }
+})
 
 function normalizeSearchKeyword(value: string) {
   return value.replace(/\s+/g, ' ').trim()
@@ -130,9 +206,16 @@ async function submitSearch() {
 
 <template>
   <div class="header-shell">
-    <header class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4">
+    <header
+      ref="headerRef"
+      class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4"
+      :data-navigation-ready="navigationReady ? 'true' : 'false'"
+    >
       <Container class="app-header-container">
-        <div class="surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4">
+        <div
+          class="app-header-surface surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4"
+          :class="navigationReady ? 'app-header-surface--ready' : ''"
+        >
           <div class="flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
             <AppHeaderLogo />
             <div class="hidden h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)] md:block" />
@@ -237,6 +320,24 @@ async function submitSearch() {
 </template>
 
 <style scoped>
+.app-header-surface {
+  visibility: hidden;
+  opacity: 0;
+  transform: translate3d(0, -0.55rem, 0) scale(0.985);
+  transform-origin: top center;
+  transition:
+    visibility 0s linear 460ms,
+    opacity 340ms cubic-bezier(0.25, 1, 0.5, 1),
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-header-surface--ready {
+  visibility: visible;
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition-delay: 0s;
+}
+
 .header-shell :deep(.app-header-container) {
   width: min(100% - 1.5rem, 1216px);
 }
@@ -326,5 +427,13 @@ input[type="search"]:focus-visible {
 
 input[type="search"]::selection {
   background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-header-surface,
+  .app-header-surface--ready {
+    transform: none;
+    transition: none;
+  }
 }
 </style>

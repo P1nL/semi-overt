@@ -207,7 +207,9 @@ function serializeListItem(
 }
 
 function serializeInlineNodes(nodes: JSONContent[]): string {
-  return nodes
+  const { leadingWhitespace, contentNodes } = splitLeadingInlineWhitespace(nodes)
+
+  return `${serializeLeadingWhitespace(leadingWhitespace)}${contentNodes
     .map((node) => {
       if (node.type === 'text') {
         return applyTextMarks(node.text ?? '', node.marks ?? [])
@@ -223,11 +225,13 @@ function serializeInlineNodes(nodes: JSONContent[]): string {
 
       return serializeInlineNodes(node.content ?? [])
     })
-    .join('')
+    .join('')}`
 }
 
 function serializeInlineNodesAsHtml(nodes: JSONContent[]): string {
-  return nodes
+  const { leadingWhitespace, contentNodes } = splitLeadingInlineWhitespace(nodes)
+
+  return `${serializeLeadingWhitespace(leadingWhitespace)}${contentNodes
     .map((node) => {
       if (node.type === 'text') {
         return applyTextMarksAsHtml(node.text ?? '', node.marks ?? [])
@@ -243,6 +247,54 @@ function serializeInlineNodesAsHtml(nodes: JSONContent[]): string {
 
       return serializeInlineNodesAsHtml(node.content ?? [])
     })
+    .join('')}`
+}
+
+function splitLeadingInlineWhitespace(nodes: JSONContent[]): {
+  leadingWhitespace: string
+  contentNodes: JSONContent[]
+} {
+  let collectingLeadingWhitespace = true
+  let leadingWhitespace = ''
+  const contentNodes: JSONContent[] = []
+
+  for (const node of nodes) {
+    if (!collectingLeadingWhitespace || node.type !== 'text') {
+      collectingLeadingWhitespace = false
+      contentNodes.push(node)
+      continue
+    }
+
+    const text = node.text ?? ''
+    const match = text.match(/^[\t \u00a0]+/)
+
+    if (!match) {
+      collectingLeadingWhitespace = false
+      contentNodes.push(node)
+      continue
+    }
+
+    leadingWhitespace += match[0]
+    const remainingText = text.slice(match[0].length)
+
+    if (remainingText) {
+      collectingLeadingWhitespace = false
+      contentNodes.push({
+        ...node,
+        text: remainingText,
+      })
+    }
+  }
+
+  return {
+    leadingWhitespace,
+    contentNodes,
+  }
+}
+
+function serializeLeadingWhitespace(value: string): string {
+  return Array.from(value)
+    .map((character) => character === '\t' ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '&nbsp;')
     .join('')
 }
 

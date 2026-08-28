@@ -43,6 +43,9 @@ const resultView = computed(() => {
 })
 const categoryQuery = useInfiniteCategoryArticlesQuery(activeCategory, 10)
 const sectionMeta = computed(() => mapCategoryValueToVm(activeCategory.value, activeCategory.value))
+const centerLabel = computed(() =>
+  activeCategory.value === CATEGORY_TAB.SHORT ? '3min\n~\n8min' : sectionMeta.value.label,
+)
 const categoryPages = computed(() => categoryQuery.data.value?.pages ?? [])
 const loading = computed(() => categoryQuery.isPending.value && categoryPages.value.length === 0)
 const errorMessage = computed(() =>
@@ -121,7 +124,7 @@ useIntersectionObserver(
           <ArticleResultStream
             :items="list"
             :view="resultView"
-            :center-label="sectionMeta.label"
+            :center-label="centerLabel"
             :result-count="total"
             fullscreen
             @update:view="onViewChange"

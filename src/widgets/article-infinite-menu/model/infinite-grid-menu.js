@@ -446,6 +446,14 @@ function readCssToken(name, fallback) {
   return value || fallback;
 }
 
+function normalizeCenterLabel(label) {
+  return String(label || '')
+    .split(/\r?\n/)
+    .map(line => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 function wrapCenterLabel(context, text, maxWidth) {
   const characters = Array.from(text);
   const lines = [];
@@ -466,12 +474,20 @@ function wrapCenterLabel(context, text, maxWidth) {
 }
 
 function fitCenterLabel(context, text, fontFamily, maxWidth, maxHeight) {
+  const explicitLines = text.split('\n').filter(Boolean);
+  const hasExplicitLineBreaks = explicitLines.length > 1;
+
   for (let fontSize = 208; fontSize >= 64; fontSize -= 8) {
     context.font = `900 ${fontSize}px ${fontFamily}`;
-    const lines = wrapCenterLabel(context, text, maxWidth);
-    const lineHeight = fontSize * 1.08;
+    const lines = hasExplicitLineBreaks ? explicitLines : wrapCenterLabel(context, text, maxWidth);
+    const lineHeight = fontSize * (hasExplicitLineBreaks ? 0.9 : 1.08);
+    const maxLines = hasExplicitLineBreaks ? 3 : 2;
 
-    if (lines.length <= 2 && lines.length * lineHeight <= maxHeight) {
+    if (
+      lines.length <= maxLines
+      && lines.length * lineHeight <= maxHeight
+      && lines.every(line => context.measureText(line).width <= maxWidth)
+    ) {
       return { fontSize, lineHeight, lines };
     }
   }
@@ -496,11 +512,14 @@ function createCenterLabelTextureCanvas(label) {
   canvas.width = 1024;
   canvas.height = 512;
 
-  const normalizedLabel = String(label || '').replace(/\s+/g, ' ').trim();
+  const normalizedLabel = normalizeCenterLabel(label);
   if (!context || !normalizedLabel) return canvas;
 
   const bareLabel = normalizedLabel.replace(/^[“”"]+|[“”"]+$/g, '').trim() || normalizedLabel;
-  const displayLabel = `“${bareLabel}”`;
+  const displayLines = bareLabel.split('\n');
+  displayLines[0] = `“${displayLines[0]}`;
+  displayLines[displayLines.length - 1] = `${displayLines[displayLines.length - 1]}”`;
+  const displayLabel = displayLines.join('\n');
   const fontFamily = readCssToken(
     '--font-display',
     '"Zhaohua Display", "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif'
@@ -696,7 +715,7 @@ class InfiniteGridMenu {
     this.onActiveItemChange = onActiveItemChange || (() => {});
     this.onMovementChange = onMovementChange || (() => {});
     this.scaleFactor = scale;
-    this.centerLabel = String(options.centerLabel || '').replace(/\s+/g, ' ').trim();
+    this.centerLabel = normalizeCenterLabel(options.centerLabel);
     this.camera.position[2] = 3 * scale;
     this.#init(onInit);
   }
