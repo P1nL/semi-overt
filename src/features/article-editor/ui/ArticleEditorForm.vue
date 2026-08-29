@@ -478,11 +478,14 @@ function syncValidationErrors() {
   return validation.valid
 }
 
+type SaveFeedbackMode = 'silent' | 'manual'
+
 async function persistDraft(
   submittedValues: EditorFormValues,
-  showToast: boolean,
+  feedbackMode: SaveFeedbackMode,
 ): Promise<boolean> {
-  const saveStartedAt = Date.now()
+  const manualFeedback = feedbackMode === 'manual'
+  const saveStartedAt = manualFeedback ? Date.now() : 0
   editorStore.saving = true
 
   try {
@@ -532,34 +535,28 @@ async function persistDraft(
       emit('created', articleId)
     }
 
-    if (showToast) {
-      toast.success('草稿已保存')
-    }
-
     return true
   } catch (error) {
     const message = getErrorMessage(error, '草稿保存失败，请稍后重试')
     saveError.value = message
     emit('error', message)
 
-    if (showToast) {
-      toast.error(message)
-    }
-
     return false
   } finally {
-    const elapsed = Date.now() - saveStartedAt
-    const remaining = MIN_SAVE_FEEDBACK_MS - elapsed
+    if (manualFeedback) {
+      const elapsed = Date.now() - saveStartedAt
+      const remaining = MIN_SAVE_FEEDBACK_MS - elapsed
 
-    if (remaining > 0) {
-      await new Promise((resolve) => setTimeout(resolve, remaining))
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining))
+      }
     }
 
     editorStore.saving = false
   }
 }
 
-async function saveDraft(showToast = false): Promise<boolean> {
+async function saveDraft(feedbackMode: SaveFeedbackMode = 'silent'): Promise<boolean> {
   saveError.value = ''
   clearSaveTimer()
 
@@ -571,7 +568,7 @@ async function saveDraft(showToast = false): Promise<boolean> {
     const previousSaved = await activeSavePromise
     if (!previousSaved) return false
     if (!editorStore.dirty) return true
-    return saveDraft(showToast)
+    return saveDraft(feedbackMode)
   }
 
   if (!syncValidationErrors()) {
@@ -579,7 +576,7 @@ async function saveDraft(showToast = false): Promise<boolean> {
   }
 
   const submittedValues = snapshotFormValues()
-  const request = persistDraft(submittedValues, showToast)
+  const request = persistDraft(submittedValues, feedbackMode)
   activeSavePromise = request
 
   try {
@@ -600,7 +597,7 @@ function scheduleAutoSave() {
   clearSaveTimer()
   saveTimer = setTimeout(() => {
     saveTimer = null
-    void saveDraft(false)
+    void saveDraft('silent')
   }, props.autoSaveDelay)
 }
 

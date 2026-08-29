@@ -62,7 +62,7 @@ function createInitialFormValues(): EditorFormValues {
 
 const formValues = ref<EditorFormValues>(createInitialFormValues())
 const editorFormRef = ref<{
-  saveDraft: (showToast?: boolean) => Promise<boolean>
+  saveDraft: (feedbackMode?: 'silent' | 'manual') => Promise<boolean>
 } | null>(null)
 const mainActionSlotRef = ref<HTMLDivElement | null>(null)
 const publishActionRef = ref<HTMLDivElement | null>(null)
@@ -71,6 +71,7 @@ const publishConfirming = ref(false)
 const cancelConfirming = ref(false)
 const publishCooldownRevealed = ref(false)
 const saveFeedback = ref<'idle' | 'saved' | 'error'>('idle')
+const manualSaving = ref(false)
 const submitError = ref('')
 const nowTimestamp = ref(Date.now())
 const publishCooldownUntil = ref(0)
@@ -255,13 +256,13 @@ const mainActionLabel = computed(() => {
   return ''
 })
 const saveVisualState = computed<'saving' | 'saved' | 'error' | 'idle'>(() => {
-  if (editorStore.saving) return 'saving'
+  if (manualSaving.value) return 'saving'
   if (saveFeedback.value === 'saved') return 'saved'
   if (saveFeedback.value === 'error') return 'error'
   return 'idle'
 })
 const saveButtonTitle = computed(() => {
-  if (editorStore.saving) return '保存中'
+  if (manualSaving.value) return '保存中'
   if (saveFeedback.value === 'saved') return '保存成功'
   if (saveFeedback.value === 'error') return '保存失败'
   return '保存草稿'
@@ -299,20 +300,11 @@ const saveStatus = computed(() => {
   if (editorStore.submitting) {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '提交审核中' }
   }
-  if (editorStore.saving) {
-    return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '保存中' }
-  }
   if (pageError.value) {
     return { dotColor: 'var(--color-danger)', textColor: 'var(--color-danger)', text: '保存失败' }
   }
   if (isPending.value) {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-warning)', text: '待审核中' }
-  }
-  if (editorStore.dirty) {
-    return { dotColor: 'var(--color-text-faint)', textColor: 'var(--color-text-faint)', text: '有未保存修改' }
-  }
-  if (editorStore.lastSavedAt) {
-    return { dotColor: 'var(--color-success)', textColor: 'var(--color-success)', text: formatSavedAt(editorStore.lastSavedAt) }
   }
   if (isReadOnly.value && currentStatusLabel.value) {
     return {
@@ -321,38 +313,8 @@ const saveStatus = computed(() => {
       text: `${currentStatusLabel.value}（只读）`,
     }
   }
-  return { dotColor: 'var(--color-text-faint)', textColor: 'var(--color-text-faint)', text: '尚未保存' }
+  return null
 })
-
-function formatSavedAt(isoString: string): string {
-  try {
-    const saved = new Date(isoString)
-    if (Number.isNaN(saved.getTime())) return isoString
-
-    const now = new Date()
-    const diffMin = (now.getTime() - saved.getTime()) / 60000
-    const hh = String(saved.getHours()).padStart(2, '0')
-    const mm = String(saved.getMinutes()).padStart(2, '0')
-    const timeStr = `${hh}:${mm}`
-
-    if (diffMin < 1) return '刚刚已保存'
-
-    if (saved.toDateString() === now.toDateString()) {
-      return `今天 ${timeStr} 已保存`
-    }
-
-    const month = String(saved.getMonth() + 1).padStart(2, '0')
-    const day = String(saved.getDate()).padStart(2, '0')
-
-    if (saved.getFullYear() === now.getFullYear()) {
-      return `${month}-${day} ${timeStr} 已保存`
-    }
-
-    return `${saved.getFullYear()}-${month}-${day} ${timeStr} 已保存`
-  } catch {
-    return isoString
-  }
-}
 
 let mainActionWidthFrame: number | null = null
 
@@ -542,10 +504,16 @@ function handleCancelAction() {
 }
 
 async function handleSaveDraft() {
-  if (!showSaveAction.value || editorStore.saving || isReadOnly.value) return
+  if (!showSaveAction.value || manualSaving.value || isReadOnly.value) return
 
-  const saved = await editorFormRef.value?.saveDraft(true)
-  setSaveFeedback(saved ? 'saved' : 'error', saved ? 900 : 1400)
+  manualSaving.value = true
+
+  try {
+    const saved = await editorFormRef.value?.saveDraft('manual')
+    setSaveFeedback(saved ? 'saved' : 'error', saved ? 900 : 1400)
+  } finally {
+    manualSaving.value = false
+  }
 }
 
 function patchProfilePageArticle(profile: UserProfileVm, article: ArticleCardVm): UserProfileVm {
@@ -624,7 +592,7 @@ async function submitArticle() {
   if (currentStatus.value && !canSubmitArticle(currentStatus.value)) return
   if (!hasEnoughContentToSubmit.value) return
 
-  const saved = await editorFormRef.value?.saveDraft(false)
+  const saved = await editorFormRef.value?.saveDraft('silent')
   if (!saved) {
     const message = pageError.value || '提交前请先完成保存'
     toast.error(message)
@@ -641,7 +609,6 @@ async function submitArticle() {
 
   submitError.value = ''
   pageError.value = ''
-  setSaveFeedback('saved', 900)
   editorStore.submitting = true
 
   try {
@@ -771,7 +738,7 @@ async function onCanceled() {
 onBeforeRouteLeave(async () => {
   if (!editorStore.dirty || isReadOnly.value) return true
 
-  const saved = await editorFormRef.value?.saveDraft(false)
+  const saved = await editorFormRef.value?.saveDraft('silent')
   if (saved) return true
 
   const message = pageError.value || '草稿尚未保存，请重试后再关闭'
@@ -802,20 +769,6 @@ watch(publishCooldownRevealed, (value) => {
     clearPublishCooldownRevealTimer()
   }
 })
-
-watch(
-  () => pageError.value,
-  (value) => {
-    if (value) {
-      setSaveFeedback('error', 1400)
-      return
-    }
-
-    if (saveFeedback.value === 'error') {
-      setSaveFeedback('idle')
-    }
-  },
-)
 
 watch(
   () => [showCancelAction.value, showPublishAction.value, mainActionLabel.value] as const,
@@ -942,7 +895,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="editor-topbar__right">
-        <span class="editor-save-pill" :style="{ color: saveStatus.textColor }">
+        <span v-if="saveStatus" class="editor-save-pill" :style="{ color: saveStatus.textColor }">
           <span class="editor-save-pill__dot" :style="{ background: saveStatus.dotColor }" />
           <span>{{ saveStatus.text }}</span>
         </span>
@@ -956,7 +909,7 @@ onBeforeUnmount(() => {
                 'is-saved': saveFeedback === 'saved',
                 'is-error': saveFeedback === 'error',
               }"
-              :disabled="editorStore.saving"
+              :disabled="manualSaving"
               :title="saveButtonTitle"
               @click="handleSaveDraft"
             >
