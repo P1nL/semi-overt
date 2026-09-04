@@ -193,5 +193,6 @@ Don't add logic inside them without a matching feature spec.
 ## Git / Repo Notes
 
 - Push uses SSH (not HTTPS). Ensure SSH key is configured before `git push`.
-- No CI workflow files found (no `.github/workflows/`). No pre-commit hooks detected.
-- Commits are not enforced by any hook; run type-check manually before pushing: `npx vue-tsc --noEmit`.
+- `.github/workflows/frontend-ci.yml` runs `npm ci` and `npm run build` for relevant pull requests, pushes to `main`, and manual dispatches.
+- The public frontend repository must not contain production SSH secrets. Production frontend deployment is orchestrated from the private `P1nL/semi-overt-springboot` repository.
+- No pre-commit hook is configured; run `npm run build` locally before pushing when practical.
