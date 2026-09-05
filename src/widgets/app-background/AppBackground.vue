@@ -22,6 +22,20 @@ const LINE_GAP_PX = 15
 const POINT_GAP_PX = 90
 const CURVE_SUBDIVISIONS = 10
 
+const pointerWarpShader = `
+uniform vec4 uPointer;
+uniform float uPointerStrength;
+vec2 warpPointer(vec2 pixel) {
+  vec2 delta = pixel - uPointer.xy;
+  float influence = exp(-dot(delta, delta) / (100.0 * 100.0));
+  vec2 local = pixel - uArtboard.xy;
+  vec2 edge = min(local, uArtboard.zw - local);
+  float pinned = smoothstep(0.0, 36.0, min(edge.x, edge.y));
+  vec2 push = delta / sqrt(dot(delta, delta) + 900.0) * 10.0 + uPointer.zw;
+  return pixel + push * influence * uPointerStrength * pinned;
+}
+`
+
 const lineCurveVertexShader = `
 precision highp float;
 
@@ -32,6 +46,7 @@ uniform vec4 uArtboard;
 uniform float uGapX;
 uniform float uPointCount;
 uniform float uTime;
+${pointerWarpShader}
 
 vec2 resolveGridPoint(float lineX, float pointIndex) {
   float pointDenominator = max(uPointCount - 1.0, 1.0);
@@ -62,7 +77,7 @@ void main() {
   vec2 firstHalf = mix(startPoint, controlPoint, progress);
   vec2 secondHalf = mix(controlPoint, endPoint, progress);
   vec2 curvePoint = mix(firstHalf, secondHalf, progress);
-  vec2 pixelPosition = uArtboard.xy + curvePoint;
+  vec2 pixelPosition = warpPointer(uArtboard.xy + curvePoint);
   vec2 clipPosition = vec2(
     pixelPosition.x / uResolution.x * 2.0 - 1.0,
     1.0 - pixelPosition.y / uResolution.y * 2.0
@@ -83,6 +98,7 @@ uniform float uGapX;
 uniform float uPointCount;
 uniform float uTime;
 uniform float uPointSize;
+${pointerWarpShader}
 
 void main() {
   float lineX = gridPoint.x;
@@ -93,7 +109,7 @@ void main() {
   float interior = step(0.5, pointIndex) * step(pointIndex, uPointCount - 1.5);
   float offsetY = cos(baseX * 0.025 + uTime * 0.25) * 40.0 * interior;
   float offsetX = sin((baseY + offsetY) * 0.02 + uTime * 0.125) * uGapX * 2.5 * interior;
-  vec2 pixelPosition = uArtboard.xy + vec2(baseX + offsetX, baseY + offsetY);
+  vec2 pixelPosition = warpPointer(uArtboard.xy + vec2(baseX + offsetX, baseY + offsetY));
   vec2 clipPosition = vec2(
     pixelPosition.x / uResolution.x * 2.0 - 1.0,
     1.0 - pixelPosition.y / uResolution.y * 2.0
@@ -166,6 +182,10 @@ let darkModePauseTimer: number | null = null
 let themeObserver: MutationObserver | null = null
 let reducedMotionQuery: MediaQueryList | null = null
 let prefersReducedMotion = false
+let lastPointerAt = 0
+let lastInteractionFrame = 0
+let previousPointer: { x: number; y: number } | null = null
+const pointerDrag = [0, 0]
 
 const sharedUniforms = {
   uResolution: { value: [1, 1] },
@@ -174,6 +194,41 @@ const sharedUniforms = {
   uPointCount: { value: 2 },
   uTime: { value: 0 },
   uPointSize: { value: 2 },
+  uPointer: { value: [0, 0, 0, 0] },
+  uPointerStrength: { value: 0 },
+}
+
+function releasePointer() {
+  previousPointer = null
+  lastPointerAt = 0
+}
+
+function resetInteraction() {
+  releasePointer()
+  sharedUniforms.uPointerStrength.value = 0
+  sharedUniforms.uPointer.value.fill(0)
+  pointerDrag.fill(0)
+  lastInteractionFrame = 0
+}
+
+function onPointerMove(event: PointerEvent) {
+  if (event.pointerType !== 'mouse' || prefersReducedMotion || resolveThemeIsDark() || document.hidden) return
+  if (!(event.target instanceof Element) || event.target.closest(
+    'header, nav, article, a, button, input, textarea, select, [role="dialog"], [role="menu"], .surface-1, .surface-2, .prose, [contenteditable]',
+  )) { releasePointer(); return }
+  const x = event.clientX, y = event.clientY
+  const pointer = sharedUniforms.uPointer.value
+  if (!previousPointer) {
+    pointer[0] = x
+    pointer[1] = y
+    pointerDrag.fill(0)
+  } else {
+    pointerDrag[0] = Math.max(-12, Math.min(12, (x - previousPointer.x) * 1.2))
+    pointerDrag[1] = Math.max(-12, Math.min(12, (y - previousPointer.y) * 1.2))
+  }
+  previousPointer = { x, y }
+  lastPointerAt = performance.now()
+  if (!animationLoopEnabled) startAnimationLoop(false)
 }
 
 function resolveThemeIsDark() {
@@ -294,6 +349,7 @@ function replaceGridGeometry(artboard: LightArtboard) {
 
 function resizeRenderer() {
   if (!renderer) return
+  resetInteraction()
 
   const width = window.innerWidth
   const height = window.innerHeight
@@ -327,6 +383,19 @@ function scheduleResize() {
 
 function renderFrame(now: number) {
   if (!renderer || !scene) return
+
+  const dt = lastInteractionFrame ? Math.min((now - lastInteractionFrame) / 1000, 0.05) : 1 / 45
+  lastInteractionFrame = now
+  const active = lastPointerAt > 0 && now - lastPointerAt < 180 && !prefersReducedMotion && !resolveThemeIsDark()
+  const ease = 1 - Math.exp(-dt / (active ? 0.16 : 0.45))
+  sharedUniforms.uPointerStrength.value += ((active ? 1 : 0) - sharedUniforms.uPointerStrength.value) * ease
+  const pointer = sharedUniforms.uPointer.value
+  if (previousPointer && active) {
+    pointer[0]! += (previousPointer.x - pointer[0]!) * ease
+    pointer[1]! += (previousPointer.y - pointer[1]!) * ease
+  }
+  pointer[2]! += ((active ? pointerDrag[0]! : 0) - pointer[2]!) * ease
+  pointer[3]! += ((active ? pointerDrag[1]! : 0) - pointer[3]!) * ease
 
   sharedUniforms.uTime.value = prefersReducedMotion ? 0 : now * 0.001
   renderer.render({
@@ -428,6 +497,7 @@ function scheduleDarkModePause() {
 }
 
 function syncThemeAnimation() {
+  resetInteraction()
   cancelDarkModePause()
 
   if (resolveThemeIsDark()) {
@@ -440,6 +510,7 @@ function syncThemeAnimation() {
 }
 
 function syncReducedMotionPreference() {
+  resetInteraction()
   prefersReducedMotion = reducedMotionQuery?.matches ?? false
 
   if (prefersReducedMotion) {
@@ -455,6 +526,7 @@ function syncReducedMotionPreference() {
 }
 
 function handleVisibilityChange() {
+  resetInteraction()
   if (document.hidden) {
     stopAnimationFrame()
     return
@@ -607,6 +679,10 @@ onMounted(async () => {
 
   reducedMotionQuery.addEventListener('change', syncReducedMotionPreference)
   window.addEventListener('resize', scheduleResize)
+  window.addEventListener('pointermove', onPointerMove, { passive: true })
+  window.addEventListener('pointerout', releasePointer)
+  window.addEventListener('blur', releasePointer)
+  window.addEventListener('scroll', releasePointer, { passive: true })
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
   if (!prefersReducedMotion && !resolveThemeIsDark()) {
@@ -615,6 +691,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerout', releasePointer)
+  window.removeEventListener('blur', releasePointer)
+  window.removeEventListener('scroll', releasePointer)
   window.removeEventListener('resize', scheduleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   reducedMotionQuery?.removeEventListener('change', syncReducedMotionPreference)

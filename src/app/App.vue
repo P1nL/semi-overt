@@ -22,7 +22,6 @@ import { getErrorMessage } from '@/shared/utils/error'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
-import { AppBackground } from '@/widgets/app-background'
 import { AppHeader } from '@/widgets/app-header'
 import { AuthDialog } from '@/widgets/auth-dialog'
 import { PageSheet } from '@/widgets/page-sheet'
@@ -36,6 +35,7 @@ const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
+const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
 const PAGE_SHEET_LEAVE = 360
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
@@ -518,7 +518,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
-    <AppBackground />
+    <div v-if="!uiStore.darkMode" aria-hidden="true" class="fixed inset-0 z-0 pointer-events-none bg-white">
+      <WavesBackground :x-gap="20" :friction="0.85" />
+    </div>
 
     <Transition name="app-background-fade">
       <div v-if="uiStore.darkMode" aria-hidden="true" class="app-silk-background">
