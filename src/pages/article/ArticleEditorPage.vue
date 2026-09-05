@@ -268,6 +268,18 @@ const saveButtonTitle = computed(() => {
   return '保存草稿'
 })
 
+function formatSavedTime(value: string): string {
+  const normalized = normalizeBackendDateTime(value)
+  if (!normalized) return ''
+
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
 const returnedReason = computed(() => {
   const article = currentRouteArticle.value
   if (!article) return ''
@@ -300,6 +312,9 @@ const saveStatus = computed(() => {
   if (editorStore.submitting) {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '提交审核中' }
   }
+  if (editorStore.saving) {
+    return { dotColor: 'var(--color-primary)', textColor: 'var(--color-text-faint)', text: '保存中' }
+  }
   if (pageError.value) {
     return { dotColor: 'var(--color-danger)', textColor: 'var(--color-danger)', text: '保存失败' }
   }
@@ -313,6 +328,19 @@ const saveStatus = computed(() => {
       text: `${currentStatusLabel.value}（只读）`,
     }
   }
+  if (editorStore.dirty) {
+    return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '有未保存的更改' }
+  }
+
+  const savedTime = formatSavedTime(editorStore.lastSavedAt)
+  if (savedTime) {
+    return {
+      dotColor: 'var(--color-success)',
+      textColor: 'var(--color-text-faint)',
+      text: `上次保存于 ${savedTime}`,
+    }
+  }
+
   return null
 })
 
