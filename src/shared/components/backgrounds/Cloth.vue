@@ -16,6 +16,8 @@ const FRAME_INTERVAL_MS = 1000 / 30
 const MAX_DEVICE_PIXEL_RATIO = 1.25
 const MAX_RENDER_PIXELS = 2560 * 1440
 const POINTER_SPEED_SCALE = 12
+// Preserve the drag strength of a 60 Hz input stream when sampling at 30 fps.
+const POINTER_REFERENCE_INTERVAL_MS = 1000 / 60
 const POINTER_FORCE = 0.27
 const POINTER_DEPTH_FORCE = 0.96
 let renderer: Renderer | undefined
@@ -38,7 +40,9 @@ const normals = new Float32Array(COUNT * 3)
 const uv = new Float32Array(COUNT * 2)
 const indices = new Uint16Array(COLS * ROWS * 6)
 const force = new Vec3()
-const pointer = { x: 0, y: 0, dx: 0, dy: 0, energy: 0, active: false }
+const pointer = { x: 0, y: 0, dx: 0, dy: 0, energy: 0, active: false, time: 0 }
+let pendingPointer: PointerEvent | null = null
+let hostRect: DOMRect | undefined
 
 const vertex = `
 attribute vec3 position;
@@ -195,6 +199,7 @@ function animate(now: number) {
     frame = requestAnimationFrame(animate)
     return
   }
+  consumePointer()
   // Keep the fixed physics step, but slow the decoration on overloaded devices
   // instead of accumulating extra work that makes the next frame even slower.
   accumulator += Math.min((now - last) / 1000, STEP * 2)
@@ -210,22 +215,35 @@ function animate(now: number) {
   frame = requestAnimationFrame(animate)
 }
 
-function resetPointer() { pointer.active = false }
+function resetPointer() {
+  pointer.active = false
+  pendingPointer = null
+}
 function move(event: PointerEvent) {
-  if (event.pointerType !== 'mouse' || motion?.matches || document.hidden) return
+  if (event.pointerType !== 'mouse' || motion?.matches || document.hidden || lost) return
+  // Keep only the latest sample; DOM queries and force updates run once per frame.
+  pendingPointer = event
+}
+
+function consumePointer() {
+  const event = pendingPointer
+  pendingPointer = null
+  if (!event) return
   if (!(event.target instanceof Element) || event.target.closest(
     'header, nav, article, a, button, input, textarea, select, [role="dialog"], [role="menu"], .surface-1, .surface-2, .prose, [contenteditable]',
   )) { resetPointer(); return }
-  const rect = host.value?.getBoundingClientRect()
-  if (!rect) return
+  const rect = hostRect
+  if (!rect || !rect.width || !rect.height) return
   const x = ((event.clientX - rect.left) / rect.width - 0.5) * viewWidth
   const y = (0.5 - (event.clientY - rect.top) / rect.height) * viewHeight
   if (pointer.active) {
-    pointer.dx = Math.max(-2, Math.min(2, (x - pointer.x) * POINTER_SPEED_SCALE))
-    pointer.dy = Math.max(-2, Math.min(2, (y - pointer.y) * POINTER_SPEED_SCALE))
+    const timeScale = POINTER_REFERENCE_INTERVAL_MS / Math.max(1, event.timeStamp - pointer.time)
+    pointer.dx = Math.max(-2, Math.min(2, (x - pointer.x) * POINTER_SPEED_SCALE * timeScale))
+    pointer.dy = Math.max(-2, Math.min(2, (y - pointer.y) * POINTER_SPEED_SCALE * timeScale))
     pointer.energy = Math.min(1.9, 0.72 + Math.hypot(pointer.dx, pointer.dy))
   }
   pointer.x = x; pointer.y = y; pointer.active = true
+  pointer.time = event.timeStamp
 }
 
 function resume() {
@@ -241,7 +259,9 @@ function resume() {
 
 function resize() {
   if (!renderer || !camera || !host.value) return
-  const { width, height } = host.value.getBoundingClientRect()
+  // This background is fixed to the viewport, so scrolling does not change its rect.
+  hostRect = host.value.getBoundingClientRect()
+  const { width, height } = hostRect
   if (!width || !height) return
   viewHeight = viewWidth * height / width
   renderer.dpr = Math.min(
@@ -259,6 +279,7 @@ function resize() {
 function contextLost(event: Event) {
   event.preventDefault()
   lost = true
+  resetPointer()
   cancelAnimationFrame(frame)
 }
 
@@ -298,6 +319,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(frame)
+  resetPointer()
+  hostRect = undefined
   motion?.removeEventListener('change', resume)
   window.removeEventListener('resize', resize)
   window.removeEventListener('pointermove', move)
