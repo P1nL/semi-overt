@@ -72,6 +72,7 @@ const cancelConfirming = ref(false)
 const publishCooldownRevealed = ref(false)
 const saveFeedback = ref<'idle' | 'saved' | 'error'>('idle')
 const manualSaving = ref(false)
+const lastManualSavedAt = ref('')
 const submitError = ref('')
 const nowTimestamp = ref(Date.now())
 const publishCooldownUntil = ref(0)
@@ -312,10 +313,10 @@ const saveStatus = computed(() => {
   if (editorStore.submitting) {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '提交审核中' }
   }
-  if (editorStore.saving) {
+  if (manualSaving.value) {
     return { dotColor: 'var(--color-primary)', textColor: 'var(--color-text-faint)', text: '保存中' }
   }
-  if (pageError.value) {
+  if (saveFeedback.value === 'error') {
     return { dotColor: 'var(--color-danger)', textColor: 'var(--color-danger)', text: '保存失败' }
   }
   if (isPending.value) {
@@ -332,7 +333,7 @@ const saveStatus = computed(() => {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '有未保存的更改' }
   }
 
-  const savedTime = formatSavedTime(editorStore.lastSavedAt)
+  const savedTime = formatSavedTime(lastManualSavedAt.value)
   if (savedTime) {
     return {
       dotColor: 'var(--color-success)',
@@ -538,6 +539,7 @@ async function handleSaveDraft() {
 
   try {
     const saved = await editorFormRef.value?.saveDraft('manual')
+    lastManualSavedAt.value = saved && !editorStore.dirty ? editorStore.lastSavedAt : ''
     setSaveFeedback(saved ? 'saved' : 'error', saved ? 900 : 1400)
   } finally {
     manualSaving.value = false
@@ -837,10 +839,18 @@ watch(
 )
 
 watch(articleId, () => {
+  lastManualSavedAt.value = ''
   publishCooldownUntil.value = articleId.value
     ? readPersistedPublishCooldownUntil(articleId.value)
     : 0
 }, { immediate: true })
+
+watch(
+  () => editorStore.dirty,
+  (dirty) => {
+    if (dirty) lastManualSavedAt.value = ''
+  },
+)
 
 watch(
   () => [showPublishAction.value, lastSubmittedAtTimestamp.value, publishCooldownUntil.value] as const,
