@@ -609,6 +609,7 @@ onBeforeUnmount(() => {
               :show-author="true"
               :show-status="true"
               :show-reason="true"
+              :summary-lines="3"
               :fill-height="true"
               :cover-eager="true"
             />
@@ -637,6 +638,7 @@ onBeforeUnmount(() => {
               :show-author="true"
               :show-status="true"
               :show-reason="true"
+              :summary-lines="3"
               :fill-height="true"
             />
           </RouterLink>
@@ -663,7 +665,14 @@ onBeforeUnmount(() => {
           :to="getArticleTargetPath(article)"
           class="ptm__mobile-item"
         >
-          <ArticleCard :article="article" :clickable="false" :show-status="true" :show-reason="true" :fill-height="true" />
+          <ArticleCard
+            :article="article"
+            :clickable="false"
+            :show-status="true"
+            :show-reason="true"
+            :summary-lines="3"
+            :fill-height="true"
+          />
         </RouterLink>
         <div class="ptm__mobile-load" aria-live="polite">
           <span v-if="loadingMore">加载中…</span>

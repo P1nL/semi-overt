@@ -17,6 +17,7 @@ const props = withDefaults(
       showStatus?: boolean
       showReason?: boolean
       compact?: boolean
+      summaryLines?: number
       fillHeight?: boolean
       coverEager?: boolean
       coverFallback?: 'title' | 'emoji'
@@ -28,6 +29,7 @@ const props = withDefaults(
       showStatus: true,
       showReason: true,
       compact: false,
+      summaryLines: undefined,
       fillHeight: false,
       coverEager: false,
       coverFallback: 'title',
@@ -45,7 +47,7 @@ const wrapperClass = computed(() =>
         ],
 )
 
-const summaryLines = computed(() => (props.compact ? 1 : 4))
+const resolvedSummaryLines = computed(() => props.summaryLines ?? (props.compact ? 1 : 4))
 const shouldShowHoverSummary = computed(() => props.compact && Boolean(props.article.summary.text))
 
 const shouldShowStatusBadge = computed(() => {
@@ -90,7 +92,7 @@ const latestReasonLabel = computed(() =>
           <ArticleStatusBadge v-if="shouldShowStatusBadge && article.status" :status="article.status" />
         </div>
 
-        <ArticleSummary v-if="article.summary.text" :summary="article.summary" :lines="summaryLines" />
+        <ArticleSummary v-if="article.summary.text" :summary="article.summary" :lines="resolvedSummaryLines" />
 
         <ArticleMetaLine :meta="article.meta" />
 
