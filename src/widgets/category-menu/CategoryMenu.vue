@@ -154,7 +154,7 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <div ref="rootRef" class="relative w-auto">
+  <div ref="rootRef" class="relative flex h-[2.85rem] w-auto items-center">
     <button
         ref="triggerRef"
         type="button"
@@ -180,18 +180,11 @@ watch(open, async (isOpen) => {
       />
     </button>
 
-    <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="translate-y-1 opacity-0"
-        enter-to-class="translate-y-0 opacity-100"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="translate-y-0 opacity-100"
-        leave-to-class="translate-y-1 opacity-0"
-    >
+    <Transition name="category-panel">
       <nav
           v-if="open"
           :id="panelId"
-          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[5rem] -translate-x-1/2 rounded-xl p-2 max-md:fixed max-md:left-3 max-md:right-3 max-md:top-[5.35rem] max-md:w-auto max-md:translate-x-0 max-md:overflow-y-auto max-md:p-3"
+          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[180px] -translate-x-1/2 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:left-3 max-md:top-20 max-md:translate-x-0"
           aria-label="栏目导航"
           @keydown="onPanelKeydown"
       >
@@ -202,7 +195,7 @@ watch(open, async (isOpen) => {
                 :to="item.path"
                 :aria-label="item.label"
                 :title="item.label"
-                class="flex items-center justify-center rounded-lg px-3 py-1 transition-all duration-200"
+                class="category-menu-item flex h-12 items-center justify-center rounded-lg px-3 transition-colors duration-200"
                 :class="
                   item.isActive
                     ? 'bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-surface)_90%)] text-(--color-primary)'
@@ -211,46 +204,31 @@ watch(open, async (isOpen) => {
                 @click="closeMenu()"
             >
               <svg
-                  v-if="getTimerIconVariant(item.value) === 'quick'"
                   class="category-menu-item__icon"
-                  viewBox="0 0 96 96"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                   xmlns="http://www.w3.org/2000/svg"
                   aria-hidden="true"
                   focusable="false"
               >
-                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
-                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
-                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 65.678 34.322 Z" fill="#30B86A"/>
-                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
-                <path d="M48 52L62 38" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
-              </svg>
-              <svg
-                  v-else-if="getTimerIconVariant(item.value) === 'short'"
-                  class="category-menu-item__icon"
-                  viewBox="0 0 96 96"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                  focusable="false"
-              >
-                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
-                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
-                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 73.000 52.000 Z" fill="#F2A33A"/>
-                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
-                <path d="M48 52L68 52" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
-              </svg>
-              <svg
-                  v-else
-                  class="category-menu-item__icon"
-                  viewBox="0 0 96 96"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                  focusable="false"
-              >
-                <circle cx="48" cy="52" r="28" fill="#F8FAFD"/>
-                <circle cx="48" cy="52" r="25" fill="#F4F7FB" stroke="#D7DEE8" stroke-width="3"/>
-                <path d="M 48 52 L 48.000 27.000 A 25 25 0 0 1 65.678 69.678 Z" fill="#E45A5A"/>
-                <circle cx="48" cy="52" r="4" fill="#1C2430"/>
-                <path d="M48 52L62 66" stroke="#1C2430" stroke-width="4" stroke-linecap="round"/>
+                <circle cx="16" cy="16" r="12" opacity="0.25" />
+                <path
+                    v-if="getTimerIconVariant(item.value) === 'quick'"
+                    d="M16 4 A12 12 0 0 1 28 16 M16 9 V16 H22"
+                />
+                <path
+                    v-else-if="getTimerIconVariant(item.value) === 'short'"
+                    d="M16 4 A12 12 0 0 1 16 28 M16 9 V22"
+                />
+                <path
+                    v-else
+                    d="M16 4 A12 12 0 1 1 4 16 M16 9 V16 H10"
+                />
+                <circle cx="16" cy="16" r="1.25" fill="currentColor" stroke="none" />
               </svg>
             </RouterLink>
           </li>
@@ -269,17 +247,48 @@ watch(open, async (isOpen) => {
 }
 
 .category-menu-panel {
-  background: var(--color-surface);
+  background: var(--color-surface-panel);
   border-color: var(--color-border-panel);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+  backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
+}
+
+.category-panel-enter-active {
+  transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.category-panel-leave-active {
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.category-panel-enter-from,
+.category-panel-leave-to {
+  opacity: 0;
+  transform: translateY(0.25rem);
+}
+
+.category-menu-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .category-menu-item__icon {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 1.75rem;
+  height: 1.75rem;
   display: block;
   flex: 0 0 auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .category-panel-enter-active,
+  .category-panel-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .category-panel-enter-from,
+  .category-panel-leave-to {
+    transform: none;
+  }
 }
 </style>
 
