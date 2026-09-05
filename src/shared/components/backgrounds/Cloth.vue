@@ -13,7 +13,11 @@ const ROWS = 18
 const COUNT = (COLS + 1) * (ROWS + 1)
 const STEP = 1 / 60
 const FRAME_INTERVAL_MS = 1000 / 30
-const MAX_RENDER_PIXELS = 1920 * 1080
+const MAX_DEVICE_PIXEL_RATIO = 1.25
+const MAX_RENDER_PIXELS = 2560 * 1440
+const POINTER_SPEED_SCALE = 12
+const POINTER_FORCE = 0.27
+const POINTER_DEPTH_FORCE = 0.96
 let renderer: Renderer | undefined
 let camera: Camera | undefined
 let geometry: Geometry | undefined
@@ -169,9 +173,9 @@ function step() {
     if (pointer.energy > 0.001) {
       const dx = p.x - pointer.x, dy = p.y - pointer.y
       const influence = Math.exp(-(dx * dx + dy * dy) / 0.65) * pointer.energy
-      force.x += pointer.dx * influence * 0.2028
-      force.y += pointer.dy * influence * 0.2028
-      force.z -= influence * 0.7605
+      force.x += pointer.dx * influence * POINTER_FORCE
+      force.y += pointer.dy * influence * POINTER_FORCE
+      force.z -= influence * POINTER_DEPTH_FORCE
     }
     body.applyForce(force)
   }
@@ -217,9 +221,9 @@ function move(event: PointerEvent) {
   const x = ((event.clientX - rect.left) / rect.width - 0.5) * viewWidth
   const y = (0.5 - (event.clientY - rect.top) / rect.height) * viewHeight
   if (pointer.active) {
-    pointer.dx = Math.max(-1.5, Math.min(1.5, (x - pointer.x) * 10))
-    pointer.dy = Math.max(-1.5, Math.min(1.5, (y - pointer.y) * 10))
-    pointer.energy = Math.min(1.5, 0.55 + Math.hypot(pointer.dx, pointer.dy))
+    pointer.dx = Math.max(-2, Math.min(2, (x - pointer.x) * POINTER_SPEED_SCALE))
+    pointer.dy = Math.max(-2, Math.min(2, (y - pointer.y) * POINTER_SPEED_SCALE))
+    pointer.energy = Math.min(1.9, 0.72 + Math.hypot(pointer.dx, pointer.dy))
   }
   pointer.x = x; pointer.y = y; pointer.active = true
 }
@@ -240,7 +244,11 @@ function resize() {
   const { width, height } = host.value.getBoundingClientRect()
   if (!width || !height) return
   viewHeight = viewWidth * height / width
-  renderer.dpr = Math.min(window.devicePixelRatio || 1, 1, Math.sqrt(MAX_RENDER_PIXELS / (width * height)))
+  renderer.dpr = Math.min(
+    window.devicePixelRatio || 1,
+    MAX_DEVICE_PIXEL_RATIO,
+    Math.sqrt(MAX_RENDER_PIXELS / (width * height)),
+  )
   renderer.setSize(width, height)
   camera.orthographic({ left: -viewWidth/2, right: viewWidth/2, top: viewHeight/2, bottom: -viewHeight/2, near: 0.1, far: 100 })
   createFabric()
