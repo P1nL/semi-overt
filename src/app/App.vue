@@ -35,7 +35,7 @@ const toast = useToast()
 const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
-const SilkBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Silk.vue'))
+const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
 
 const PAGE_SHEET_LEAVE = 360
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
@@ -522,13 +522,8 @@ onBeforeUnmount(() => {
 
     <Transition name="app-background-fade">
       <div v-if="uiStore.darkMode" aria-hidden="true" class="app-silk-background">
-        <SilkBackground
+        <ClothBackground
           class="app-silk-background__canvas"
-          :speed="3"
-          :scale="1.15"
-          color="#7B7481"
-          :noise-intensity="1.2"
-          :rotation="0.12"
         />
         <div class="app-silk-background__overlay" />
       </div>

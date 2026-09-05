@@ -184,7 +184,7 @@ watch(open, async (isOpen) => {
       <nav
           v-if="open"
           :id="panelId"
-          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[180px] -translate-x-1/2 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:left-3 max-md:top-20 max-md:translate-x-0"
+          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[120px] -translate-x-1/2 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:left-3 max-md:top-20 max-md:translate-x-0"
           aria-label="栏目导航"
           @keydown="onPanelKeydown"
       >

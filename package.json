@@ -28,6 +28,7 @@
     "@vueuse/core": "^14.2.1",
     "@vueuse/motion": "^3.0.3",
     "axios": "^1.13.6",
+    "cannon-es": "^0.20.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
     "dompurify": "^3.3.3",
