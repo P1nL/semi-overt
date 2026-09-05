@@ -248,6 +248,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .article-infinite-menu {
+  --infinite-menu-copy-edge: 28vw;
+  --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);
+  --infinite-menu-copy-width: max(0px, calc(50vw - var(--infinite-menu-copy-edge) - var(--infinite-menu-copy-gap) - 1.5rem));
   position: relative;
   width: 100vw;
   height: clamp(40rem, 72vw, 54rem);
@@ -309,11 +312,9 @@ onBeforeUnmount(() => {
 }
 
 .article-infinite-menu__title {
-  --infinite-menu-copy-edge: clamp(11.5rem, 14vw, 18rem);
-  --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);
   top: 50%;
   right: calc(50% + var(--infinite-menu-copy-edge) + var(--infinite-menu-copy-gap));
-  width: min(30rem, 27vw);
+  width: min(30rem, var(--infinite-menu-copy-width));
   margin: 0;
   color: var(--color-text);
   font-size: clamp(2rem, 3.2vw, 4rem);
@@ -328,12 +329,10 @@ onBeforeUnmount(() => {
 }
 
 .article-infinite-menu__left-meta {
-  --infinite-menu-copy-edge: clamp(11.5rem, 14vw, 18rem);
-  --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);
   top: 50%;
   right: calc(50% + var(--infinite-menu-copy-edge) + var(--infinite-menu-copy-gap));
   display: flex;
-  width: min(24rem, 27vw);
+  width: min(24rem, var(--infinite-menu-copy-width));
   flex-direction: column;
   align-items: flex-end;
   gap: 0.85rem;
@@ -344,24 +343,21 @@ onBeforeUnmount(() => {
 }
 
 .article-infinite-menu__details {
-  --infinite-menu-copy-edge: clamp(11.5rem, 14vw, 18rem);
-  --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);
   top: 50%;
   left: calc(50% + var(--infinite-menu-copy-edge) + var(--infinite-menu-copy-gap));
   display: flex;
-  width: min(23rem, 22vw);
+  width: min(23rem, var(--infinite-menu-copy-width));
   max-height: min(24rem, 58vh);
   flex-direction: column;
   gap: 0.9rem;
   overflow: hidden;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
   transform: translate3d(0, -50%, 0);
   user-select: none;
 }
 
 .article-infinite-menu__result-index {
-  --infinite-menu-copy-edge: clamp(11.5rem, 14vw, 18rem);
-  --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);
   top: calc(50% + clamp(13.5rem, 18vw, 21rem));
   left: calc(50% + var(--infinite-menu-copy-edge) + var(--infinite-menu-copy-gap));
   min-width: 4.5rem;
@@ -420,6 +416,8 @@ onBeforeUnmount(() => {
 
 .article-infinite-menu__author {
   margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--color-text);
   font-size: 0.95rem;
   font-weight: 700;

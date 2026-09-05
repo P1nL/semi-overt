@@ -955,6 +955,27 @@ class InfiniteGridMenu {
       mat4.copy(this.discInstances.matrices[ndx], matrix);
     });
 
+    // Keep DOM copy outside the actual projected card, including after resize.
+    const activeMatrix = this.discInstances.matrices[this.#findNearestVertexIndex()];
+    if (activeMatrix) {
+      const radius = Math.hypot(activeMatrix[12], activeMatrix[13], activeMatrix[14]);
+      let halfWidth = 0;
+      for (const x of [-0.8, 0.8]) {
+        for (const y of [-1, 0, 1]) {
+          const point = vec3.transformMat4(vec3.create(), [x, y, 0], activeMatrix);
+          vec3.normalize(point, point);
+          vec3.scale(point, point, radius);
+          vec3.transformMat4(point, point, this.camera.matrices.view);
+          vec3.transformMat4(point, point, this.camera.matrices.projection);
+          halfWidth = Math.max(halfWidth, Math.abs(point[0]) * gl.canvas.clientWidth / 2);
+        }
+      }
+      const edge = `${Math.ceil(halfWidth)}px`;
+      if (gl.canvas.parentElement?.style.getPropertyValue('--infinite-menu-copy-edge') !== edge) {
+        gl.canvas.parentElement?.style.setProperty('--infinite-menu-copy-edge', edge);
+      }
+    }
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.discInstances.buffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.discInstances.matricesArray);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
