@@ -108,8 +108,6 @@ async function handleSubmit() {
 
     await finishLoadingAnimation
 
-    toast.success('登录成功')
-
     const queryRedirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     const redirect = queryRedirect || sessionStore.consumeAuthRedirect(ROUTE_PATH.HOME)
     if (queryRedirect) {

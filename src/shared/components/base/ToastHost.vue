@@ -23,9 +23,8 @@ const props = withDefaults(
       max?: number
     }>(),
     {
-      toasts: () => [],
-      position: 'top-right',
-      max: 5,
+      position: 'bottom-right',
+      max: 3,
     },
 )
 
@@ -36,9 +35,13 @@ const emit = defineEmits<{
 
 const internalToasts = ref<ToastItem[]>([])
 const timers = new Map<string | number, number>()
+const remaining = new Map<string | number, number>()
+const startedAt = new Map<string | number, number>()
+const hovered = new Set<string | number>()
+const focused = new Set<string | number>()
 
 const list = computed(() => {
-  const source = props.toasts.length ? props.toasts : internalToasts.value
+  const source = props.toasts ?? internalToasts.value
   return source.slice(0, props.max)
 })
 
@@ -58,7 +61,7 @@ const variantMeta = {
 } as const
 
 function sync(next: ToastItem[]) {
-  if (props.toasts.length) {
+  if (props.toasts !== undefined) {
     emit('update:toasts', next)
   } else {
     internalToasts.value = next
@@ -68,15 +71,47 @@ function sync(next: ToastItem[]) {
 function remove(id: string | number) {
   window.clearTimeout(timers.get(id))
   timers.delete(id)
+  remaining.delete(id)
+  startedAt.delete(id)
+  hovered.delete(id)
+  focused.delete(id)
   sync(list.value.filter((item) => item.id !== id))
   emit('remove', id)
 }
 
 function schedule(item: ToastItem) {
   if (item.duration === 0) return
-  const duration = item.duration ?? 3000
+  const duration = remaining.get(item.id) ?? item.duration ?? 5000
+  remaining.set(item.id, duration)
+  startedAt.set(item.id, performance.now())
   const timer = window.setTimeout(() => remove(item.id), duration)
   timers.set(item.id, timer)
+}
+
+function pause(id: string | number, kind: 'pointer' | 'focus') {
+  ;(kind === 'pointer' ? hovered : focused).add(id)
+  if (!timers.has(id)) return
+  window.clearTimeout(timers.get(id))
+  timers.delete(id)
+  remaining.set(id, Math.max(0, (remaining.get(id) ?? 5000) - (performance.now() - (startedAt.get(id) ?? performance.now()))))
+}
+
+function resume(item: ToastItem, kind: 'pointer' | 'focus', event?: FocusEvent) {
+  if (event?.relatedTarget instanceof Node && (event.currentTarget as HTMLElement).contains(event.relatedTarget)) return
+  ;(kind === 'pointer' ? hovered : focused).delete(item.id)
+  if (!hovered.has(item.id) && !focused.has(item.id) && !timers.has(item.id)) schedule(item)
+}
+
+function beforeLeave(element: Element) {
+  const el = element as HTMLElement
+  const rect = el.getBoundingClientRect()
+  // Freeze the departing item in its current slot, then travel beyond the viewport.
+  el.style.top = `${el.offsetTop}px`
+  el.style.width = `${el.offsetWidth}px`
+  el.style.setProperty('--toast-exit-y', `${window.innerHeight - rect.top + 32}px`)
+  el.style.pointerEvents = 'none'
+  el.setAttribute('aria-hidden', 'true')
+  el.inert = true
 }
 
 function push(toast: Omit<ToastItem, 'id'> & { id?: string | number }) {
@@ -84,18 +119,21 @@ function push(toast: Omit<ToastItem, 'id'> & { id?: string | number }) {
     id: toast.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     closable: true,
     variant: 'default',
-    duration: 3000,
+    duration: 5000,
     ...toast,
   }
 
   const merged = [next, ...list.value].slice(0, props.max)
   sync(merged)
-  schedule(next)
 }
 
 function clear() {
   Array.from(timers.values()).forEach((timer) => window.clearTimeout(timer))
   timers.clear()
+  remaining.clear()
+  startedAt.clear()
+  hovered.clear()
+  focused.clear()
   sync([])
 }
 
@@ -106,10 +144,20 @@ function onToastEvent(event: Event) {
 }
 
 watch(
-    () => props.toasts,
+    list,
     (items) => {
+      for (const id of remaining.keys()) {
+        if (!items.some((item) => item.id === id)) {
+          window.clearTimeout(timers.get(id))
+          timers.delete(id)
+          remaining.delete(id)
+          startedAt.delete(id)
+          hovered.delete(id)
+          focused.delete(id)
+        }
+      }
       items.forEach((item) => {
-        if (!timers.has(item.id)) {
+        if (!remaining.has(item.id)) {
           schedule(item)
         }
       })
@@ -138,26 +186,29 @@ defineExpose({
     <div
         :class="
         cn(
-          'toast-viewport pointer-events-none fixed z-[70] flex flex-col gap-3',
+          'toast-viewport pointer-events-none fixed grid',
           positionClassMap[position],
         )
       "
         aria-live="polite"
-        aria-atomic="true"
+        aria-label="操作失败提示"
     >
       <TransitionGroup
-          enter-active-class="transition duration-300 ease-out"
-          enter-from-class="translate-y-2 scale-[0.98] opacity-0"
-          enter-to-class="translate-y-0 opacity-100"
-          leave-active-class="transition duration-200 ease-in"
-          leave-from-class="opacity-100"
-          leave-to-class="scale-[0.98] opacity-0"
+          name="toast"
+          move-class="toast-no-move"
+          @before-leave="beforeLeave"
       >
         <div
-            v-for="toast in list"
+            v-for="(toast, index) in list"
             :key="toast.id"
-            class="surface-1 pointer-events-auto flex w-fit max-w-full items-center gap-2.5 rounded-[var(--radius-pill)] px-3.5 shadow-[var(--shadow-lg)]"
-            :class="toast.title || $slots.action ? 'min-h-9 py-3' : 'h-9 py-0'"
+            :style="{ '--toast-depth': index, zIndex: max - index }"
+            :inert="index > 0"
+            :class="{ 'toast-behind': index > 0 }"
+            class="toast-item pointer-events-auto flex w-full items-center gap-2.5 px-3.5 py-2.5"
+            @mouseenter="pause(toast.id, 'pointer')"
+            @mouseleave="resume(toast, 'pointer')"
+            @focusin="pause(toast.id, 'focus')"
+            @focusout="resume(toast, 'focus', $event)"
         >
           <span class="flex shrink-0 items-center leading-none" :class="variantMeta[toast.variant ?? 'default'].color">
             <Icon :name="variantMeta[toast.variant ?? 'default'].icon" :size="18" />
@@ -169,8 +220,8 @@ defineExpose({
             </p>
             <p
                 v-if="toast.description"
-                class="text-sm text-[var(--color-text-muted)]"
-                :class="toast.title ? 'mt-1 leading-6' : 'leading-none'"
+                class="text-sm leading-5 text-[var(--color-text)] break-words"
+                :class="toast.title ? 'mt-1' : ''"
             >
               {{ toast.description }}
             </p>
@@ -186,7 +237,7 @@ defineExpose({
 
           <IconButton
               v-if="toast.closable !== false"
-              ariaLabel="Dismiss toast"
+              ariaLabel="关闭提示"
               variant="ghost"
               size="sm"
               @click="remove(toast.id)"
@@ -201,8 +252,53 @@ defineExpose({
 
 <style scoped>
 .toast-viewport {
-  width: fit-content;
-  max-width: min(calc(100vw - 1.5rem), 17rem);
+  z-index: 2147483647;
+  width: min(calc(100vw - 2rem), 320px);
+  /* Cards share one slot; reserve only the two exposed lower edges. */
+  margin-bottom: 20px;
+}
+
+.toast-item {
+  grid-area: 1 / 1;
+  min-height: 56px;
+  max-height: min(160px, calc(100dvh - 80px - env(safe-area-inset-bottom)));
+  transform-origin: center bottom;
+  transform: translateY(calc(var(--toast-depth) * 10px)) scaleX(calc(1 - var(--toast-depth) * 0.04));
+  transition: transform 220ms cubic-bezier(0.25, 1, 0.5, 1), opacity 220ms ease;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: min(var(--radius-md), 14px);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.toast-behind > * {
+  visibility: hidden;
+}
+.toast-behind {
+  pointer-events: none;
+}
+.toast-no-move {
+  transition: none !important;
+}
+.toast-enter-active {
+  transition: transform 220ms cubic-bezier(0.25, 1, 0.5, 1), opacity 220ms ease;
+}
+.toast-enter-from {
+  transform: translateX(calc(100% + 40px + env(safe-area-inset-right)));
+  opacity: 0;
+}
+.toast-leave-active {
+  position: absolute;
+  transition: transform 180ms ease-in;
+}
+.toast-leave-to {
+  transform: translateY(var(--toast-exit-y)) scaleX(calc(1 - var(--toast-depth) * 0.04));
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-item, .toast-enter-active, .toast-leave-active {
+    transition: none;
+  }
 }
 
 .toast-viewport-top-right {
@@ -216,8 +312,15 @@ defineExpose({
 }
 
 .toast-viewport-bottom-right {
-  bottom: 1rem;
-  right: 1rem;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  right: max(24px, env(safe-area-inset-right));
+}
+
+@media (max-width: 640px) {
+  .toast-viewport-bottom-right {
+    bottom: max(16px, env(safe-area-inset-bottom));
+    right: max(16px, env(safe-area-inset-right));
+  }
 }
 
 .toast-viewport-bottom-left {

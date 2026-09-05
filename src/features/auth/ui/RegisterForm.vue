@@ -178,8 +178,6 @@ async function handleSubmit() {
     authStore.setAuth(mapAuthRespToSession(result))
 
     await finishLoadingAnimation()
-
-    toast.success('注册成功，已自动登录')
     await router.push({ name: ROUTE_NAME.HOME })
 
     emit('success')
@@ -215,7 +213,6 @@ async function sendCode() {
     })
     codeSent.value = true
     successMessage.value = '验证码已发送，请查看邮箱'
-    toast.success('验证码已发送，请查看邮箱')
     startResendCountdown()
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : '验证码发送失败，请稍后重试'

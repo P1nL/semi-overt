@@ -84,7 +84,6 @@ async function handleDelete() {
       ? await deleteOwnArticleById(props.articleId)
       : await adminDeleteArticleById(props.articleId)
     emit('deleted', result)
-    toast.success(props.successMessage || (props.mode === 'owner' ? '文章已删除' : '文章已由管理员删除'))
     resetConfirm()
   } catch (error) {
     toast.error(getErrorMessage(error, '删除失败，请稍后重试'))

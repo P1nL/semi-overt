@@ -649,7 +649,6 @@ async function submitArticle() {
 
     resetPublishConfirm()
     setSaveFeedback('idle')
-    toast.success('文章已提交审核')
     void queryClient.invalidateQueries({
       queryKey: queryKeys.reviewPendingRoot,
     })
@@ -715,7 +714,6 @@ async function cancelReview() {
     }
 
     await onCanceled()
-    toast.success('已取消审核，文章恢复为草稿')
   } catch (error) {
     const message = getErrorMessage(error, '取消审核失败，请稍后重试')
     toast.error(message)

@@ -164,7 +164,6 @@ async function sendCode() {
     await finishLoadingAnimation()
     codeSent.value = true
     successMessage.value = '验证码已发送，请查看邮箱'
-    toast.success('验证码已发送，请查看邮箱')
     startResendCountdown()
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : '发送失败，请稍后重试'
@@ -191,7 +190,6 @@ async function handleSubmit() {
     await authApi.resetPassword(mapResetPasswordFormToDto(form))
     await finishLoadingAnimation()
     successMessage.value = '密码已重置，请使用新密码登录'
-    toast.success('密码已重置，请使用新密码登录')
     emit('success')
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : '重置失败，请稍后重试'

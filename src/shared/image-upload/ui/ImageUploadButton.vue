@@ -65,7 +65,6 @@ async function handleInputChange(event: Event) {
     })
 
     emit('uploaded', uploaded)
-    toast.success('图片上传成功')
   } catch (error) {
     const message = error instanceof Error ? error.message : '图片上传失败'
     emit('error', message)

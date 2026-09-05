@@ -163,8 +163,6 @@ async function removeDraft(item: DraftBoxItem) {
 
     // 使用户个人页文章列表缓存失效，确保个人页数据同步更新
     void queryClient.invalidateQueries({ queryKey: queryKeys.userProfileRoot })
-
-    toast.success('文章已删除')
   } catch (error) {
     toast.error(getErrorMessage(error, '删除文章失败'))
   } finally {

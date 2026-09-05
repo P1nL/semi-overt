@@ -814,7 +814,7 @@ function editLink() {
   const isActiveLink = editor.isActive('link')
 
   if (!hasSelection && !isActiveLink) {
-    toast.info('请先选中文字，再添加链接')
+    toast.error('无法添加链接，请先选中文字')
     return
   }
 

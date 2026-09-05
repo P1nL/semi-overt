@@ -379,12 +379,11 @@ async function handleLogout() {
   try {
     await authApi.logout()
   } catch (error) {
-    toast.warning(getErrorMessage(error, '退出失败，但本地登录状态已清除。'))
+    toast.error(getErrorMessage(error, '退出失败，但本地登录状态已清除。'))
   } finally {
     authStore.clearAuth()
     userMenuOpen.value = false
     loggingOut.value = false
-    toast.success('已退出登录')
     await router.push({ name: ROUTE_NAME.HOME })
   }
 }

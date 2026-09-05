@@ -76,8 +76,6 @@ async function handleSubmit() {
       queryKey: [queryKeys.userProfile('', '', 0, 0)[0]],
     })
     await finishLoadingAnimation()
-
-    toast.success('资料更新成功')
     emit('updated', profile)
     closeDialog()
   } catch (error) {

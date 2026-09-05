@@ -17,20 +17,13 @@ export interface ShowToastOptions {
 
 let toastSeed = 0
 const globalToasts = ref<ToastItem[]>([])
-const globalTimers = new Map<number, number>()
 
 export function useToast() {
     const toasts = globalToasts
-    const timers = globalTimers
 
     function remove(id: number): void {
         toasts.value = toasts.value.filter((item) => item.id !== id)
 
-        const timer = timers.get(id)
-        if (timer) {
-            window.clearTimeout(timer)
-            timers.delete(id)
-        }
     }
 
     function show(type: UIToastType, message: string, options: ShowToastOptions = {}): number {
@@ -48,34 +41,17 @@ export function useToast() {
             createdAt: Date.now(),
         }
 
-        toasts.value = [item, ...toasts.value]
-
-        if (duration > 0 && typeof window !== 'undefined') {
-            const timer = window.setTimeout(() => remove(id), duration)
-            timers.set(id, timer)
-        }
+        // The host owns expiry so pointer/focus interaction can pause it.
+        toasts.value = [item, ...toasts.value].slice(0, 3)
 
         return id
-    }
-
-    function success(message: string, options?: ShowToastOptions): number {
-        return show(UI_TOAST_TYPE.SUCCESS, message, options)
     }
 
     function error(message: string, options?: ShowToastOptions): number {
         return show(UI_TOAST_TYPE.ERROR, message, options)
     }
 
-    function warning(message: string, options?: ShowToastOptions): number {
-        return show(UI_TOAST_TYPE.WARNING, message, options)
-    }
-
-    function info(message: string, options?: ShowToastOptions): number {
-        return show(UI_TOAST_TYPE.INFO, message, options)
-    }
-
     function clear(): void {
-        Array.from(timers.keys()).forEach(remove)
         toasts.value = []
     }
 
@@ -84,11 +60,7 @@ export function useToast() {
     return {
         toasts,
         count,
-        show,
-        success,
         error,
-        warning,
-        info,
         remove,
         clear,
     }

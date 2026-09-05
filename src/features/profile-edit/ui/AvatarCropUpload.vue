@@ -214,7 +214,6 @@ async function uploadCroppedAvatar() {
     })
 
     emit('uploaded', uploaded)
-    toast.success('头像上传成功')
     cancelDraft()
   } catch (error) {
     const message = error instanceof Error ? error.message : '头像上传失败'

@@ -342,7 +342,6 @@ async function submitAction(action: ReviewActionValue) {
     await refreshReviewRelatedData(articleIdStr)
 
     emit('acted', result)
-    toast.success(`审核${action === REVIEW_ACTION.APPROVE ? '通过' : action === REVIEW_ACTION.RETURN ? '退回' : '拒绝'}成功`)
     resetInteractionState()
   } catch (error) {
     const isConflict = error instanceof ApiBusinessError && error.code === 409
