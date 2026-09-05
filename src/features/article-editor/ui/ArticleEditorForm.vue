@@ -72,7 +72,7 @@ const props = withDefaults(
     articleId: undefined,
     modelValue: null,
     disabled: false,
-    autoSaveDelay: 2000,
+    autoSaveDelay: 10000,
     loadOnMounted: true,
     returnedReason: '',
   },

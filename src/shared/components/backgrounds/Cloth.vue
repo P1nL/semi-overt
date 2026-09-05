@@ -7,10 +7,13 @@ import { World, Body, Particle, DistanceConstraint, Vec3, GSSolver, SAPBroadphas
 // https://tympanus.net/codrops/2020/02/11/how-to-create-a-physics-based-3d-cloth-with-cannon-js-and-three-js/
 // Uses a particle/constraint fabric with OGL rendering, without slideshow images.
 const host = useTemplateRef<HTMLDivElement>('host')
-const COLS = 36
-const ROWS = 28
+// A decorative background does not need a full-resolution physics mesh.
+const COLS = 24
+const ROWS = 18
 const COUNT = (COLS + 1) * (ROWS + 1)
 const STEP = 1 / 60
+const FRAME_INTERVAL_MS = 1000 / 30
+const MAX_RENDER_PIXELS = 1920 * 1080
 let renderer: Renderer | undefined
 let camera: Camera | undefined
 let geometry: Geometry | undefined
@@ -134,7 +137,10 @@ function createFabric() {
 function updateMesh() {
   for (let i = 0; i < COUNT; i++) {
     const p = bodies[i]!.position
-    positions.set([p.x, p.y, p.z], i * 3)
+    const offset = i * 3
+    positions[offset] = p.x
+    positions[offset + 1] = p.y
+    positions[offset + 2] = p.z
   }
   normals.fill(0)
   for (let i = 0; i < indices.length; i += 3) {
@@ -142,9 +148,9 @@ function updateMesh() {
     const abx = positions[b]! - positions[a]!, aby = positions[b+1]! - positions[a+1]!, abz = positions[b+2]! - positions[a+2]!
     const acx = positions[c]! - positions[a]!, acy = positions[c+1]! - positions[a+1]!, acz = positions[c+2]! - positions[a+2]!
     const x = aby*acz-abz*acy, y = abz*acx-abx*acz, z = abx*acy-aby*acx
-    for (const index of [a,b,c]) {
-      normals[index]! += x; normals[index+1]! += y; normals[index+2]! += z
-    }
+    normals[a]! += x; normals[a+1]! += y; normals[a+2]! += z
+    normals[b]! += x; normals[b+1]! += y; normals[b+2]! += z
+    normals[c]! += x; normals[c+1]! += y; normals[c+2]! += z
   }
   if (geometry) {
     geometry.attributes.position!.needsUpdate = true
@@ -160,11 +166,13 @@ function step() {
     const p = body.position
     const wind = Math.sin(p.x * 1.1 + elapsed * 0.65) * Math.cos(p.y * 0.6 - elapsed * 0.4)
     force.set(0.00169 * Math.sin(elapsed * 0.4), 0, 0.0507 * wind)
-    const distance = Math.hypot(p.x - pointer.x, p.y - pointer.y)
-    const influence = Math.exp(-distance * distance / 0.65) * pointer.energy
-    force.x += pointer.dx * influence * 0.2028
-    force.y += pointer.dy * influence * 0.2028
-    force.z -= influence * 0.7605
+    if (pointer.energy > 0.001) {
+      const dx = p.x - pointer.x, dy = p.y - pointer.y
+      const influence = Math.exp(-(dx * dx + dy * dy) / 0.65) * pointer.energy
+      force.x += pointer.dx * influence * 0.2028
+      force.y += pointer.dy * influence * 0.2028
+      force.z -= influence * 0.7605
+    }
     body.applyForce(force)
   }
   world!.step(STEP)
@@ -179,11 +187,17 @@ function draw() {
 function animate(now: number) {
   frame = 0
   if (document.hidden || motion?.matches || lost) return
-  accumulator += Math.min((now - last) / 1000, 0.05)
+  if (now - last < FRAME_INTERVAL_MS - 0.5) {
+    frame = requestAnimationFrame(animate)
+    return
+  }
+  // Keep the fixed physics step, but slow the decoration on overloaded devices
+  // instead of accumulating extra work that makes the next frame even slower.
+  accumulator += Math.min((now - last) / 1000, STEP * 2)
   last = now
   // Bound catch-up work after slow frames; never simulate an entire hidden tab gap.
   let steps = 0
-  while (accumulator >= STEP && steps < 3) {
+  while (accumulator >= STEP && steps < 2) {
     step()
     accumulator -= STEP
     steps++
@@ -226,6 +240,7 @@ function resize() {
   const { width, height } = host.value.getBoundingClientRect()
   if (!width || !height) return
   viewHeight = viewWidth * height / width
+  renderer.dpr = Math.min(window.devicePixelRatio || 1, 1, Math.sqrt(MAX_RENDER_PIXELS / (width * height)))
   renderer.setSize(width, height)
   camera.orthographic({ left: -viewWidth/2, right: viewWidth/2, top: viewHeight/2, bottom: -viewHeight/2, near: 0.1, far: 100 })
   createFabric()
@@ -242,7 +257,7 @@ function contextLost(event: Event) {
 onMounted(() => {
   if (!host.value) return
   try {
-    renderer = new Renderer({ alpha: true, antialias: true, dpr: Math.min(devicePixelRatio, 1.35) })
+    renderer = new Renderer({ alpha: false, antialias: false, depth: false, dpr: 1, powerPreference: 'low-power' })
     const gl = renderer.gl
     gl.clearColor(0.043, 0.043, 0.059, 1)
     camera = new Camera(gl)
