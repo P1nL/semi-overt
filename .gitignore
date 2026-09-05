@@ -48,9 +48,19 @@ test-results/
 playwright-report/
 /playwright-*.json
 /*snapshot*.md
-/*.png
-/*.zip
-/*.tgz
+# Keep source images and archives visible; put disposable output in /tmp/.
+/tmp/
+/artifacts/
+*.env
+!*.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+Thumbs.db
+Desktop.ini
 
 # Local startup helpers
 scripts/start-now-demo.cmd
