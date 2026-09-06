@@ -5,7 +5,7 @@ import { onClickOutside } from '@vueuse/core'
 
 import { mapCategoryValueToVm } from '@/entities/category'
 import { CATEGORY_ORDER } from '@/entities/category'
-import AnimatedFolderIcon from '@/shared/components/base/AnimatedFolderIcon.vue'
+import CategoryFolderIcon from '@/shared/components/base/CategoryFolderIcon.vue'
 import Icon from '@/shared/components/base/Icon.vue'
 
 const props = withDefaults(
@@ -21,6 +21,8 @@ const route = useRoute()
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const open = ref(false)
+const triggerHovered = ref(false)
+const triggerFocused = ref(false)
 const itemRefs = ref<HTMLAnchorElement[]>([])
 const panelId = 'header-category-menu'
 
@@ -81,6 +83,8 @@ function closeMenu(eventOrOptions?: PointerEvent | { restoreFocus?: boolean }) {
   if (restoreFocus) {
     void nextTick(() => {
       triggerRef.value?.focus()
+      // Restoring keyboard focus must not reopen the folder after dismissal.
+      triggerFocused.value = false
     })
   }
 }
@@ -144,6 +148,8 @@ onClickOutside(rootRef, closeMenu)
 
 watch(open, async (isOpen) => {
   if (!isOpen) {
+    triggerHovered.value = false
+    triggerFocused.value = false
     itemRefs.value = []
     return
   }
@@ -163,14 +169,16 @@ watch(open, async (isOpen) => {
         :aria-controls="panelId"
         aria-label="栏目"
         aria-haspopup="true"
+        @mouseenter="triggerHovered = true"
+        @mouseleave="triggerHovered = false"
+        @focus="triggerFocused = triggerRef?.matches(':focus-visible') ?? false"
+        @blur="triggerFocused = false"
         @click="toggleMenu"
         @keydown="onTriggerKeydown"
     >
-      <AnimatedFolderIcon
+      <CategoryFolderIcon
           class="category-menu-trigger__icon"
-          size="1.05rem"
-          title="栏目"
-          :decorative="false"
+          :active="open || triggerHovered || triggerFocused"
       />
       <Icon
           name="chevron-down"
@@ -205,30 +213,22 @@ watch(open, async (isOpen) => {
             >
               <svg
                   class="category-menu-item__icon"
-                  viewBox="0 0 32 32"
+                  viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="1.75"
+                  stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   xmlns="http://www.w3.org/2000/svg"
                   aria-hidden="true"
                   focusable="false"
               >
-                <circle cx="16" cy="16" r="12" opacity="0.25" />
-                <path
-                    v-if="getTimerIconVariant(item.value) === 'quick'"
-                    d="M16 4 A12 12 0 0 1 28 16 M16 9 V16 H22"
+                <circle cx="12" cy="12" r="10" />
+                <line class="minute-hand" x1="12" y1="12" x2="12" y2="6" />
+                <line class="hour-hand" x1="12" y1="12"
+                    :x2="getTimerIconVariant(item.value) === 'quick' ? 16 : getTimerIconVariant(item.value) === 'short' ? 12 : 7.5"
+                    :y2="getTimerIconVariant(item.value) === 'short' ? 16.5 : 12"
                 />
-                <path
-                    v-else-if="getTimerIconVariant(item.value) === 'short'"
-                    d="M16 4 A12 12 0 0 1 16 28 M16 9 V22"
-                />
-                <path
-                    v-else
-                    d="M16 4 A12 12 0 1 1 4 16 M16 9 V16 H10"
-                />
-                <circle cx="16" cy="16" r="1.25" fill="currentColor" stroke="none" />
               </svg>
             </RouterLink>
           </li>
@@ -240,8 +240,8 @@ watch(open, async (isOpen) => {
 
 <style scoped>
 .category-menu-trigger__icon {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 1.75rem;
+  height: 1.75rem;
   display: block;
   flex: 0 0 auto;
 }
@@ -279,7 +279,18 @@ watch(open, async (isOpen) => {
   display: block;
   flex: 0 0 auto;
 }
+.minute-hand,
+.hour-hand {
+  transform-origin: 12px 12px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hour-hand { transition-duration: 0.5s; transition-timing-function: ease-in-out; }
+.category-menu-item:hover .minute-hand,
+.category-menu-item:focus-visible .minute-hand { transform: rotate(360deg); }
+.category-menu-item:hover .hour-hand,
+.category-menu-item:focus-visible .hour-hand { transform: rotate(30deg); }
 @media (prefers-reduced-motion: reduce) {
+  .minute-hand, .hour-hand { transition: none; transform: none !important; }
   .category-panel-enter-active,
   .category-panel-leave-active {
     transition-duration: 1ms;

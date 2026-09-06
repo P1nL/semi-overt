@@ -62,20 +62,18 @@ const isOwner = computed(() => {
       </div>
 
       <div class="profile-card__content">
-        <div class="profile-card__avatar-layer">
-          <Avatar
-            :src="profile.avatarUrl ?? undefined"
-            :alt="profile.displayName"
-            :name="profile.displayName"
-            :fallback="profile.displayName.slice(0, 1)"
-            size="xl"
-            rounded
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            class="profile-card__avatar"
-          />
-        </div>
+        <Avatar
+          :src="profile.avatarUrl ?? undefined"
+          :alt="profile.displayName"
+          :name="profile.displayName"
+          :fallback="profile.displayName.slice(0, 1)"
+          size="xl"
+          rounded
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+          class="profile-card__avatar"
+        />
 
         <div class="profile-card__identity-layer">
           <h1 class="profile-card__name">
@@ -164,31 +162,19 @@ const isOwner = computed(() => {
   transform-style: preserve-3d;
 }
 
-.profile-card__avatar-layer {
-  display: inline-flex;
-  transform: translateZ(76px);
-}
-
 .profile-card__avatar {
   width: 5rem;
   height: 5rem;
-  border-color: rgb(255 255 255 / 0.7);
-  background: rgb(255 255 255 / 0.16);
+  border: 0;
+  background: transparent;
   color: white;
   font-size: 1.5rem;
-  box-shadow:
-    0 22px 48px rgb(8 15 34 / 0.34),
-    0 0 0 5px rgb(255 255 255 / 0.24);
-  backdrop-filter: blur(10px) saturate(140%);
+  box-shadow: none;
+  transform: translateZ(76px);
 }
 
 .profile-card--plain .profile-card__avatar {
-  border-color: color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
-  background: color-mix(in srgb, var(--color-surface-glass-strong) 92%, transparent);
   color: var(--color-text);
-  box-shadow:
-    0 22px 48px rgb(15 23 42 / 0.14),
-    0 0 0 5px color-mix(in srgb, var(--color-surface) 66%, transparent);
 }
 
 .profile-card__identity-layer {
@@ -326,7 +312,7 @@ html.dark .profile-card--plain {
     transform-style: flat;
   }
 
-  .profile-card__avatar-layer,
+  .profile-card__avatar,
   .profile-card__identity-layer,
   .profile-card__role-layer,
   .profile-card__signature,
@@ -341,7 +327,7 @@ html.dark .profile-card--plain {
     transform-style: flat;
   }
 
-  .profile-card__avatar-layer,
+  .profile-card__avatar,
   .profile-card__identity-layer,
   .profile-card__role-layer,
   .profile-card__signature,

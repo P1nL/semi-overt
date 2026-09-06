@@ -806,7 +806,8 @@ async function handleLogout() {
   color: var(--color-text);
 }
 
-.header-draft-entry .tool-icon-button:hover {
+.header-draft-entry .tool-icon-button:hover,
+.user-trigger:hover {
   background: transparent;
 }
 
