@@ -34,6 +34,8 @@ const AsyncDraftBoxDrawer = defineAsyncComponent(
   () => import('@/features/draft-box/ui/DraftBoxDrawer.vue'),
 )
 
+const emit = defineEmits<{ 'dock-blocked': [blocked: boolean] }>()
+
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
@@ -45,6 +47,11 @@ const authDialogOpen = ref(false)
 const draftMenuOpen = ref(false)
 const draftDrawerLoaded = ref(false)
 const userMenuOpen = ref(false)
+watch(
+  () => authDialogOpen.value || draftMenuOpen.value || userMenuOpen.value,
+  value => emit('dock-blocked', value),
+  { immediate: true },
+)
 const draftTriggerRef = ref<HTMLButtonElement | null>(null)
 const themeEntryRef = ref<HTMLElement | null>(null)
 const draftEntryRef = ref<HTMLElement | null>(null)
@@ -427,8 +434,9 @@ async function handleLogout() {
     class="header-actions relative z-10 flex shrink-0 items-center gap-2"
     :class="uiStore.appreciationMode ? 'header-actions--appreciation' : ''"
   >
-    <div ref="themeEntryRef" class="header-theme-entry">
+    <div ref="themeEntryRef" class="header-theme-entry" data-header-dock-item="theme">
       <ThemeSwitch
+        data-header-dock-button
         :show-label="false"
         :appreciation-enabled="appreciationEnabled"
         class="header-theme-switch hidden md:inline-flex"
@@ -439,11 +447,13 @@ async function handleLogout() {
       <div
         v-if="showAuthenticatedActions"
         ref="draftEntryRef"
+        data-header-dock-item="draft"
         class="header-draft-entry"
       >
         <div ref="draftMenuRef" class="relative">
           <button
             ref="draftTriggerRef"
+            data-header-dock-button
             type="button"
             class="tool-icon-button"
             :class="draftMenuOpen ? 'tool-icon-button-active' : ''"
@@ -471,7 +481,7 @@ async function handleLogout() {
       </div>
     </Transition>
 
-    <div class="header-auth-identity-slot" :aria-hidden="uiStore.appreciationMode ? 'true' : undefined">
+    <div class="header-auth-identity-slot" data-header-dock-item="identity" :aria-hidden="uiStore.appreciationMode ? 'true' : undefined">
       <Transition
         name="header-auth-identity"
         mode="out-in"
@@ -485,6 +495,7 @@ async function handleLogout() {
         >
         <button
           ref="userTriggerRef"
+          data-header-dock-button
           type="button"
           class="user-trigger"
           :aria-expanded="userMenuOpen"
@@ -561,12 +572,13 @@ async function handleLogout() {
         <button
           v-else
           key="anonymous"
+          data-header-dock-button
           type="button"
           class="tool-icon-button auth-trigger-button"
           aria-label="登录 / 注册"
           @click="authDialogOpen = true"
         >
-          <AnimatedAttributionIcon size="1.45rem" title="登录 / 注册" :decorative="false" />
+          <AnimatedAttributionIcon size="1.55rem" title="登录 / 注册" :decorative="false" />
         </button>
       </Transition>
     </div>
@@ -578,6 +590,31 @@ async function handleLogout() {
 <style scoped>
 .header-actions {
   transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Keep icon sizing explicit; the login player otherwise adds another 1.3x. */
+.header-theme-switch :deep(.theme-switch-icon:not(.theme-switch-icon--appreciation)) {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+.auth-trigger-button :deep(.animated-attribution-icon__player) {
+  width: 100%;
+  height: 100%;
+}
+
+.header-theme-entry,
+.header-draft-entry > :first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--header-dock-width, 2.85rem);
+  height: 2.85rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .header-theme-entry { width: 0; }
+  .header-actions--appreciation .header-theme-entry { width: 2.85rem; }
 }
 
 .header-actions--appreciation {
@@ -613,7 +650,7 @@ async function handleLogout() {
 .header-draft-entry {
   display: flex;
   flex: 0 0 auto;
-  width: calc(2.85rem + 0.5rem + 1px);
+  width: calc(var(--header-dock-width, 2.85rem) + 0.5rem + 1px);
   align-items: center;
   gap: 0.5rem;
   transform-origin: right center;
@@ -648,7 +685,7 @@ async function handleLogout() {
 
 .header-auth-identity-slot {
   display: flex;
-  width: 2.85rem;
+  width: var(--header-dock-width, 2.85rem);
   height: 2.85rem;
   flex: 0 0 auto;
   align-items: center;

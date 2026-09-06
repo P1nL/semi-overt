@@ -6,6 +6,7 @@ import { onClickOutside } from '@vueuse/core'
 import Icon from '@/shared/components/base/Icon.vue'
 import HeaderGlass from '@/shared/components/effects/HeaderGlass.vue'
 import { Container } from '@/shared/components/layout'
+import { useDockMagnification } from '@/shared/composables/useDockMagnification'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { useUiStore } from '@/stores/ui'
 import { CategoryMenu } from '@/widgets/category-menu'
@@ -32,6 +33,10 @@ const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
 const headerRef = ref<HTMLElement | null>(null)
 const navigationReady = ref(false)
+const dockOverlayOpen = ref(false)
+useDockMagnification(headerRef, computed(() =>
+  navigationReady.value && !searchOpen.value && !dockOverlayOpen.value && !uiStore.appreciationMode,
+))
 
 const NAVIGATION_REVEAL_TIMEOUT_MS = 4200
 type ReadyLordIconElement = HTMLElement & { isReady?: boolean }
@@ -116,7 +121,7 @@ const actionSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : 
 const searchWrapClass = computed(() =>
   searchOpen.value
     ? 'left-0 right-0 w-auto max-md:z-20 md:left-auto md:w-[min(22rem,calc(100vw-18rem))] lg:w-[min(26rem,calc(100vw-20rem))]'
-    : 'w-[2.85rem]',
+    : 'header-search-wrap-closed',
 )
 
 const trimmedKeyword = computed(() => normalizeSearchKeyword(keyword.value))
@@ -227,8 +232,9 @@ async function submitSearch() {
           <div class="header-search-region relative flex min-w-0 flex-1 items-center justify-end">
             <div
               ref="searchWrapRef"
+              data-header-dock-item="search"
               class="absolute right-0 top-1/2 -translate-y-1/2 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              :class="[searchWrapClass, showDropdown ? 'overflow-visible' : 'overflow-hidden']"
+              :class="[searchWrapClass, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
             >
               <form
                 class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
@@ -237,6 +243,7 @@ async function submitSearch() {
               >
                 <button
                   ref="searchButtonRef"
+                  data-header-dock-button
                   type="button"
                   class="tool-icon-button flex h-[2.85rem] w-[2.85rem] shrink-0 items-center justify-center text-[var(--color-text-muted)]"
                   :class="searchOpen ? 'tool-icon-button-open' : ''"
@@ -312,7 +319,7 @@ async function submitSearch() {
             </div>
           </div>
 
-          <AppHeaderActions :class="actionSectionClass" />
+          <AppHeaderActions :class="actionSectionClass" @dock-blocked="dockOverlayOpen = $event" />
         </div>
       </Container>
     </header>
@@ -382,6 +389,15 @@ async function submitSearch() {
   z-index: 1;
 }
 .app-header-surface--glass .header-search-region > div { transition-duration: 360ms; }
+
+/* Widths really participate in layout; button scaling fills the expanded slots. */
+.header-search-wrap-closed { width: var(--header-dock-width, 2.85rem); }
+.app-header-surface--glass .header-search-region > .header-search-wrap-closed { transition: none; }
+.header-search-shell-closed { justify-content: center; }
+.app-header-surface :deep([data-header-dock-button]) {
+  transform: translateY(var(--header-dock-lift, 0px)) scale(var(--header-dock-scale, 1));
+  transform-origin: center;
+}
 
 .header-search-shell {
   position: relative;
