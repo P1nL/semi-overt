@@ -12,7 +12,11 @@ import {
 
 const uiStore = useUiStore()
 const reducedMotion = usePreferredReducedMotion()
+const HOVER_TURN_DURATION = 2400
+const HOVER_RAMP_DURATION = 480
+
 const angle = ref(CUBE_REST_YAW)
+const hovering = ref(false)
 let frame: number | null = null
 const geometry = computed(() => createCubeLogoGeometry(angle.value))
 
@@ -26,28 +30,94 @@ function finishRotation() {
   angle.value = CUBE_REST_YAW
 }
 
-watch(() => uiStore.darkMode, () => {
+function animateTo(target: number, duration: number) {
   stopAnimation()
+
+  const from = angle.value
+  const start = performance.now()
+  const animate = (now: number) => {
+    const progress = Math.min(1, (now - start) / duration)
+    const eased = progress * progress * (3 - 2 * progress)
+    angle.value = from + (target - from) * eased
+
+    if (progress < 1) {
+      frame = requestAnimationFrame(animate)
+      return
+    }
+
+    finishRotation()
+  }
+
+  frame = requestAnimationFrame(animate)
+}
+
+function startHoverRotation() {
+  hovering.value = true
+  stopAnimation()
+
   if (reducedMotion.value === 'reduce') {
     finishRotation()
     return
   }
+
   const from = angle.value
-  // Continue from the displayed geometry on rapid toggles, never jump to the start.
-  const to = CUBE_REST_YAW + (Math.floor((from - CUBE_REST_YAW) / CUBE_TURN) + 1) * CUBE_TURN
   const start = performance.now()
   const animate = (now: number) => {
-    const progress = Math.min(1, (now - start) / CUBE_TURN_DURATION)
-    const eased = progress * progress * (3 - 2 * progress)
-    angle.value = from + (to - from) * eased
-    if (progress < 1) frame = requestAnimationFrame(animate)
-    else finishRotation()
+    const elapsed = now - start
+    const travelTime = elapsed < HOVER_RAMP_DURATION
+      ? elapsed * elapsed / (2 * HOVER_RAMP_DURATION)
+      : elapsed - HOVER_RAMP_DURATION / 2
+
+    angle.value = from + (travelTime / HOVER_TURN_DURATION) * CUBE_TURN
+    frame = requestAnimationFrame(animate)
   }
+
   frame = requestAnimationFrame(animate)
+}
+
+function stopHoverRotation() {
+  hovering.value = false
+
+  if (reducedMotion.value === 'reduce') {
+    finishRotation()
+    return
+  }
+
+  const turns = Math.round((angle.value - CUBE_REST_YAW) / CUBE_TURN)
+  const target = CUBE_REST_YAW + Math.max(0, turns) * CUBE_TURN
+  const remaining = Math.abs(target - angle.value)
+
+  if (remaining < 0.001) {
+    finishRotation()
+    return
+  }
+
+  const settleDuration = Math.max(240, Math.min(800, HOVER_TURN_DURATION * remaining / CUBE_TURN))
+  animateTo(target, settleDuration)
+}
+
+watch(() => uiStore.darkMode, () => {
+  if (hovering.value) {
+    startHoverRotation()
+    return
+  }
+
+  if (reducedMotion.value === 'reduce') {
+    finishRotation()
+    return
+  }
+
+  const target = CUBE_REST_YAW
+    + (Math.floor((angle.value - CUBE_REST_YAW) / CUBE_TURN) + 1) * CUBE_TURN
+  animateTo(target, CUBE_TURN_DURATION)
 })
 
 watch(reducedMotion, (value) => {
-  if (value === 'reduce') finishRotation()
+  if (value === 'reduce') {
+    finishRotation()
+  } else if (hovering.value) {
+    startHoverRotation()
+  }
 })
 onBeforeUnmount(stopAnimation)
 </script>
@@ -55,8 +125,10 @@ onBeforeUnmount(stopAnimation)
 <template>
   <RouterLink
     :to="{ name: ROUTE_NAME.HOME }"
-    class="inline-flex items-center rounded-[var(--radius-pill)] px-2 py-1.5 text-[var(--color-text)]"
+    class="brand-home-link inline-flex items-center rounded-[var(--radius-pill)] px-2 py-1.5 text-[var(--color-text)]"
     aria-label="返回首页"
+    @mouseenter="startHoverRotation"
+    @mouseleave="stopHoverRotation"
   >
     <svg
       class="brand-cube"
@@ -84,10 +156,14 @@ onBeforeUnmount(stopAnimation)
 </template>
 
 <style scoped>
+.brand-home-link:hover .brand-cube {
+  color: var(--color-text);
+}
+
 .brand-cube {
   display: block;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3rem;
+  height: 3rem;
   flex-shrink: 0;
   color: var(--color-text);
   transition: color var(--cube-transition-duration) ease;
