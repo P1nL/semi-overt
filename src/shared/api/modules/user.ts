@@ -10,6 +10,7 @@ import type {
     ProfileDto,
     UpdateProfileReqDto,
     UserProfileRespDto,
+    RequestConfig,
 } from '../../types/api'
 
 const USER_BASE = '/users'
@@ -29,9 +30,10 @@ export function updateMyProfile(payload: UpdateProfileReqDto): Promise<ProfileDt
 export function getUserProfile(
     username: string,
     params?: GetUserProfileParams,
+    config?: RequestConfig,
 ): Promise<UserProfileRespDto> {
     return request
-        .get<BackendUserProfileResp>(`${USER_BASE}/${encodeURIComponent(username)}/profile`, params)
+        .get<BackendUserProfileResp>(`${USER_BASE}/${encodeURIComponent(username)}/profile`, params, config)
         .then(normalizeUserProfileResp)
 }
 

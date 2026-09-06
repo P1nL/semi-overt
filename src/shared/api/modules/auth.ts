@@ -18,18 +18,21 @@ export interface RegisterCodeReqDto {
 export function sendRegisterCode(payload: RegisterCodeReqDto): Promise<null> {
     return request.post<null>(`${AUTH_BASE}/register-code`, payload, {
         withAuth: false,
+        errorPolicy: 'local',
     })
 }
 
 export function register(payload: RegisterReqDto): Promise<AuthRespDto> {
     return request.post<BackendAuthResp>(`${AUTH_BASE}/register`, payload, {
         withAuth: false,
+        errorPolicy: 'local',
     }).then(normalizeAuthResp)
 }
 
 export function login(payload: LoginReqDto): Promise<AuthRespDto> {
     return request.post<BackendAuthResp>(`${AUTH_BASE}/login`, payload, {
         withAuth: false,
+        errorPolicy: 'local',
     }).then(normalizeAuthResp)
 }
 
@@ -40,12 +43,14 @@ export function logout(): Promise<null> {
 export function forgotPassword(payload: ForgotPasswordReqDto): Promise<null> {
     return request.post<null>(`${AUTH_BASE}/forgot-password`, payload, {
         withAuth: false,
+        errorPolicy: 'local',
     })
 }
 
 export function resetPassword(payload: ResetPasswordReqDto): Promise<null> {
     return request.post<null>(`${AUTH_BASE}/reset-password`, payload, {
         withAuth: false,
+        errorPolicy: 'local',
     })
 }
 

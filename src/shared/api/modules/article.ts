@@ -71,7 +71,9 @@ export function getArticleDetail(articleId: number | string): Promise<ArticleDet
         .get<BackendArticleDetailResp>(
             `${ARTICLE_BASE}/${articleId}`,
             undefined,
-            isPublicArticleDetailRoute() ? { withAuth: false } : undefined,
+            isPublicArticleDetailRoute()
+                ? { withAuth: false, errorPolicy: 'local' }
+                : { errorPolicy: 'auth' },
         )
         .then(normalizeArticleDetailDto)
 }

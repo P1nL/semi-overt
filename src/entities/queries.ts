@@ -219,7 +219,9 @@ export function useUserProfileQuery(
                 resolvePositiveInt(resolvedParams.pageSize, 10),
             )
         }),
-        queryFn: async () => mapUserProfilePageDtoToVm(await userApi.getUserProfile(toValue(username), toValue(params))),
+        queryFn: async () => mapUserProfilePageDtoToVm(
+            await userApi.getUserProfile(toValue(username), toValue(params), { errorPolicy: 'route' }),
+        ),
         enabled: computed(() => Boolean(toValue(username).trim())),
         placeholderData: keepPreviousData,
     })
@@ -243,12 +245,17 @@ export function useInfiniteUserProfileQuery(
         initialPageParam: 1,
         queryFn: async ({ pageParam }) => {
             const resolvedParams = toValue(params)
+            const page = resolvePositiveInt(Number(pageParam), 1)
 
-            return mapUserProfilePageDtoToVm(await userApi.getUserProfile(toValue(username), {
-                ...resolvedParams,
-                page: resolvePositiveInt(Number(pageParam), 1),
-                pageSize: resolvePositiveInt(resolvedParams.pageSize, 10),
-            }))
+            return mapUserProfilePageDtoToVm(await userApi.getUserProfile(
+                toValue(username),
+                {
+                    ...resolvedParams,
+                    page,
+                    pageSize: resolvePositiveInt(resolvedParams.pageSize, 10),
+                },
+                { errorPolicy: page === 1 ? 'route' : 'auth' },
+            ))
         },
         getNextPageParam: (lastPage) =>
             lastPage.page * lastPage.pageSize < lastPage.total ? lastPage.page + 1 : undefined,

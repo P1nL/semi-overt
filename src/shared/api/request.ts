@@ -30,7 +30,7 @@ async function requestAndUnwrap<T>(
 ): Promise<T> {
     const response = await promise
     return await unwrapApiResponse<T>(response.data, {
-        runSideEffects: config?.withAuth !== false,
+        errorPolicy: config?.errorPolicy ?? 'auth',
     })
 }
 

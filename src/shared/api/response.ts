@@ -1,4 +1,4 @@
-import { ApiBusinessError, type ApiResponse } from '../types/api'
+import { ApiBusinessError, type ApiErrorPolicy, type ApiResponse } from '../types/api'
 
 export interface ApiSideEffectHandlers {
     onUnauthorized?: () => void | Promise<void>
@@ -7,7 +7,7 @@ export interface ApiSideEffectHandlers {
 }
 
 export interface UnwrapApiResponseOptions {
-    runSideEffects?: boolean
+    errorPolicy?: ApiErrorPolicy
 }
 
 let sideEffectHandlers: ApiSideEffectHandlers = {}
@@ -34,9 +34,20 @@ export function isBusinessSuccess(code: number): boolean {
     return code === 200
 }
 
-export async function runApiSideEffects(code: number, message: string): Promise<void> {
+export async function runApiSideEffects(
+    code: number,
+    message: string,
+    errorPolicy: ApiErrorPolicy = 'auth',
+): Promise<void> {
+    if (errorPolicy === 'local') {
+        return
+    }
     if (code === 401) {
         await sideEffectHandlers.onUnauthorized?.()
+        return
+    }
+
+    if (errorPolicy !== 'route') {
         return
     }
 
@@ -62,11 +73,11 @@ export async function unwrapApiResponse<T>(
     }
 
     if (!isBusinessSuccess(payload.code)) {
-        const runSideEffects = options.runSideEffects ?? true
-
-        if (runSideEffects) {
-            await runApiSideEffects(payload.code, payload.message)
-        }
+        await runApiSideEffects(
+            payload.code,
+            payload.message,
+            options.errorPolicy ?? 'auth',
+        )
 
         throw new ApiBusinessError(payload.message || '请求失败', {
             code: payload.code,

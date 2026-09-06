@@ -214,11 +214,16 @@ onBeforeUnmount(() => {
       <span class="block text-sm font-medium text-[var(--color-text)]">{{ switchLabel }}</span>
       <span class="mt-0.5 block text-xs text-[var(--color-text-muted)]">{{ switchDescription }}</span>
     </span>
+    <span
+      v-if="appreciationEnabled && !isAppreciating && !disabled"
+      class="theme-switch-tooltip"
+      aria-hidden="true"
+    ><strong>切换主题</strong> · 长按进入<strong>ZEN</strong></span>
   </button>
 </template>
 
 <style scoped>
-.theme-switch-root { display:inline-flex; align-items:center; gap:.75rem; flex-shrink:0; padding:0; border:0; background:transparent; }
+.theme-switch-root { position:relative; display:inline-flex; align-items:center; gap:.75rem; flex-shrink:0; padding:0; border:0; background:transparent; }
 .theme-switch-button { position:relative; display:inline-flex; height:2.85rem; width:2.85rem; align-items:center; justify-content:center; border-radius:999px; color:var(--color-text-muted); transition:color 220ms ease, background-color 220ms ease, transform 220ms cubic-bezier(.22,1,.36,1); }
 .theme-switch-root[data-pressing='true'] .theme-switch-button { transform:scale(.9); color:var(--color-primary); }
 .theme-switch-icon { position:absolute; inset:50% auto auto 50%; height:1.3rem; width:1.3rem; transform:translate(-50%, -50%); }
@@ -230,4 +235,42 @@ onBeforeUnmount(() => {
 .theme-switch-icon-enter-from,.theme-switch-icon-leave-to { opacity:0; transform:translate(-50%, -50%) scale(.82) rotate(-14deg); }
 .theme-switch-icon-enter-to,.theme-switch-icon-leave-from { opacity:1; transform:translate(-50%, -50%) scale(1) rotate(0); }
 @media (prefers-reduced-motion: reduce) { .theme-switch-button,.theme-switch-icon-enter-active,.theme-switch-icon-leave-active { transition-duration:.01ms; } }
+
+.theme-switch-tooltip {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 50;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-panel);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(var(--backdrop-blur-panel));
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 0s linear 150ms;
+}
+.theme-switch-tooltip strong { color: var(--color-text); font-weight: 600; }
+.theme-switch-root:focus-visible .theme-switch-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+@media (hover: hover) and (pointer: fine) {
+  .theme-switch-root:hover:not([data-pressing='true']) .theme-switch-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 600ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-switch-tooltip { transition-duration: 0s; }
+}
 </style>
