@@ -204,6 +204,7 @@ onBeforeUnmount(() => {
             class="home-showcase-rail__item"
             :style="getItemStyle(index)"
             @mouseenter="hoveredIndex = index"
+            @mouseleave="hoveredIndex === index && (hoveredIndex = null)"
             @click.capture="onItemClick($event, item)"
             v-motion="getMotionKey(index)"
             :initial="getMotionState(index)"
