@@ -806,6 +806,10 @@ async function handleLogout() {
   color: var(--color-text);
 }
 
+.header-draft-entry .tool-icon-button:hover {
+  background: transparent;
+}
+
 .draft-box-icon {
   width: 1.55rem;
   height: auto;
