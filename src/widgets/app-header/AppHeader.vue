@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
 import Icon from '@/shared/components/base/Icon.vue'
+import HeaderGlass from '@/shared/components/effects/HeaderGlass.vue'
 import { Container } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { useUiStore } from '@/stores/ui'
@@ -205,7 +206,7 @@ async function submitSearch() {
 </script>
 
 <template>
-  <div class="header-shell">
+  <div class="header-shell" :class="uiStore.appreciationMode ? 'header-shell--appreciation' : ''">
     <header
       ref="headerRef"
       class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4"
@@ -213,16 +214,17 @@ async function submitSearch() {
     >
       <Container class="app-header-container">
         <div
-          class="app-header-surface surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4"
+          class="app-header-surface app-header-surface--glass surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4"
           :class="navigationReady ? 'app-header-surface--ready' : ''"
         >
-          <div class="flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
+          <HeaderGlass v-if="!uiStore.appreciationMode" :refract="true" />
+          <div class="header-leading flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
             <AppHeaderLogo />
             <div class="hidden h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)] md:block" />
             <CategoryMenu :active-category="activeCategory" />
           </div>
 
-          <div class="relative flex min-w-0 flex-1 items-center justify-end">
+          <div class="header-search-region relative flex min-w-0 flex-1 items-center justify-end">
             <div
               ref="searchWrapRef"
               class="absolute right-0 top-1/2 -translate-y-1/2 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -320,7 +322,30 @@ async function submitSearch() {
 </template>
 
 <style scoped>
+.header-shell--appreciation .app-header-surface {
+  pointer-events: none;
+  transform: none !important;
+  transition: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.header-shell--appreciation .app-header-surface .header-actions { pointer-events: auto; }
+
+.header-shell--appreciation .header-leading,
+.header-shell--appreciation .header-search-region {
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0, -0.75rem, 0);
+  transition: opacity 260ms ease, transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-shell--appreciation + div[aria-hidden='true'] { height: 0; }
+
 .app-header-surface {
+  position: relative;
   visibility: hidden;
   opacity: 0;
   transform: translate3d(0, -0.55rem, 0) scale(0.985);
@@ -342,26 +367,54 @@ async function submitSearch() {
   width: min(100% - 1.5rem, 1216px);
 }
 
+/* Keep backdrop filtering on a separate layer: content and menus stay sharp. */
+.app-header-surface--glass {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.app-header-surface--glass > .header-leading,
+.app-header-surface--glass > .header-search-region,
+.app-header-surface--glass > :deep(.header-actions:not(.header-actions--appreciation)) {
+  position: relative;
+  z-index: 1;
+}
+.app-header-surface--glass .header-search-region > div { transition-duration: 360ms; }
+
 .header-search-shell {
+  position: relative;
+  z-index: 0;
   background: transparent;
   border: 0;
   box-shadow: none;
   backdrop-filter: none;
 }
 
-.header-search-shell-open {
-  overflow: hidden;
+.header-search-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
   background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
-  box-shadow:
-    0 10px 28px rgb(15 23 42 / 0.028),
-    inset 0 1px 0 rgb(255 255 255 / 0.34);
+  box-shadow: var(--nav-search-frost-shadow);
+  -webkit-backdrop-filter: blur(var(--backdrop-blur)) saturate(180%);
   backdrop-filter: blur(var(--backdrop-blur)) saturate(180%);
-  clip-path: inset(0 round 999px);
+  transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.header-search-shell-open:has(.header-search-input:-webkit-autofill),
-.header-search-shell-open:has(.header-search-input:autofill) {
-  background: color-mix(in srgb, var(--color-surface-glass-strong) 94%, transparent);
+.header-search-shell-open::before {
+  opacity: 1;
+}
+
+/* A neutral keyboard cue, not a blue ring on mouse click or input autofocus. */
+.header-search-shell button:focus-visible {
+  outline: 1px solid var(--color-text-muted) !important;
+  outline-offset: -4px;
 }
 
 .tool-icon-button {
@@ -383,7 +436,6 @@ async function submitSearch() {
   transform: none;
 }
 
-.header-search-shell button:focus-visible,
 .header-search-shell input:focus-visible {
   outline: none !important;
   outline-offset: 0;
@@ -430,10 +482,20 @@ input[type="search"]::selection {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .header-search-shell::before { transition: none; }
+  .app-header-surface--glass .header-search-region > div { transition: none; }
   .app-header-surface,
   .app-header-surface--ready {
     transform: none;
     transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .header-search-shell::before {
+    background: var(--color-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 </style>

@@ -28,6 +28,11 @@ function applyDarkMode(enabled: boolean) {
     document.documentElement.classList.toggle('dark', enabled)
 }
 
+function applyAppreciationMode(enabled: boolean) {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('appreciation-mode', enabled)
+}
+
 /**
  * 主题切换两阶段控制：
  *
@@ -73,6 +78,7 @@ export const useUiStore = defineStore('ui', () => {
     const suppressNextPageTransition = ref(false)
 
     const darkMode = ref(readDarkModeFromStorage())
+    const appreciationMode = ref(false)
     const searchQuery = ref(readSearchQueryFromStorage())
 
     const isMenuDrawer = computed(() => drawerType.value === 'menu')
@@ -160,6 +166,19 @@ export const useUiStore = defineStore('ui', () => {
         setDarkMode(!darkMode.value)
     }
 
+    function setAppreciationMode(enabled: boolean) {
+        appreciationMode.value = enabled
+        applyAppreciationMode(enabled)
+    }
+
+    function enterAppreciationMode() {
+        setAppreciationMode(true)
+    }
+
+    function exitAppreciationMode() {
+        setAppreciationMode(false)
+    }
+
     function initializeUiPreferences() {
         applyDarkMode(darkMode.value)
     }
@@ -172,7 +191,9 @@ export const useUiStore = defineStore('ui', () => {
         suppressNextPageTransition.value = false
         searchQuery.value = readSearchQueryFromStorage()
         darkMode.value = readDarkModeFromStorage()
+        appreciationMode.value = false
         applyDarkMode(darkMode.value)
+        applyAppreciationMode(false)
     }
 
     return {
@@ -182,6 +203,7 @@ export const useUiStore = defineStore('ui', () => {
         isDrawerClosing,
         suppressNextPageTransition,
         darkMode,
+        appreciationMode,
         searchQuery,
 
         isMenuDrawer,
@@ -204,6 +226,9 @@ export const useUiStore = defineStore('ui', () => {
 
         setDarkMode,
         toggleDarkMode,
+        setAppreciationMode,
+        enterAppreciationMode,
+        exitAppreciationMode,
         initializeUiPreferences,
         resetUiState,
     }

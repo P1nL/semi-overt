@@ -8,7 +8,7 @@ import {
   watch,
   type ComponentPublicInstance,
 } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 
@@ -37,6 +37,7 @@ const AsyncDraftBoxDrawer = defineAsyncComponent(
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const queryClient = useQueryClient()
 
@@ -45,6 +46,8 @@ const draftMenuOpen = ref(false)
 const draftDrawerLoaded = ref(false)
 const userMenuOpen = ref(false)
 const draftTriggerRef = ref<HTMLButtonElement | null>(null)
+const themeEntryRef = ref<HTMLElement | null>(null)
+const draftEntryRef = ref<HTMLElement | null>(null)
 const draftMenuRef = ref<HTMLElement | null>(null)
 const userTriggerRef = ref<HTMLButtonElement | null>(null)
 const userMenuRef = ref<HTMLElement | null>(null)
@@ -106,6 +109,36 @@ const showAuthenticatedActions = computed(() => authStore.isAuthenticated && !au
 const userLabel = computed(() => authStore.displayName || (authStore.isAdmin ? '管理员' : '个人中心'))
 const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')
 const themeMenuLabel = computed(() => (uiStore.darkMode ? '切换到浅色模式' : '切换到深色模式'))
+const appreciationEnabled = computed(() => route.name === ROUTE_NAME.HOME)
+
+function animateSurvivorMove(element: HTMLElement | null, previousRect: DOMRect | undefined) {
+  if (!element || !previousRect || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const nextRect = element.getBoundingClientRect()
+  const deltaX = previousRect.left - nextRect.left
+  const deltaY = previousRect.top - nextRect.top
+  if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+  element.animate(
+    [
+      { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
+      { transform: 'translate3d(0, 0, 0)' },
+    ],
+    { duration: 720, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+  )
+}
+
+watch(
+  () => uiStore.appreciationMode,
+  async () => {
+    const themeRect = themeEntryRef.value?.getBoundingClientRect()
+    const draftRect = draftEntryRef.value?.getBoundingClientRect()
+    draftMenuOpen.value = false
+    userMenuOpen.value = false
+    await nextTick()
+    animateSurvivorMove(themeEntryRef.value, themeRect)
+    animateSurvivorMove(draftEntryRef.value, draftRect)
+  },
+  { flush: 'pre' },
+)
 
 const profileRoute = computed(() => {
   if (!authStore.user?.username) return { name: ROUTE_NAME.HOME }
@@ -390,12 +423,22 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="relative z-10 flex shrink-0 items-center gap-2">
-    <ThemeSwitch :show-label="false" class="hidden md:inline-flex" />
+  <div
+    class="header-actions relative z-10 flex shrink-0 items-center gap-2"
+    :class="uiStore.appreciationMode ? 'header-actions--appreciation' : ''"
+  >
+    <div ref="themeEntryRef" class="header-theme-entry">
+      <ThemeSwitch
+        :show-label="false"
+        :appreciation-enabled="appreciationEnabled"
+        class="header-theme-switch hidden md:inline-flex"
+      />
+    </div>
 
     <Transition name="header-draft-state" :appear="authStore.isAuthenticated">
       <div
         v-if="showAuthenticatedActions"
+        ref="draftEntryRef"
         class="header-draft-entry"
       >
         <div ref="draftMenuRef" class="relative">
@@ -428,7 +471,7 @@ async function handleLogout() {
       </div>
     </Transition>
 
-    <div class="header-auth-identity-slot">
+    <div class="header-auth-identity-slot" :aria-hidden="uiStore.appreciationMode ? 'true' : undefined">
       <Transition
         name="header-auth-identity"
         mode="out-in"
@@ -533,6 +576,40 @@ async function handleLogout() {
 </template>
 
 <style scoped>
+.header-actions {
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-actions--appreciation {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 80;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.header-actions--appreciation .header-theme-entry { order: 1; }
+.header-actions--appreciation .header-theme-switch { display: inline-flex !important; }
+
+.header-actions--appreciation .header-draft-entry {
+  order: 2;
+  width: 2.85rem;
+}
+
+.header-actions--appreciation .header-auth-divider,
+.header-actions--appreciation .header-auth-identity-slot {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .header-actions--appreciation { top: 1rem; right: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-actions { transition-duration: 0.01ms; }
+}
+
 .header-draft-entry {
   display: flex;
   flex: 0 0 auto;
@@ -632,6 +709,10 @@ async function handleLogout() {
 .auth-trigger-button {
   min-height: 2.85rem;
   min-width: 2.85rem;
+}
+
+.auth-trigger-button:hover {
+  background: transparent;
 }
 
 .tool-icon-button:active,

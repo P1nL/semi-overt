@@ -83,10 +83,28 @@
 
     --header-height: 5.5rem;
     --header-height-md: 5.75rem;
+
+    /* Navigation-only clear lens; do not change shared surface materials. */
+    --nav-glass-tint: rgb(255 255 255 / 0.08);
+    --nav-glass-mobile-tint: rgb(255 255 255 / 0.18);
+    --nav-glass-blur: 1.5px;
+    --nav-glass-border: rgb(255 255 255 / 0.38);
+    --nav-glass-reflection: linear-gradient(165deg, rgb(255 255 255 / 0.16), transparent 28%, transparent 76%, rgb(255 255 255 / 0.04));
+    --nav-glass-shadow: 0 4px 16px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.04);
+    --nav-glass-rim-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), inset 1px 0 0 rgb(255 255 255 / 0.26), inset 0 -1px 0 rgb(15 23 42 / 0.12);
+    --nav-search-frost-shadow: 0 10px 28px rgb(15 23 42 / 0.028), inset 0 1px 0 rgb(255 255 255 / 0.34);
 }
 
 html.dark {
     color-scheme: dark;
+
+    --nav-glass-tint: rgb(8 10 15 / 0.12);
+    --nav-glass-mobile-tint: rgb(8 10 15 / 0.24);
+    --nav-glass-border: rgb(255 255 255 / 0.12);
+    --nav-glass-reflection: linear-gradient(165deg, rgb(255 255 255 / 0.07), transparent 28%, transparent 76%, rgb(255 255 255 / 0.02));
+    --nav-glass-shadow: 0 4px 16px rgb(0 0 0 / 0.16), 0 1px 3px rgb(0 0 0 / 0.12);
+    --nav-glass-rim-shadow: inset 0 1px 0 rgb(255 255 255 / 0.32), inset 1px 0 0 rgb(255 255 255 / 0.1), inset 0 -1px 0 rgb(0 0 0 / 0.32);
+    --nav-search-frost-shadow: 0 10px 28px rgb(0 0 0 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.12);
 
     --color-primary: #2997ff;
     --color-primary-strong: #54adff;
@@ -118,6 +136,12 @@ html.dark {
     --color-scrollbar-track: rgb(255 255 255 / 0);
     --color-selection-bg: rgb(41 151 255 / 0.42);
     --color-selection-text: #f5f5f7;
+
+    /* 暗色背景前景玻璃遮罩保持层次，但减少模糊以保留布纹细节。 */
+    --backdrop-blur: 14px;
+    --backdrop-blur-soft: 9px;
+    --backdrop-blur-panel: 18px;
+    --backdrop-blur-card: 10px;
 
     /* 暗色背景光团：截图实际呈现的 #323638 / #272b2c */
     --glow-color1: 50, 54, 56;

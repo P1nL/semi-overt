@@ -4,6 +4,7 @@ import {
   defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   ref,
   shallowRef,
   watch,
@@ -309,6 +310,13 @@ async function waitForSheetRouteData(
 }
 
 async function closeSheet() {
+  // ZEN can survive opening an editor sheet. Closing it should always return
+  // to the ZEN home surface instead of following a stale history entry (e.g. /404).
+  if (uiStore.appreciationMode) {
+    await router.replace({ name: ROUTE_NAME.HOME })
+    return
+  }
+
   const historyState = typeof window !== 'undefined'
     ? (window.history.state as { back?: string | null } | null)
     : null
@@ -507,7 +515,17 @@ watch(
   { deep: true },
 )
 
+function handleAppreciationKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && uiStore.appreciationMode) uiStore.exitAppreciationMode()
+}
+
+
+onMounted(() => {
+  window.addEventListener('keydown', handleAppreciationKeydown)
+})
+
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleAppreciationKeydown)
   if (drawerNavigationTimer !== null) {
     window.clearTimeout(drawerNavigationTimer)
   }
@@ -518,20 +536,27 @@ onBeforeUnmount(() => {
 
 <template>
   <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
-    <div v-if="!uiStore.darkMode" aria-hidden="true" class="fixed inset-0 z-0 pointer-events-none bg-white">
+    <div
+      aria-hidden="true"
+      class="app-theme-background app-waves-background"
+      :class="uiStore.darkMode ? 'app-theme-background--hidden' : 'app-theme-background--visible'"
+    >
       <WavesBackground :x-gap="20" :friction="0.85" />
     </div>
 
-    <Transition name="app-background-fade">
-      <div v-if="uiStore.darkMode" aria-hidden="true" class="app-silk-background">
-        <ClothBackground
-          class="app-silk-background__canvas"
-        />
-        <div class="app-silk-background__overlay" />
-      </div>
-    </Transition>
+    <div
+      aria-hidden="true"
+      class="app-theme-background app-silk-background"
+      :class="uiStore.darkMode ? 'app-theme-background--visible' : 'app-theme-background--hidden'"
+    >
+      <ClothBackground class="app-silk-background__canvas" />
+      <div class="app-silk-background__overlay" />
+    </div>
 
-    <div class="relative z-10">
+    <div
+      class="app-interface relative z-10"
+      :class="uiStore.appreciationMode && baseRenderRoute.name === ROUTE_NAME.HOME ? 'app-interface--appreciation' : ''"
+    >
       <AppHeader
         v-if="shouldShowAppHeader"
         :active-category="activeHeaderCategory"
@@ -605,14 +630,34 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.app-silk-background {
+.app-interface > :not(:first-child) {
+  transition: opacity 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-interface--appreciation > :not(:first-child) {
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0, 0.75rem, 0) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-interface > :not(:first-child) { transition-duration: 0.01ms; }
+}
+
+.app-theme-background {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #0b0b0f;
+  transition: opacity 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
 }
+
+.app-theme-background--visible { opacity: 1; }
+.app-theme-background--hidden { opacity: 0; }
+.app-waves-background { background: #fff; }
+.app-silk-background { background: #0b0b0f; }
 
 .app-silk-background__canvas,
 .app-silk-background__overlay {
@@ -627,13 +672,7 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgb(8 10 15 / 0.08), rgb(8 10 15 / 0.24));
 }
 
-.app-background-fade-enter-active,
-.app-background-fade-leave-active {
-  transition: opacity 540ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.app-background-fade-enter-from,
-.app-background-fade-leave-to {
-  opacity: 0;
+@media (prefers-reduced-motion: reduce) {
+  .app-theme-background { transition-duration: 0.01ms; }
 }
 </style>
