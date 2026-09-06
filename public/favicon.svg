@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 40 40">
   <!-- Same 35-degree / 22-degree projection as the navigation cube, with tab-sized strokes. -->
-  <style>svg{color:#25262b}@media(prefers-color-scheme:dark){svg{color:#f5f5f7}}</style>
+  <style>:root{color:#25262b;background:transparent}@media(prefers-color-scheme:dark){:root{color:#f5f5f7}}</style>
   <g fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" stroke-linecap="round">
     <path d="M26.824119491286375,7.3375450480942845 L26.824119491286375,28.662773703130394" opacity="0.2"/>
     <path d="M26.824119491286375,28.662773703130394 L7.9836224726395635,33.60468054548779" opacity="0.2"/>
