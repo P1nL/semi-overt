@@ -5,12 +5,19 @@ type DockItem = {
   slot: HTMLElement
   button: HTMLElement
   baseSize: number
+  maxScale: number
   scale: number
   velocity: number
 }
 
+type DockBounds = { left: number; right: number; top: number; bottom: number }
+
 /** Distance-driven spring sizes. Slot widths reflow; the toolbar height stays fixed. */
-export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Readonly<Ref<boolean>>) {
+export function useDockMagnification(
+  root: Ref<HTMLElement | null>,
+  enabled: Readonly<Ref<boolean>>,
+  interactionOpen: Readonly<Ref<boolean>>,
+) {
   const finePointer = useMediaQuery('(hover: hover) and (pointer: fine) and (min-width: 768px)')
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const active = computed(() => enabled.value && finePointer.value && !reducedMotion.value)
@@ -19,14 +26,21 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
   let pointer: { x: number; y: number } | null = null
   let focused: HTMLElement | null = null
   let pressed = false
+  let bounds: DockBounds | null = null
+  let clickHold: DockBounds | null = null
   let frame = 0
   let lastTime = 0
   let mutations: MutationObserver | undefined
   let host: HTMLElement | null = null
   const selector = '[data-header-dock-item]'
 
-  function liftFor(scale: number) {
-    return -6 * Math.max(0, (scale - 1) / 0.3)
+  function contains(point: { x: number; y: number }, region: DockBounds | null) {
+    return region !== null && point.x >= region.left && point.x <= region.right
+      && point.y >= region.top && point.y <= region.bottom
+  }
+
+  function liftFor(item: DockItem) {
+    return -6 * Math.max(0, (item.scale - 1) / (item.maxScale - 1))
   }
 
   function clearStyle(item: DockItem) {
@@ -50,6 +64,18 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     pointer = null
     focused = null
     pressed = false
+    bounds = null
+    clickHold = null
+  }
+
+  function returnToRest() {
+    // Search expansion is an explicit exception to click-to-hold. Keep current
+    // values and let the same spring return them, rather than clearing styles.
+    clickHold = null
+    pointer = null
+    focused = null
+    for (const item of items) item.velocity = 0
+    requestTick()
   }
 
   function collectItems() {
@@ -59,10 +85,12 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
       if (!button || !button.getClientRects().length) return []
       const previousItem = previous.get(slot)
       previous.delete(slot)
+      const requestedScale = Number(slot.dataset.headerDockMaxScale ?? 1.3)
       return [{
         slot,
         button,
         baseSize: parseFloat(getComputedStyle(button).width),
+        maxScale: Number.isFinite(requestedScale) && requestedScale > 1 && requestedScale <= 2 ? requestedScale : 1.3,
         scale: previousItem?.scale ?? 1,
         velocity: previousItem?.velocity ?? 0,
       }]
@@ -73,7 +101,7 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
 
   function tick(time: number) {
     frame = 0
-    if (!active.value || pressed) return
+    if (!active.value || pressed || clickHold) return
     if (dirty) collectItems()
     const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.032) : 1 / 60
     lastTime = time
@@ -83,7 +111,7 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     // Retain the resting hit band when a button lifts away from a stationary pointer.
     const hitBands = rects.map((rect, index) => {
       const item = items[index]!
-      const restingCenter = rect.y + rect.height / 2 - liftFor(item.scale)
+      const restingCenter = rect.y + rect.height / 2 - liftFor(item)
       return {
         top: Math.min(rect.top, restingCenter - item.baseSize / 2),
         bottom: Math.max(rect.bottom, restingCenter + item.baseSize / 2),
@@ -94,12 +122,14 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     // Allow a small horizontal approach zone without expanding the vertical hit region.
     // Keep the small gaps inside the group active so moving between neighbors is continuous.
     const horizontalEntryPadding = 12
-    const insideDock = pointer && rects.length > 0
-      && pointer.x >= Math.min(...rects.map(rect => rect.left)) - horizontalEntryPadding
-      && pointer.x <= Math.max(...rects.map(rect => rect.right)) + horizontalEntryPadding
-      && pointer.y >= Math.min(...hitBands.map(band => band.top))
-      && pointer.y <= Math.max(...hitBands.map(band => band.bottom))
-    const source = focusedRect
+    bounds = rects.length ? {
+      left: Math.min(...rects.map(rect => rect.left)) - horizontalEntryPadding,
+      right: Math.max(...rects.map(rect => rect.right)) + horizontalEntryPadding,
+      top: Math.min(...hitBands.map(band => band.top)),
+      bottom: Math.max(...hitBands.map(band => band.bottom)),
+    } : null
+    const insideDock = pointer && contains(pointer, bounds) && !interactionOpen.value
+    const source = interactionOpen.value ? null : focusedRect
       ? { x: focusedRect.x + focusedRect.width / 2, y: focusedRect.y + focusedRect.height / 2 }
       : insideDock ? pointer : null
     let moving = false
@@ -109,13 +139,13 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
       const distance = source ? Math.abs(source.x - (rect.x + rect.width / 2)) : Infinity
       const inRow = source && Math.abs(source.y - (rect.y + rect.height / 2)) < item.baseSize
       const proximity = inRow ? Math.min(distance / (item.baseSize * 3.2), 1) : 1
-      const target = 1 + 0.3 * (1 + Math.cos(Math.PI * proximity)) / 2
+      const target = 1 + (item.maxScale - 1) * (1 + Math.cos(Math.PI * proximity)) / 2
       // Near-critical spring: softer lift/return, with bounded substeps after tab stalls.
       const steps = Math.ceil(dt / (1 / 120))
       const step = dt / steps
       for (let i = 0; i < steps; i++) {
         item.velocity += ((target - item.scale) * 180 - item.velocity * 26) * step
-        item.scale = Math.max(0.94, Math.min(1.3, item.scale + item.velocity * step))
+        item.scale = Math.max(0.94, Math.min(item.maxScale, item.scale + item.velocity * step))
       }
       if (Math.abs(target - item.scale) < 0.0005 && Math.abs(item.velocity) < 0.003) {
         item.scale = target
@@ -128,7 +158,7 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     for (const item of items) {
       item.slot.style.setProperty('--header-dock-width', (item.baseSize * item.scale).toFixed(3) + 'px')
       item.slot.style.setProperty('--header-dock-scale', item.scale.toFixed(4))
-      item.slot.style.setProperty('--header-dock-lift', liftFor(item.scale).toFixed(3) + 'px')
+      item.slot.style.setProperty('--header-dock-lift', liftFor(item).toFixed(3) + 'px')
     }
     if (host) host.dataset.headerDockRunning = String(moving)
     if (moving) requestTick()
@@ -136,25 +166,42 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
   }
 
   function requestTick() {
-    if (!frame && active.value && !pressed) frame = requestAnimationFrame(tick)
+    if (!frame && active.value && !pressed && !clickHold) frame = requestAnimationFrame(tick)
   }
 
   function onPointerMove(event: PointerEvent) {
     if (event.pointerType !== 'mouse' || !active.value) return
-    pointer = { x: event.clientX, y: event.clientY }
+    const next = { x: event.clientX, y: event.clientY }
+    // Track physical coordinates even over a dialog/backdrop. DOM pointerleave can
+    // fire when a popup opens under a stationary mouse and must not cancel hover.
+    if (clickHold) {
+      if (contains(next, clickHold)) return
+      clickHold = null
+      for (const item of items) item.velocity = 0
+    }
+    pointer = interactionOpen.value ? null : next
     focused = null
-    requestTick()
+    // Do not measure the navigation on every unrelated page mousemove.
+    if (!bounds || contains(next, bounds) || items.some(item => Math.abs(item.scale - 1) > 0.0001)) requestTick()
   }
 
-  function onPointerLeave() {
+  function onDocumentPointerOut(event: PointerEvent) {
+    // A modal making the header inert can also emit pointerout with no relatedTarget.
+    // Only treat an actual viewport exit as leaving; popup-induced events stay held.
+    if (event.relatedTarget !== null || (event.clientX > 0 && event.clientX < window.innerWidth
+      && event.clientY > 0 && event.clientY < window.innerHeight)) return
+    clickHold = null
     pointer = null
     requestTick()
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (!(event.target instanceof Element) || !event.target.closest('[data-header-dock-button]')) return
+    if (!active.value || event.button !== 0 || !(event.target instanceof Element)
+      || !event.target.closest('[data-header-dock-button]')) return
     // Freeze geometry while clicking/long-pressing so the hit target cannot move away.
     pressed = true
+    clickHold = bounds ? { ...bounds } : null
+    for (const item of items) item.velocity = 0
     stopFrame()
   }
 
@@ -185,12 +232,22 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     reset()
   })
 
+  const stopWatchingInteraction = watch(interactionOpen, open => {
+    // Opening a search/menu is not leaving the dock: preserve the clicked pose.
+    // Once the pointer actually leaves, return softly and don't react behind a popup.
+    if (open) {
+      focused = null
+      if (!clickHold) pointer = null
+    }
+    requestTick()
+  })
+
   onMounted(() => {
     host = root.value
     if (!host) return
     host.dataset.headerDockEnabled = String(active.value)
-    host.addEventListener('pointermove', onPointerMove)
-    host.addEventListener('pointerleave', onPointerLeave)
+    window.addEventListener('pointermove', onPointerMove, { capture: true, passive: true })
+    document.addEventListener('pointerout', onDocumentPointerOut)
     host.addEventListener('pointerdown', onPointerDown, true)
     host.addEventListener('focusin', onFocusIn)
     host.addEventListener('focusout', onFocusOut)
@@ -213,10 +270,11 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
 
   onBeforeUnmount(() => {
     stopWatching()
+    stopWatchingInteraction()
     reset()
     mutations?.disconnect()
-    host?.removeEventListener('pointermove', onPointerMove)
-    host?.removeEventListener('pointerleave', onPointerLeave)
+    window.removeEventListener('pointermove', onPointerMove, true)
+    document.removeEventListener('pointerout', onDocumentPointerOut)
     host?.removeEventListener('pointerdown', onPointerDown, true)
     host?.removeEventListener('focusin', onFocusIn)
     host?.removeEventListener('focusout', onFocusOut)
@@ -225,4 +283,6 @@ export function useDockMagnification(root: Ref<HTMLElement | null>, enabled: Rea
     window.removeEventListener('blur', reset)
     window.removeEventListener('resize', onResize)
   })
+
+  return { returnToRest }
 }

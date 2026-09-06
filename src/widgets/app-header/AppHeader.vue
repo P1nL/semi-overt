@@ -29,14 +29,19 @@ const searchWrapRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchButtonRef = ref<HTMLButtonElement | null>(null)
 const searchOpen = ref(false)
+const searchTransitioning = ref(false)
+let searchAnimation: Animation | null = null
+let searchTransitionRevision = 0
 const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
 const headerRef = ref<HTMLElement | null>(null)
 const navigationReady = ref(false)
 const dockOverlayOpen = ref(false)
-useDockMagnification(headerRef, computed(() =>
-  navigationReady.value && !searchOpen.value && !dockOverlayOpen.value && !uiStore.appreciationMode,
-))
+const { returnToRest: returnDockToRest } = useDockMagnification(
+  headerRef,
+  computed(() => navigationReady.value && !uiStore.appreciationMode),
+  computed(() => searchOpen.value || searchTransitioning.value || dockOverlayOpen.value),
+)
 
 const NAVIGATION_REVEAL_TIMEOUT_MS = 4200
 type ReadyLordIconElement = HTMLElement & { isReady?: boolean }
@@ -104,6 +109,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  searchTransitionRevision++
+  searchAnimation?.cancel()
   clearNavigationReadyWaiters()
 
   if (navigationRevealFrame !== null) {
@@ -120,7 +127,7 @@ const leftSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''
 const actionSectionClass = computed(() => (searchOpen.value ? 'max-md:hidden' : ''))
 const searchWrapClass = computed(() =>
   searchOpen.value
-    ? 'left-0 right-0 w-auto max-md:z-20 md:left-auto md:w-[min(22rem,calc(100vw-18rem))] lg:w-[min(26rem,calc(100vw-20rem))]'
+    ? 'w-full max-md:z-20 md:w-[min(22rem,calc(100vw-18rem))] lg:w-[min(26rem,calc(100vw-20rem))]'
     : 'header-search-wrap-closed',
 )
 
@@ -135,12 +142,37 @@ watch(
 )
 
 watch(searchOpen, async (value) => {
+  // Capture the currently rendered width before Vue changes classes, including
+  // an interrupted transition. This also handles mobile percent/auto sizing.
+  const from = searchWrapRef.value?.getBoundingClientRect()
+  const revision = ++searchTransitionRevision
+  searchAnimation?.cancel()
+  searchAnimation = null
+  searchTransitioning.value = true
+  returnDockToRest()
   if (!value) {
     dropdownVisible.value = false
-    return
   }
   await nextTick()
-  searchInputRef.value?.focus()
+  if (revision !== searchTransitionRevision) return
+  const element = searchWrapRef.value
+  const to = element?.getBoundingClientRect()
+  if (element && from && to && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Width animation belongs to open/close only; Dock slot widths remain spring-driven.
+    const animation = element.animate([
+      { width: from.width + 'px', transform: 'translateX(' + (from.right - to.right) + 'px)' },
+      { width: to.width + 'px', transform: 'translateX(0px)' },
+    ], { duration: 360, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
+    searchAnimation = animation
+    animation.onfinish = () => {
+      if (revision !== searchTransitionRevision) return
+      searchAnimation = null
+      searchTransitioning.value = false
+    }
+  } else {
+    searchTransitioning.value = false
+  }
+  if (value) searchInputRef.value?.focus()
 })
 
 watch(trimmedKeyword, (value) => {
@@ -233,8 +265,8 @@ async function submitSearch() {
             <div
               ref="searchWrapRef"
               data-header-dock-item="search"
-              class="absolute right-0 top-1/2 -translate-y-1/2 transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              :class="[searchWrapClass, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
+              class="absolute right-0 top-1/2 -translate-y-1/2"
+              :class="[searchWrapClass, { 'header-search-wrap--transitioning': searchTransitioning }, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
             >
               <form
                 class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
@@ -252,7 +284,7 @@ async function submitSearch() {
                   aria-controls="header-search-input"
                   @click="searchOpen ? submitSearch() : toggleSearch()"
                 >
-                  <Icon name="search" size="1.15rem" />
+                  <Icon name="search" :size="24" />
                 </button>
 
                 <input
@@ -341,12 +373,20 @@ async function submitSearch() {
 
 .header-shell--appreciation .app-header-surface .header-actions { pointer-events: auto; }
 
+.header-leading,
+.header-search-region {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .header-shell--appreciation .header-leading,
 .header-shell--appreciation .header-search-region {
   pointer-events: none;
   opacity: 0;
   transform: translate3d(0, -0.75rem, 0);
-  transition: opacity 260ms ease, transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .header-shell--appreciation + div[aria-hidden='true'] { height: 0; }
@@ -388,12 +428,15 @@ async function submitSearch() {
   position: relative;
   z-index: 1;
 }
-.app-header-surface--glass .header-search-region > div { transition-duration: 360ms; }
 
 /* Widths really participate in layout; button scaling fills the expanded slots. */
 .header-search-wrap-closed { width: var(--header-dock-width, 2.85rem); }
-.app-header-surface--glass .header-search-region > .header-search-wrap-closed { transition: none; }
 .header-search-shell-closed { justify-content: center; }
+.header-search-wrap--transitioning .header-search-shell-closed { justify-content: flex-start; }
+.header-search-shell-open > .tool-icon-button,
+.header-search-wrap--transitioning .tool-icon-button {
+  margin-left: max(0px, calc((var(--header-dock-width, 2.85rem) - 2.85rem) / 2));
+}
 .app-header-surface :deep([data-header-dock-button]) {
   transform: translateY(var(--header-dock-lift, 0px)) scale(var(--header-dock-scale, 1));
   transform-origin: center;
@@ -406,6 +449,12 @@ async function submitSearch() {
   border: 0;
   box-shadow: none;
   backdrop-filter: none;
+}
+
+/* Keep the navigation search canvas at 24px instead of the player's default 110%. */
+.header-search-shell :deep(.animated-search-icon__player) {
+  width: 100%;
+  height: 100%;
 }
 
 .header-search-shell::before {

@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 
 import appreciationAnimationUrl from '@/shared/assets/lottie/system-outline-27-globe-loop-cycle.json?url'
+import { UI_TIMING } from '@/shared/constants/ui'
 import { useUiStore } from '@/stores/ui'
 
 const props = withDefaults(
@@ -26,12 +27,17 @@ const LONG_PRESS_MS = 600
 const pressing = ref(false)
 let longPressTimer: number | null = null
 let enterModeTimer: number | null = null
+let exitModeTimer: number | null = null
+let suppressClickTimer: number | null = null
 let suppressNextClick = false
 const enteringAppreciation = ref(false)
+const exitingAppreciation = ref(false)
 
 const isDark = computed(() => uiStore.darkMode)
 const isAppreciating = computed(() => uiStore.appreciationMode)
-const showAppreciationIcon = computed(() => enteringAppreciation.value || isAppreciating.value)
+const showAppreciationIcon = computed(() =>
+  enteringAppreciation.value || isAppreciating.value || exitingAppreciation.value,
+)
 const switchLabel = computed(() => (isAppreciating.value ? 'ZEN' : isDark.value ? '深色模式' : '浅色模式'))
 const switchDescription = computed(() => props.appreciationEnabled ? '点击切换主题 · 长按欣赏背景' : '切换全局主题')
 const ariaLabel = computed(() => {
@@ -48,10 +54,44 @@ function clearLongPress() {
   pressing.value = false
 }
 
+function clearClickSuppression() {
+  if (suppressClickTimer !== null) {
+    window.clearTimeout(suppressClickTimer)
+    suppressClickTimer = null
+  }
+  suppressNextClick = false
+}
+
+function finishPress() {
+  clearLongPress()
+
+  if (!suppressNextClick) return
+
+  // The synthetic click for this pointer interaction is dispatched directly
+  // after pointerup. Drop suppression on the next task so it cannot consume a
+  // later, intentional click when the browser does not emit that synthetic click.
+  suppressClickTimer = window.setTimeout(() => {
+    suppressClickTimer = null
+    suppressNextClick = false
+  }, 0)
+}
+
+function cancelPress() {
+  clearLongPress()
+  clearClickSuppression()
+}
+
 function clearEnterModeTimer() {
   if (enterModeTimer !== null) {
     window.clearTimeout(enterModeTimer)
     enterModeTimer = null
+  }
+}
+
+function clearExitModeTimer() {
+  if (exitModeTimer !== null) {
+    window.clearTimeout(exitModeTimer)
+    exitModeTimer = null
   }
 }
 
@@ -85,12 +125,18 @@ function onToggle() {
   clearLongPress()
 
   if (suppressNextClick) {
-    suppressNextClick = false
+    clearClickSuppression()
     return
   }
 
   if (isAppreciating.value) {
+    clearExitModeTimer()
+    exitingAppreciation.value = true
     uiStore.exitAppreciationMode()
+    exitModeTimer = window.setTimeout(() => {
+      exitModeTimer = null
+      exitingAppreciation.value = false
+    }, UI_TIMING.APPRECIATION_MOVE)
     return
   }
 
@@ -102,6 +148,8 @@ function onToggle() {
 onBeforeUnmount(() => {
   clearLongPress()
   clearEnterModeTimer()
+  clearExitModeTimer()
+  clearClickSuppression()
 })
 </script>
 
@@ -115,9 +163,9 @@ onBeforeUnmount(() => {
     :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
     :data-pressing="pressing ? 'true' : 'false'"
     @pointerdown="startLongPress"
-    @pointerup="clearLongPress"
-    @pointercancel="clearLongPress"
-    @pointerleave="clearLongPress"
+    @pointerup="finishPress"
+    @pointercancel="cancelPress"
+    @pointerleave="cancelPress"
     @contextmenu.prevent
     @click="onToggle"
   >

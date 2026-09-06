@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">立方体门洞标志 · 深色示例</title>
+  <desc id="description">三分之四视角的线框立方体，右面略宽，轻微俯视。矩形门洞与右墙共面，门底贴合底边，背面棱线弱化。</desc>
+  <rect width="1024" height="1024" fill="#24252a"/>
+  <defs>
+    <!-- The opening lies on F-R-R2-F2. Its top and bottom share that face's slope. -->
+    <mask id="door-occlusion" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="white"/>
+      <path d="M535 559.315 L625 535.585 L625 740.585 L535 764.315 Z" fill="black" stroke="black" stroke-width="1"/>
+    </mask>
+  </defs>
+  <g fill="none" stroke="#e6e6e9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Back edges are not visible through the filled opening. -->
+    <path d="M523 241 V593 M523 593 L212 675 M523 593 L741 710"
+          opacity="0.2" stroke-width="2.3" mask="url(#door-occlusion)"/>
+    <!-- Outer silhouette: L-B-R-R2-F2-L2-L. -->
+    <path d="M212 323 L523 241 L741 358 V710 L430 792 L212 675 Z"
+          stroke-width="3" opacity="0.88"/>
+    <!-- Front edges: L-F, F-R, F-F2. -->
+    <path d="M212 323 L430 440 L741 358 M430 440 V792"
+          stroke-width="3.2" opacity="0.96"/>
+  </g>
+  <!-- Projected rectangle, not a swung-out door leaf. -->
+  <path d="M535 559.315 L625 535.585 L625 740.585 L535 764.315 Z"
+        fill="#eeeef0"/>
+</svg>

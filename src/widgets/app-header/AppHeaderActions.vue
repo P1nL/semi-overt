@@ -24,6 +24,7 @@ import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributio
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
+import { UI_TIMING } from '@/shared/constants/ui'
 import { getErrorMessage } from '@/shared/utils/error'
 import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
@@ -118,34 +119,80 @@ const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')
 const themeMenuLabel = computed(() => (uiStore.darkMode ? '切换到浅色模式' : '切换到深色模式'))
 const appreciationEnabled = computed(() => route.name === ROUTE_NAME.HOME)
 
-function animateSurvivorMove(element: HTMLElement | null, previousRect: DOMRect | undefined) {
-  if (!element || !previousRect || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+type SurvivorMoveOffset = { x: number; y: number }
+
+let themeMoveOutOffset: SurvivorMoveOffset | null = null
+let draftMoveOutOffset: SurvivorMoveOffset | null = null
+
+function animateSurvivorMove(
+  element: HTMLElement | null,
+  previousRect: DOMRect | undefined,
+  reusedOffset?: SurvivorMoveOffset | null,
+) {
+  if (!element || !previousRect || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null
+
   const nextRect = element.getBoundingClientRect()
-  const deltaX = previousRect.left - nextRect.left
-  const deltaY = previousRect.top - nextRect.top
-  if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+  const measuredOffset = {
+    x: previousRect.left - nextRect.left,
+    y: previousRect.top - nextRect.top,
+  }
+  const offset = reusedOffset ?? measuredOffset
+
+  if (Math.abs(offset.x) < 1 && Math.abs(offset.y) < 1) return measuredOffset
+
+  element.getAnimations().forEach(animation => animation.cancel())
   element.animate(
     [
-      { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
+      { transform: `translate3d(${offset.x}px, ${offset.y}px, 0)` },
       { transform: 'translate3d(0, 0, 0)' },
     ],
-    { duration: 720, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    { duration: UI_TIMING.APPRECIATION_MOVE, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
   )
+
+  return measuredOffset
 }
 
-watch(
-  () => uiStore.appreciationMode,
-  async () => {
-    const themeRect = themeEntryRef.value?.getBoundingClientRect()
-    const draftRect = draftEntryRef.value?.getBoundingClientRect()
-    draftMenuOpen.value = false
-    userMenuOpen.value = false
-    await nextTick()
-    animateSurvivorMove(themeEntryRef.value, themeRect)
-    animateSurvivorMove(draftEntryRef.value, draftRect)
-  },
-  { flush: 'pre' },
-)
+const stopAppreciationMoveSubscription = uiStore.$onAction(({ name, args, after }) => {
+  if (!['enterAppreciationMode', 'exitAppreciationMode', 'setAppreciationMode'].includes(name)) return
+
+  const targetEnabled = name === 'enterAppreciationMode'
+    ? true
+    : name === 'exitAppreciationMode'
+      ? false
+      : Boolean(args[0])
+
+  if (targetEnabled === uiStore.appreciationMode) return
+
+  // Capture before the store mutates layout. Entering records the real move-out
+  // vector; exiting reuses its inverse so the icon follows exactly the same path home.
+  const themeRect = themeEntryRef.value?.getBoundingClientRect()
+  const draftRect = draftEntryRef.value?.getBoundingClientRect()
+  draftMenuOpen.value = false
+  userMenuOpen.value = false
+
+  after(() => {
+    void nextTick(() => {
+      if (targetEnabled) {
+        themeMoveOutOffset = animateSurvivorMove(themeEntryRef.value, themeRect)
+        draftMoveOutOffset = animateSurvivorMove(draftEntryRef.value, draftRect)
+        return
+      }
+
+      animateSurvivorMove(
+        themeEntryRef.value,
+        themeRect,
+        themeMoveOutOffset && { x: -themeMoveOutOffset.x, y: -themeMoveOutOffset.y },
+      )
+      animateSurvivorMove(
+        draftEntryRef.value,
+        draftRect,
+        draftMoveOutOffset && { x: -draftMoveOutOffset.x, y: -draftMoveOutOffset.y },
+      )
+      themeMoveOutOffset = null
+      draftMoveOutOffset = null
+    })
+  })
+})
 
 const profileRoute = computed(() => {
   if (!authStore.user?.username) return { name: ROUTE_NAME.HOME }
@@ -408,6 +455,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  stopAppreciationMoveSubscription()
   clearScheduledWarmUserSurfaces()
 })
 
@@ -434,7 +482,7 @@ async function handleLogout() {
     class="header-actions relative z-10 flex shrink-0 items-center gap-2"
     :class="uiStore.appreciationMode ? 'header-actions--appreciation' : ''"
   >
-    <div ref="themeEntryRef" class="header-theme-entry" data-header-dock-item="theme">
+    <div ref="themeEntryRef" class="header-theme-entry" data-header-dock-item="theme" data-header-dock-max-scale="1.4">
       <ThemeSwitch
         data-header-dock-button
         :show-label="false"
@@ -578,7 +626,7 @@ async function handleLogout() {
           aria-label="登录 / 注册"
           @click="authDialogOpen = true"
         >
-          <AnimatedAttributionIcon size="1.55rem" title="登录 / 注册" :decorative="false" />
+          <AnimatedAttributionIcon :size="28" title="登录 / 注册" :decorative="false" />
         </button>
       </Transition>
     </div>
@@ -594,8 +642,8 @@ async function handleLogout() {
 
 /* Keep icon sizing explicit; the login player otherwise adds another 1.3x. */
 .header-theme-switch :deep(.theme-switch-icon:not(.theme-switch-icon--appreciation)) {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 26px;
+  height: 26px;
 }
 .auth-trigger-button :deep(.animated-attribution-icon__player) {
   width: 100%;
@@ -634,9 +682,19 @@ async function handleLogout() {
   width: 2.85rem;
 }
 
-.header-actions--appreciation .header-auth-divider,
+.header-actions--appreciation .header-auth-divider {
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleY(0.45);
+}
+
 .header-actions--appreciation .header-auth-identity-slot {
-  display: none;
+  width: var(--header-dock-width, 2.85rem);
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0.45rem, -0.35rem, 0) scale(0.9);
 }
 
 @media (max-width: 767px) {
@@ -658,6 +716,12 @@ async function handleLogout() {
 
 .header-auth-divider {
   flex: 0 0 auto;
+  opacity: 1;
+  transform: scaleY(1);
+  transform-origin: center;
+  transition:
+    opacity 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .header-draft-state-enter-active {
@@ -690,6 +754,11 @@ async function handleLogout() {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    opacity 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .header-auth-identity-enter-active {
