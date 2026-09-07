@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
@@ -251,6 +252,7 @@ async function submitSearch() {
     >
       <Container class="app-header-container">
         <div
+          data-panel-origin-surface
           class="app-header-surface app-header-surface--glass surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4"
           :class="navigationReady ? 'app-header-surface--ready' : ''"
         >
@@ -301,7 +303,7 @@ async function submitSearch() {
               </form>
 
               <!-- 搜索建议下拉框 -->
-              <Transition
+              <LiquidPanelTransition variant="search"
                 enter-active-class="transition duration-150 ease-out"
                 enter-from-class="opacity-0 translate-y-1"
                 enter-to-class="opacity-100 translate-y-0"
@@ -347,7 +349,7 @@ async function submitSearch() {
                     </span>
                   </button>
                 </div>
-              </Transition>
+              </LiquidPanelTransition>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
+import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
@@ -25,6 +26,8 @@ const triggerHovered = ref(false)
 const triggerFocused = ref(false)
 const itemRefs = ref<HTMLAnchorElement[]>([])
 const panelId = 'header-category-menu'
+const HOVER_CLOSE_DELAY_MS = 140
+let hoverCloseTimer: number | null = null
 
 const currentCategory = computed(() => {
   if (props.activeCategory) return props.activeCategory
@@ -48,7 +51,41 @@ function getTimerIconVariant(category: string | null | undefined): 'quick' | 'sh
   }
 }
 
+function supportsHoverMenu() {
+  return window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
+function cancelHoverClose() {
+  if (hoverCloseTimer === null) return
+  window.clearTimeout(hoverCloseTimer)
+  hoverCloseTimer = null
+}
+
+function openMenuFromHover() {
+  if (!supportsHoverMenu()) return
+  cancelHoverClose()
+  open.value = true
+}
+
+function scheduleMenuCloseFromHover() {
+  if (!supportsHoverMenu()) return
+  cancelHoverClose()
+  hoverCloseTimer = window.setTimeout(() => {
+    hoverCloseTimer = null
+    closeMenu()
+  }, HOVER_CLOSE_DELAY_MS)
+}
+
 function toggleMenu() {
+  cancelHoverClose()
+
+  // Hover-capable devices have already opened the panel on pointer entry.
+  // Keep click as an explicit open action there, while touch devices retain toggle behavior.
+  if (supportsHoverMenu()) {
+    open.value = true
+    return
+  }
+
   open.value = !open.value
 }
 
@@ -77,6 +114,7 @@ async function openMenuWithKeyboard(index = 0) {
 }
 
 function closeMenu(eventOrOptions?: PointerEvent | { restoreFocus?: boolean }) {
+  cancelHoverClose()
   open.value = false
 
   const restoreFocus = eventOrOptions && !(eventOrOptions instanceof Event) && eventOrOptions.restoreFocus
@@ -145,6 +183,7 @@ function onPanelKeydown(event: KeyboardEvent) {
 }
 
 onClickOutside(rootRef, closeMenu)
+onBeforeUnmount(cancelHoverClose)
 
 watch(open, async (isOpen) => {
   if (!isOpen) {
@@ -160,7 +199,12 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <div ref="rootRef" class="relative flex h-[2.85rem] w-auto items-center">
+  <div
+    ref="rootRef"
+    class="relative flex h-[2.85rem] w-auto items-center"
+    @mouseenter="openMenuFromHover"
+    @mouseleave="scheduleMenuCloseFromHover"
+  >
     <button
         ref="triggerRef"
         type="button"
@@ -188,12 +232,13 @@ watch(open, async (isOpen) => {
       />
     </button>
 
-    <Transition name="category-panel">
+    <LiquidPanelTransition name="category-panel">
       <nav
           v-if="open"
           :id="panelId"
           class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[120px] -translate-x-1/2 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:left-3 max-md:top-20 max-md:translate-x-0"
           aria-label="栏目导航"
+          @mouseenter="cancelHoverClose"
           @keydown="onPanelKeydown"
       >
         <ul class="m-0 list-none p-0">
@@ -234,7 +279,7 @@ watch(open, async (isOpen) => {
           </li>
         </ul>
       </nav>
-    </Transition>
+    </LiquidPanelTransition>
   </div>
 </template>
 

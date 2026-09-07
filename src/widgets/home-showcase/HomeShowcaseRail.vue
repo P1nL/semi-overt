@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useMotions, type Variant } from '@vueuse/motion'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
@@ -147,6 +147,32 @@ function clearNavigationSettleTimer() {
   navigationSettleTimer = null
 }
 
+function clearHoveredItem() {
+  hoveredIndex.value = null
+}
+
+function handleRailPointerMove(event: PointerEvent) {
+  if (event.pointerType !== 'mouse' || !isDesktopRail.value) return
+
+  const item = event.target instanceof Element
+    ? event.target.closest<HTMLElement>('[data-showcase-item-index]')
+    : null
+  const index = item ? Number(item.dataset.showcaseItemIndex) : Number.NaN
+
+  hoveredIndex.value = Number.isInteger(index) ? index : null
+}
+
+function handleDocumentPointerOut(event: PointerEvent) {
+  if (event.pointerType !== 'mouse' || event.relatedTarget !== null) return
+
+  const pointerStillInsideViewport = event.clientX > 0
+    && event.clientX < window.innerWidth
+    && event.clientY > 0
+    && event.clientY < window.innerHeight
+
+  if (!pointerStillInsideViewport) clearHoveredItem()
+}
+
 function shouldUseNativeNavigation(event: MouseEvent) {
   return (
     event.defaultPrevented ||
@@ -184,8 +210,15 @@ watch(visibleItemSignature, () => {
   void syncMotionState()
 }, { flush: 'post' })
 
+onMounted(() => {
+  document.addEventListener('pointerout', handleDocumentPointerOut)
+  window.addEventListener('blur', clearHoveredItem)
+})
+
 onBeforeUnmount(() => {
   clearNavigationSettleTimer()
+  document.removeEventListener('pointerout', handleDocumentPointerOut)
+  window.removeEventListener('blur', clearHoveredItem)
 })
 // --- 🌟 动画核心逻辑结束 ---
 </script>
@@ -194,7 +227,8 @@ onBeforeUnmount(() => {
   <div
       class="home-showcase-rail"
       :class="{ 'home-showcase-rail--featured': featured }"
-      @mouseleave="hoveredIndex = null"
+      @pointermove="handleRailPointerMove"
+      @pointerleave="clearHoveredItem"
   >
     <div class="home-showcase-rail__viewport">
       <div class="home-showcase-rail__track">
@@ -203,8 +237,7 @@ onBeforeUnmount(() => {
             :key="`${item.id}-${index}-${layoutVersion}`"
             class="home-showcase-rail__item"
             :style="getItemStyle(index)"
-            @mouseenter="hoveredIndex = index"
-            @mouseleave="hoveredIndex === index && (hoveredIndex = null)"
+            :data-showcase-item-index="index"
             @click.capture="onItemClick($event, item)"
             v-motion="getMotionKey(index)"
             :initial="getMotionState(index)"

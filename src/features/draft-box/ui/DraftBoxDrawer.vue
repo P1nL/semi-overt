@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
 import { computed, nextTick, ref, useAttrs, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
@@ -209,7 +210,10 @@ watch(
 </script>
 
 <template>
+  <LiquidPanelTransition name="draft-panel" anchor="right" appear>
   <div
+    v-show="modelValue"
+    :inert="!modelValue"
     v-bind="attrs"
     class="draft-box-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:inset-x-3 max-md:top-20 max-md:w-auto"
     :class="modelValue ? 'draft-box-panel--open' : ''"
@@ -257,6 +261,7 @@ watch(
       @retry="loadDrafts"
     />
   </div>
+  </LiquidPanelTransition>
 </template>
 
 <style scoped>
@@ -287,25 +292,12 @@ watch(
   border-color: var(--color-border-panel);
   -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
   backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(0.25rem);
-  visibility: hidden;
-  transition:
-    opacity 180ms ease,
-    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 200ms;
 }
-
-.draft-box-panel--open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-  visibility: visible;
-  transition:
-    opacity 220ms ease,
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s;
+.draft-panel-enter-active { transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.draft-panel-leave-active { pointer-events: none; transition: opacity 180ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+.draft-panel-enter-from, .draft-panel-leave-to { opacity: 0; transform: translateY(0.25rem); }
+@media (prefers-reduced-motion: reduce) {
+  .draft-panel-enter-active, .draft-panel-leave-active { transition-duration: 1ms; }
 }
 
 .draft-box-panel__body {

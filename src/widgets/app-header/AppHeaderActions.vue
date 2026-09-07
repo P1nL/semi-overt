@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
 import {
   computed,
   defineAsyncComponent,
@@ -564,18 +565,11 @@ async function handleLogout() {
           />
         </button>
 
-        <Transition
-          enter-active-class="transition duration-200 ease-out"
-          enter-from-class="translate-y-1 opacity-0"
-          enter-to-class="translate-y-0 opacity-100"
-          leave-active-class="transition duration-150 ease-in"
-          leave-from-class="translate-y-0 opacity-100"
-          leave-to-class="translate-y-1 opacity-0"
-        >
+        <LiquidPanelTransition name="header-user-panel">
           <div
             v-if="userMenuOpen"
             :id="userMenuId"
-            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-44 rounded-lg p-2 shadow-(--shadow-lg) max-md:w-[min(18rem,calc(100vw-1.5rem))]"
+            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-44 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:w-[min(18rem,calc(100vw-1.5rem))]"
             role="menu"
             aria-label="用户菜单"
             @keydown="onUserMenuKeydown"
@@ -614,7 +608,7 @@ async function handleLogout() {
               <AnimatedPersonExitIcon size="1.35rem" :decorative="true" />
             </button>
           </div>
-        </Transition>
+        </LiquidPanelTransition>
         </div>
 
         <button
@@ -839,10 +833,11 @@ async function handleLogout() {
 .menu-item {
   display: flex;
   width: 100%;
+  min-height: 3rem;
   align-items: center;
   justify-content: flex-start;
-  border-radius: 999px;
-  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-lg);
+  padding: 0.65rem 0.75rem;
   color: var(--color-text);
   font-size: 0.95rem;
   transition:
@@ -870,18 +865,41 @@ async function handleLogout() {
   backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
 }
 
+.header-user-panel-enter-active {
+  transition:
+    opacity 220ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-user-panel-leave-active {
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-user-panel-enter-from,
+.header-user-panel-leave-to {
+  opacity: 0;
+  transform: translateY(0.25rem);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .header-draft-state-enter-active,
   .header-draft-state-leave-active,
   .header-auth-identity-enter-active,
-  .header-auth-identity-leave-active {
+  .header-auth-identity-leave-active,
+  .header-user-panel-enter-active,
+  .header-user-panel-leave-active {
     transition-duration: 1ms;
   }
 
   .header-draft-state-enter-from,
   .header-draft-state-leave-to,
   .header-auth-identity-enter-from,
-  .header-auth-identity-leave-to {
+  .header-auth-identity-leave-to,
+  .header-user-panel-enter-from,
+  .header-user-panel-leave-to {
     transform: none;
   }
 }

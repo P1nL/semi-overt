@@ -36,7 +36,6 @@ const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
-const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
 const PAGE_SHEET_LEAVE = 360
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
@@ -538,10 +537,9 @@ onBeforeUnmount(() => {
   <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
     <div
       aria-hidden="true"
-      class="app-theme-background app-waves-background"
+      class="app-theme-background app-light-background"
       :class="uiStore.darkMode ? 'app-theme-background--hidden' : 'app-theme-background--visible'"
     >
-      <WavesBackground :x-gap="20" :friction="0.85" />
     </div>
 
     <div
@@ -656,7 +654,7 @@ onBeforeUnmount(() => {
 
 .app-theme-background--visible { opacity: 1; }
 .app-theme-background--hidden { opacity: 0; }
-.app-waves-background { background: #fff; }
+.app-light-background { background: #fff; }
 .app-silk-background { background: #0b0b0f; }
 
 .app-silk-background__canvas,
