@@ -137,7 +137,12 @@ function animateSurvivorMove(
     x: previousRect.left - nextRect.left,
     y: previousRect.top - nextRect.top,
   }
-  const offset = reusedOffset ?? measuredOffset
+  // Dock magnification or a viewport change can invalidate the saved entry offset.
+  // Only reuse its exact reverse when it still starts at the current visual position.
+  const canReuseOffset = reusedOffset
+    && Math.abs(reusedOffset.x - measuredOffset.x) < 1
+    && Math.abs(reusedOffset.y - measuredOffset.y) < 1
+  const offset = canReuseOffset ? reusedOffset : measuredOffset
 
   if (Math.abs(offset.x) < 1 && Math.abs(offset.y) < 1) return measuredOffset
 

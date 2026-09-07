@@ -149,6 +149,7 @@ interface Config {
 }
 
 interface WavesProps {
+  active?: boolean;
   lineColor?: string;
   backgroundColor?: string;
   waveSpeedX?: number;
@@ -165,6 +166,7 @@ interface WavesProps {
 }
 
 const props = withDefaults(defineProps<WavesProps>(), {
+  active: true,
   lineColor: 'black',
   backgroundColor: 'transparent',
   waveSpeedX: 0.0125,
@@ -212,6 +214,33 @@ let config: Config = {
   yGap: props.yGap
 };
 let frameId: number | null = null;
+let pauseTimer: number | null = null;
+let paused = true;
+let elapsed = 0;
+let previousTime: number | null = null;
+
+const stop = () => {
+  paused = true;
+  if (frameId !== null) cancelAnimationFrame(frameId);
+  frameId = null;
+  previousTime = null;
+};
+const syncPlayback = () => {
+  if (pauseTimer !== null) window.clearTimeout(pauseTimer);
+  pauseTimer = null;
+  if (document.hidden) { stop(); return; }
+  if (props.active) {
+    if (ctx && paused) {
+      paused = false;
+      previousTime = null;
+      frameId = requestAnimationFrame(tick);
+    }
+  } else if (!paused) {
+    // Match the background's 900ms crossfade before stopping the hidden loop.
+    pauseTimer = window.setTimeout(() => { pauseTimer = null; stop(); }, 900);
+  }
+};
+watch(() => props.active, syncPlayback);
 
 const setSize = () => {
   const container = containerRef.value;
@@ -317,6 +346,10 @@ const drawLines = () => {
 };
 
 const tick = (t: number) => {
+  frameId = null;
+  if (paused) return;
+  if (previousTime !== null) elapsed += Math.min(t - previousTime, 50);
+  previousTime = t;
   const container = containerRef.value;
   if (!container) return;
 
@@ -334,7 +367,7 @@ const tick = (t: number) => {
   container.style.setProperty('--x', `${mouse.sx}px`);
   container.style.setProperty('--y', `${mouse.sy}px`);
 
-  movePoints(t);
+  movePoints(elapsed);
   drawLines();
   frameId = requestAnimationFrame(tick);
 };
@@ -342,9 +375,12 @@ const tick = (t: number) => {
 const onResize = () => {
   setSize();
   setLines();
+  movePoints(elapsed);
+  drawLines();
 };
 
 const updateMouse = (x: number, y: number) => {
+  if (paused || !props.active) return;
   mouse.x = x - bounding.left;
   mouse.y = y - bounding.top;
   if (!mouse.set) {
@@ -375,7 +411,10 @@ onMounted(() => {
 
   setSize();
   setLines();
-  frameId = requestAnimationFrame(tick);
+  movePoints(elapsed);
+  drawLines();
+  syncPlayback();
+  document.addEventListener('visibilitychange', syncPlayback);
 
   window.addEventListener('resize', onResize);
   window.addEventListener('mousemove', onMouseMove);
@@ -383,6 +422,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  stop();
+  if (pauseTimer !== null) window.clearTimeout(pauseTimer);
+  document.removeEventListener('visibilitychange', syncPlayback);
   window.removeEventListener('resize', onResize);
   window.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('touchmove', onTouchMove);

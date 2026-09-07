@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import appreciationAnimationUrl from '@/shared/assets/lottie/system-outline-27-globe-loop-cycle.json?url'
+import ThemeMorphIcon from '@/features/theme-switch/ui/ThemeMorphIcon.vue'
+import { revealTheme } from '@/features/theme-switch/model/revealTheme'
 import { UI_TIMING } from '@/shared/constants/ui'
 import { useUiStore } from '@/stores/ui'
 
@@ -24,6 +25,8 @@ const emit = defineEmits<{
 
 const uiStore = useUiStore()
 const LONG_PRESS_MS = 600
+const ICON_MORPH_MS = 220
+const ENTER_MOVE_DELAY_MS = 120
 const pressing = ref(false)
 let longPressTimer: number | null = null
 let enterModeTimer: number | null = null
@@ -41,13 +44,28 @@ const showAppreciationIcon = computed(() =>
 // Observe the shared mode so Escape and other external exits also suppress hints.
 const appreciationMoving = ref(false)
 let appreciationMoveTimer: number | null = null
-watch(isAppreciating, () => {
+watch(isAppreciating, (enabled, previous) => {
+  clearEnterModeTimer()
+  clearExitModeTimer()
+  enteringAppreciation.value = false
   if (appreciationMoveTimer !== null) window.clearTimeout(appreciationMoveTimer)
-  appreciationMoving.value = true
-  appreciationMoveTimer = window.setTimeout(() => {
-    appreciationMoveTimer = null
-    appreciationMoving.value = false
-  }, UI_TIMING.APPRECIATION_MOVE)
+  appreciationMoveTimer = null
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  appreciationMoving.value = !reducedMotion
+  exitingAppreciation.value = previous && !enabled && !reducedMotion
+  if (exitingAppreciation.value) {
+    // Keep the globe for the return journey, then morph during its final segment.
+    exitModeTimer = window.setTimeout(() => {
+      exitModeTimer = null
+      exitingAppreciation.value = false
+    }, Math.max(0, UI_TIMING.APPRECIATION_MOVE - ICON_MORPH_MS))
+  }
+  if (!reducedMotion) {
+    appreciationMoveTimer = window.setTimeout(() => {
+      appreciationMoveTimer = null
+      appreciationMoving.value = false
+    }, UI_TIMING.APPRECIATION_MOVE)
+  }
 }, { flush: 'sync' })
 const showTooltip = computed(() =>
   props.appreciationEnabled && !props.disabled && !pressing.value
@@ -115,6 +133,7 @@ function startLongPress(event: PointerEvent) {
   if (props.disabled || (!props.appreciationEnabled && !isAppreciating.value)) return
   if (event.pointerType === 'mouse' && event.button !== 0) return
 
+  const button = event.currentTarget as HTMLElement
   clearLongPress()
   pressing.value = true
   longPressTimer = window.setTimeout(() => {
@@ -123,20 +142,22 @@ function startLongPress(event: PointerEvent) {
     suppressNextClick = true
 
     if (isAppreciating.value) {
-      uiStore.toggleDarkMode()
+      const next = !uiStore.darkMode
+      void revealTheme(button, instant => uiStore.setDarkMode(next, instant))
       return
     }
 
+    clearEnterModeTimer()
     enteringAppreciation.value = true
     enterModeTimer = window.setTimeout(() => {
       enterModeTimer = null
       uiStore.enterAppreciationMode()
       enteringAppreciation.value = false
-    }, 280)
+    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ENTER_MOVE_DELAY_MS)
   }, LONG_PRESS_MS)
 }
 
-function onToggle() {
+function onToggle(event: MouseEvent) {
   if (props.disabled) return
   clearLongPress()
 
@@ -146,19 +167,15 @@ function onToggle() {
   }
 
   if (isAppreciating.value) {
-    clearExitModeTimer()
-    exitingAppreciation.value = true
     uiStore.exitAppreciationMode()
-    exitModeTimer = window.setTimeout(() => {
-      exitModeTimer = null
-      exitingAppreciation.value = false
-    }, UI_TIMING.APPRECIATION_MOVE)
     return
   }
 
   const next = !uiStore.darkMode
-  uiStore.setDarkMode(next)
-  emit('change', next)
+  void revealTheme(event.currentTarget as HTMLElement, instant => {
+    uiStore.setDarkMode(next, instant)
+    emit('change', next)
+  })
 }
 
 onBeforeUnmount(() => {
@@ -179,6 +196,7 @@ onBeforeUnmount(() => {
     class="theme-switch-root"
     :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
     :data-pressing="pressing ? 'true' : 'false'"
+    :data-zen-icon="showAppreciationIcon ? 'true' : 'false'"
     @pointerdown="startLongPress"
     @pointerup="finishPress"
     @pointercancel="cancelPress"
@@ -187,44 +205,11 @@ onBeforeUnmount(() => {
     @click="onToggle"
   >
     <span class="theme-switch-button">
-      <Transition name="theme-switch-icon">
-        <lord-icon
-          v-if="showAppreciationIcon"
-          key="appreciation"
-          class="theme-switch-icon theme-switch-icon--appreciation current-color"
-          :src="appreciationAnimationUrl"
-          trigger="loop"
-        />
-        <svg
-          v-else-if="!isDark"
-          key="sun"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          class="theme-switch-icon theme-switch-icon--sun"
-        >
-          <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="1.9" />
-          <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.9">
-            <path d="M12 2.7v2.2" /><path d="M12 19.1v2.2" /><path d="M4.91 4.91l1.56 1.56" />
-            <path d="M17.53 17.53l1.56 1.56" /><path d="M2.7 12h2.2" /><path d="M19.1 12h2.2" />
-            <path d="M4.91 19.09l1.56-1.56" /><path d="M17.53 6.47l1.56-1.56" />
-          </g>
-        </svg>
-        <svg
-          v-else
-          key="moon"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          class="theme-switch-icon"
-        >
-          <path d="M7 6c0 6.08 4.92 11 11 11c0.53 0 1.05 -0.04 1.56 -0.11c-1.61 2.47 -4.39 4.11 -7.56 4.11c-4.97 0 -9 -4.03 -9 -9c0 -3.17 1.64 -5.95 4.11 -7.56c-0.07 0.51 -0.11 1.03 -0.11 1.56Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
-          <g fill="currentColor">
-            <path d="M15.22 6.03l2.53 -1.94l-3.19 -0.09l-1.06 -3l-1.06 3l-3.19 0.09l2.53 1.94l-0.91 3.06l2.63 -1.81l2.63 1.81l-0.91 -3.06Z"><animate attributeName="opacity" dur="6s" keyTimes="0;0.1;0.4;0.5;1" repeatCount="indefinite" values="0;1;1;0;0" /></path>
-            <path d="M19.61 12.25l1.64 -1.25l-2.06 -0.05l-0.69 -1.95l-0.69 1.95l-2.06 0.05l1.64 1.25l-0.59 1.98l1.7 -1.17l1.7 1.17l-0.59 -1.98Z"><animate attributeName="opacity" dur="6s" keyTimes="0;0.2;0.3;0.6;0.7;1" repeatCount="indefinite" values="0;0;1;1;0;0" /></path>
-          </g>
-        </svg>
-      </Transition>
+      <ThemeMorphIcon
+        class="theme-switch-icon"
+        :mode="showAppreciationIcon ? 'globe' : isDark ? 'moon' : 'sun'"
+        :duration="ICON_MORPH_MS"
+      />
     </span>
 
     <span v-if="showLabel" class="min-w-0">
@@ -242,32 +227,34 @@ onBeforeUnmount(() => {
 <style scoped>
 .theme-switch-root { position:relative; display:inline-flex; align-items:center; gap:.75rem; flex-shrink:0; padding:0; border:0; background:transparent; }
 .theme-switch-button { position:relative; display:inline-flex; height:2.85rem; width:2.85rem; align-items:center; justify-content:center; border-radius:999px; color:var(--color-text-muted); transition:color 220ms ease, background-color 220ms ease, transform 220ms cubic-bezier(.22,1,.36,1); }
-.theme-switch-root[data-pressing='true'] .theme-switch-button { transform:scale(.9); color:var(--color-primary); }
+/* The globe starts its return directly; press recoil would overlap the FLIP motion. */
+.theme-switch-root[data-pressing='true']:not([data-zen-icon='true']) .theme-switch-button { transform:scale(.9); color:var(--color-primary); }
 .theme-switch-icon { position:absolute; inset:50% auto auto 50%; height:1.3rem; width:1.3rem; transform:translate(-50%, -50%); }
-.theme-switch-icon--appreciation { height:1.55rem; width:1.55rem; }
-.theme-switch-icon--appreciation.current-color { --lord-icon-primary:currentColor; --lord-icon-secondary:currentColor; }
-.theme-switch-icon--sun { transition:transform 560ms cubic-bezier(.22,.8,.3,1); transform-origin:50% 50%; }
-.theme-switch-root:hover .theme-switch-icon--sun { transform:translate(-50%, -50%) rotate(120deg); }
-.theme-switch-icon-enter-active,.theme-switch-icon-leave-active { transition:opacity 420ms cubic-bezier(.22,1,.36,1), transform 420ms cubic-bezier(.22,1,.36,1); }
-.theme-switch-icon-enter-from,.theme-switch-icon-leave-to { opacity:0; transform:translate(-50%, -50%) scale(.82) rotate(-14deg); }
-.theme-switch-icon-enter-to,.theme-switch-icon-leave-from { opacity:1; transform:translate(-50%, -50%) scale(1) rotate(0); }
-@media (prefers-reduced-motion: reduce) { .theme-switch-button,.theme-switch-icon-enter-active,.theme-switch-icon-leave-active { transition-duration:.01ms; } }
+.theme-switch-root :deep(.theme-morph-rays) { transform-origin: 12px 12px; transition: transform 560ms cubic-bezier(.22,.8,.3,1); }
+.theme-switch-root:hover :deep(.theme-morph-rays) { transform: rotate(120deg); }
+@media (prefers-reduced-motion: reduce) {
+  .theme-switch-button { transition-duration:.01ms; }
+  .theme-switch-root :deep(.theme-morph-rays) { transition: none; transform: none; }
+}
 
 .theme-switch-tooltip {
   position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
+  top: calc(100% + 1.5rem / var(--header-dock-scale, 1));
+  left: 50%;
   z-index: 50;
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
+  /* Keep the hint centered and at its own size while the Dock scales the button. */
+  transform: translateX(-50%) scale(calc(1 / var(--header-dock-scale, 1)));
+  transform-origin: top center;
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-sm);
   background: var(--color-surface-panel);
   color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
   backdrop-filter: blur(var(--backdrop-blur-panel));
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.4;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;

@@ -36,6 +36,7 @@ const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
+const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
 const PAGE_SHEET_LEAVE = 360
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
@@ -537,9 +538,10 @@ onBeforeUnmount(() => {
   <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
     <div
       aria-hidden="true"
-      class="app-theme-background app-light-background"
+      class="app-theme-background app-waves-background"
       :class="uiStore.darkMode ? 'app-theme-background--hidden' : 'app-theme-background--visible'"
     >
+      <WavesBackground :active="!uiStore.darkMode" :x-gap="20" :friction="0.85" />
     </div>
 
     <div
@@ -629,13 +631,13 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-interface > :not(:first-child) {
-  transition: opacity 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .app-interface--appreciation > :not(:first-child) {
   pointer-events: none;
   opacity: 0;
-  transform: translate3d(0, 0.75rem, 0) scale(0.99);
+  transform: translate3d(0, 0.75rem, 0);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -654,7 +656,7 @@ onBeforeUnmount(() => {
 
 .app-theme-background--visible { opacity: 1; }
 .app-theme-background--hidden { opacity: 0; }
-.app-light-background { background: #fff; }
+.app-waves-background { background: #fff; }
 .app-silk-background { background: #0b0b0f; }
 
 .app-silk-background__canvas,

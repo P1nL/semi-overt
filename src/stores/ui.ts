@@ -142,7 +142,7 @@ export const useUiStore = defineStore('ui', () => {
         setSearchQuery('')
     }
 
-    function setDarkMode(enabled: boolean) {
+    function setDarkMode(enabled: boolean, instant = false) {
         if (darkMode.value === enabled) return
 
         const commitTheme = () => {
@@ -151,14 +151,9 @@ export const useUiStore = defineStore('ui', () => {
             applyDarkMode(enabled)
         }
 
-        // 不使用 View Transition API：
-        // 页面包含 filter:blur、isolation:isolate、复杂合成层的卡片，
-        // startViewTransition 截图时部分区域无法正确光栅化，导致闪白/缺失。
-        //
-        // 两阶段切换：
-        //   theme-switching (580ms) — 颜色/opacity 过渡；blur 全部禁用
-        //   theme-settling  (320ms) — blur 通过 CSS transition 平滑恢复
-        markThemeSwitching()
+        // Button-origin reveals commit a settled theme for their snapshot.
+        // Other callers retain the existing two-stage crossfade fallback.
+        if (!instant) markThemeSwitching()
         commitTheme()
     }
 

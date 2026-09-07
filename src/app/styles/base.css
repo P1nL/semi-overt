@@ -206,3 +206,22 @@ html::-webkit-scrollbar-thumb:hover {
     background: var(--color-selection-bg);
     color: var(--color-selection-text);
 }
+
+/* The reveal owns theme timing; snapshot a settled new theme, not a crossfade. */
+html.theme-revealing *,
+html.theme-revealing *::before,
+html.theme-revealing *::after { transition: none !important; }
+html.theme-revealing::view-transition-old(root),
+html.theme-revealing::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+html.theme-revealing::view-transition-old(root) { z-index: 1; }
+html.theme-revealing::view-transition-new(root) {
+    z-index: 2;
+    /* Hide the new snapshot until WAAPI starts; never expose a full-theme first frame. */
+    clip-path: circle(0px at var(--theme-reveal-x) var(--theme-reveal-y));
+}
+html.theme-revealing::view-transition-group(root) {
+    animation: none;
+}

@@ -120,7 +120,7 @@ function play(el: Element, done: () => void, entering: boolean) {
     .find(item => item.getAttribute('aria-controls') === node.id) : null
   const originSurface = node.closest<HTMLElement>('[data-panel-origin-surface]')
   const slow = import.meta.env.DEV && new URLSearchParams(location.search).get('motionSpeed') === 'slow' ? 3 : 1
-  const duration = Math.max(100, (entering ? 540 : 420) * Math.abs(end-start)) * slow
+  const duration = Math.max(100, (entering ? 620 : 500) * Math.abs(end-start)) * slow
   // WAAPI supplies a pauseable timeline; only the decorative surface is shaped.
   const driver = surface.animate([{ opacity: 1 }, { opacity: 1 }], { duration, fill: 'both' })
   let nativeSurface = true
@@ -177,8 +177,9 @@ function play(el: Element, done: () => void, entering: boolean) {
   const tick = () => {
     if (running.get(node) !== run) return
     const time = Math.max(0, Math.min(1, Number(driver.currentTime ?? 0)/duration))
-    const eased = time*time*(3-2*time)
-    render(start + (end-start)*eased)
+    // Geometry channels already ease their own phases. Easing the timeline as
+    // well concentrates growth in the middle and makes the panel snap open/shut.
+    render(start + (end-start)*time)
     run.frame = requestAnimationFrame(tick)
   }
   running.set(node, run)
