@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import appreciationAnimationUrl from '@/shared/assets/lottie/system-outline-27-globe-loop-cycle.json?url'
 import { UI_TIMING } from '@/shared/constants/ui'
@@ -38,6 +38,22 @@ const isAppreciating = computed(() => uiStore.appreciationMode)
 const showAppreciationIcon = computed(() =>
   enteringAppreciation.value || isAppreciating.value || exitingAppreciation.value,
 )
+// Observe the shared mode so Escape and other external exits also suppress hints.
+const appreciationMoving = ref(false)
+let appreciationMoveTimer: number | null = null
+watch(isAppreciating, () => {
+  if (appreciationMoveTimer !== null) window.clearTimeout(appreciationMoveTimer)
+  appreciationMoving.value = true
+  appreciationMoveTimer = window.setTimeout(() => {
+    appreciationMoveTimer = null
+    appreciationMoving.value = false
+  }, UI_TIMING.APPRECIATION_MOVE)
+}, { flush: 'sync' })
+const showTooltip = computed(() =>
+  props.appreciationEnabled && !props.disabled && !pressing.value
+  && !showAppreciationIcon.value && !appreciationMoving.value,
+)
+
 const switchLabel = computed(() => (isAppreciating.value ? 'ZEN' : isDark.value ? '深色模式' : '浅色模式'))
 const switchDescription = computed(() => props.appreciationEnabled ? '点击切换主题 · 长按欣赏背景' : '切换全局主题')
 const ariaLabel = computed(() => {
@@ -146,6 +162,7 @@ function onToggle() {
 }
 
 onBeforeUnmount(() => {
+  if (appreciationMoveTimer !== null) window.clearTimeout(appreciationMoveTimer)
   clearLongPress()
   clearEnterModeTimer()
   clearExitModeTimer()
@@ -215,7 +232,7 @@ onBeforeUnmount(() => {
       <span class="mt-0.5 block text-xs text-[var(--color-text-muted)]">{{ switchDescription }}</span>
     </span>
     <span
-      v-if="appreciationEnabled && !isAppreciating && !disabled"
+      v-if="showTooltip"
       class="theme-switch-tooltip"
       aria-hidden="true"
     ><strong>切换主题</strong> · 长按进入<strong>ZEN</strong></span>
