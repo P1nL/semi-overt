@@ -5,7 +5,6 @@ import type { ArticleCardEntityDto, ArticleCardVm } from '@/entities/article/mod
 
 export interface UserProfileEntityDto extends ProfileDto {
     nickname?: string | null
-    email?: string | null
     role?: UserRole | string
 }
 

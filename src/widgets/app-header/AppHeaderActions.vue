@@ -17,6 +17,7 @@ import { mapPendingReviewItemDtoToVm } from '@/entities/review'
 import { mapUserProfilePageDtoToVm } from '@/entities/user/model/user.mapper'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { authApi } from '@/shared/api/modules/auth'
+import { beginLogout } from '@/shared/api/authRuntime'
 import { reviewApi } from '@/shared/api/modules/review'
 import { userApi } from '@/shared/api/modules/user'
 import { queryKeys } from '@/shared/api/queryKeys'
@@ -471,11 +472,12 @@ async function handleLogout() {
   loggingOut.value = true
 
   try {
+    beginLogout()
     await authApi.logout()
   } catch (error) {
-    toast.error(getErrorMessage(error, '退出失败，但本地登录状态已清除。'))
+    toast.error(getErrorMessage(error, '服务器尚未确认退出，请联网后重试。'))
   } finally {
-    authStore.clearAuth()
+    authStore.clearAuth({ skipRuntime: true })
     userMenuOpen.value = false
     loggingOut.value = false
     await router.push({ name: ROUTE_NAME.HOME })

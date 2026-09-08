@@ -3,7 +3,6 @@ import type { AuthUser } from '@/stores/auth'
 export interface LoginFormValues {
     account: string
     password: string
-    rememberMe: boolean
 }
 
 export interface RegisterFormValues {

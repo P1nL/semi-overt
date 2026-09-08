@@ -3,18 +3,23 @@ import { defineStore } from 'pinia'
 
 import { queryClient } from '@/shared/lib/queryClient'
 import { userApi } from '@/shared/api/modules/user'
+import {
+    acceptSession,
+    hasPendingLogout,
+    getAccessToken,
+    invalidateSession,
+    isAuthRefreshCancelledError,
+    isAuthRefreshUnauthorizedError,
+    refreshAccessToken,
+    subscribe as subscribeAuthRuntime,
+    type AuthRuntimeEvent,
+} from '@/shared/api/authRuntime'
 import { AUTH_BIZ_CODE } from '@/shared/constants/auth'
 import { getErrorMessage } from '@/shared/utils/error'
-import {
-    clearStoredAuth,
-    readStoredAuth,
-    type AuthPersistence,
-    writeStoredToken,
-    writeStoredUser,
-} from '@/shared/utils/authStorage'
-import { ApiBusinessError } from '@/shared/types/api'
+import { ApiBusinessError, type AuthRespDto } from '@/shared/types/api'
 
 export type UserRole = 'USER' | 'ADMIN'
+export type SessionRestoreState = 'idle' | 'restoring' | 'ready' | 'unauthorized' | 'unavailable'
 
 export interface AuthUser {
     id: number | string
@@ -34,15 +39,28 @@ function clearAllQueries() {
     queryClient.clear()
 }
 
+function mapAuthResponseToUser(payload: AuthRespDto): AuthUser {
+    return {
+        id: payload.user.id,
+        username: payload.user.username,
+        nickname: payload.user.nickname ?? payload.user.username,
+        avatar: payload.user.avatarUrl ?? null,
+        role: payload.user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+        profileLoaded: false,
+    }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-    const storedAuth = readStoredAuth<AuthUser>()
-    const authPersistence = ref<AuthPersistence>(storedAuth.persistence ?? 'local')
-    const token = ref<string | null>(storedAuth.token)
-    const user = ref<AuthUser | null>(storedAuth.user)
+    const token = ref<string | null>(getAccessToken())
+    const user = ref<AuthUser | null>(null)
     const authError = ref<AuthErrorState>({
         code: null,
         message: '',
     })
+    const sessionRestoreState = ref<SessionRestoreState>('idle')
+    const sessionRestoreMessage = ref('')
+
+    let sessionRestorePromise: Promise<void> | null = null
 
     const isAuthenticated = computed(() => Boolean(token.value))
     const role = computed<UserRole | null>(() => user.value?.role ?? null)
@@ -51,26 +69,54 @@ export const useAuthStore = defineStore('auth', () => {
     const hasAuthError = computed(() => authError.value.code !== null)
     const hasCurrentUserProfile = computed(() => user.value?.profileLoaded === true)
 
-    function setToken(nextToken: string | null, persistence = authPersistence.value) {
-        authPersistence.value = persistence
-        token.value = nextToken
-        writeStoredToken(nextToken, persistence)
-    }
-
-    function setUser(nextUser: AuthUser | null, persistence = authPersistence.value) {
-        authPersistence.value = persistence
-        user.value = nextUser
-        writeStoredUser(nextUser, persistence)
-    }
-
-    function setAuth(
-        payload: { token: string; user: AuthUser },
-        options: { persistence?: AuthPersistence } = {},
+    function applyAuthResponse(
+        payload: AuthRespDto,
+        options: { clearQueries?: boolean; preserveProfileState?: boolean } = {},
     ) {
+        if (options.clearQueries) {
+            clearAllQueries()
+        }
+
+        token.value = payload.token
+        const nextUser = mapAuthResponseToUser(payload)
+        if (
+            options.preserveProfileState
+            && user.value
+            && String(user.value.id) === String(nextUser.id)
+        ) {
+            nextUser.profileLoaded = user.value.profileLoaded
+        }
+        user.value = nextUser
+        clearAuthError()
+    }
+
+    function setToken(nextToken: string | null) {
+        token.value = nextToken
+        if (!nextToken) {
+            user.value = null
+        }
+    }
+
+    function setUser(nextUser: AuthUser | null) {
+        user.value = nextUser
+    }
+
+    function setAuth(payload: { token: string; user: AuthUser }) {
+        acceptSession({
+            token: payload.token,
+            user: {
+                id: Number(payload.user.id),
+                username: payload.user.username,
+                nickname: payload.user.nickname ?? payload.user.username,
+                email: null,
+                role: payload.user.role,
+                avatarUrl: payload.user.avatar ?? null,
+            },
+        })
         clearAllQueries()
-        const persistence = options.persistence ?? 'local'
-        setToken(payload.token, persistence)
-        setUser(payload.user, persistence)
+        token.value = payload.token
+        user.value = payload.user
+        sessionRestoreState.value = 'ready'
         clearAuthError()
     }
 
@@ -82,12 +128,13 @@ export const useAuthStore = defineStore('auth', () => {
         })
     }
 
-    function clearAuth(options: { keepError?: boolean } = {}) {
+    function clearAuth(options: { keepError?: boolean; skipRuntime?: boolean } = {}) {
         clearAllQueries()
+        if (!options.skipRuntime) {
+            invalidateSession()
+        }
         token.value = null
         user.value = null
-        authPersistence.value = 'local'
-        clearStoredAuth()
 
         if (!options.keepError) {
             clearAuthError()
@@ -109,6 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (code === AUTH_BIZ_CODE.UNAUTHORIZED) {
             clearAuth({ keepError: true })
             setAuthError(AUTH_BIZ_CODE.UNAUTHORIZED, message || '登录状态已失效，请重新登录')
+            sessionRestoreState.value = 'unauthorized'
             return
         }
 
@@ -118,6 +166,55 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         setAuthError(code, message || '请求失败')
+    }
+
+    async function ensureSessionRestored(): Promise<void> {
+        if (sessionRestoreState.value !== 'idle') {
+            await sessionRestorePromise
+            return
+        }
+
+        if (token.value) {
+            sessionRestoreState.value = 'ready'
+            return
+        }
+
+        sessionRestoreState.value = 'restoring'
+        sessionRestorePromise = refreshAccessToken()
+            .then((payload) => {
+                applyAuthResponse(payload)
+                sessionRestoreState.value = 'ready'
+            })
+            .catch((error) => {
+                if (isAuthRefreshUnauthorizedError(error)) {
+                    clearAuth({ keepError: true })
+                    setAuthError(AUTH_BIZ_CODE.UNAUTHORIZED, '登录状态已失效，请重新登录')
+                    sessionRestoreState.value = 'unauthorized'
+                    return
+                }
+
+                if (isAuthRefreshCancelledError(error)) {
+                    clearAuth({ keepError: true, skipRuntime: true })
+                    sessionRestoreState.value = 'unauthorized'
+                    return
+                }
+
+                // Offline/timeout/5xx must not be converted into a credential
+                // failure.  Later protected requests may retry refresh.
+                sessionRestoreMessage.value = getErrorMessage(error, '暂时无法恢复本设备登录状态，请稍后重试')
+                sessionRestoreState.value = 'unavailable'
+            })
+            .finally(() => {
+                sessionRestorePromise = null
+            })
+
+        await sessionRestorePromise
+    }
+
+    async function retrySessionRestore(): Promise<void> {
+        if (sessionRestoreState.value !== 'unavailable') return
+        sessionRestoreState.value = 'idle'
+        await ensureSessionRestored()
     }
 
     async function fetchCurrentUser() {
@@ -144,10 +241,26 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    function handleRuntimeEvent(event: AuthRuntimeEvent) {
+        if (event.type === 'refreshed') {
+            applyAuthResponse(event.session, { preserveProfileState: true })
+            sessionRestoreState.value = 'ready'
+            return
+        }
+
+        clearAuth({ skipRuntime: true })
+        sessionRestoreMessage.value = '服务器尚未确认退出；自动登录已暂停，请联网后重试退出'
+        sessionRestoreState.value = hasPendingLogout() ? 'unavailable' : 'unauthorized'
+    }
+
+    subscribeAuthRuntime(handleRuntimeEvent)
+
     return {
         token,
         user,
         authError,
+        sessionRestoreState,
+        sessionRestoreMessage,
 
         isAuthenticated,
         role,
@@ -165,6 +278,8 @@ export const useAuthStore = defineStore('auth', () => {
         setAuthError,
         clearAuthError,
         handleAuthBizCode,
+        ensureSessionRestored,
+        retrySessionRestore,
         fetchCurrentUser,
     }
 })

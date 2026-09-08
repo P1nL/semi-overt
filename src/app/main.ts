@@ -50,11 +50,10 @@ const router = createAppRouter()
 app.use(pinia)
 app.use(MotionPlugin)
 setupQueryClient(app)
+setupApiSideEffects(router)
 app.use(router)
 
 useUiStore(pinia).initializeUiPreferences()
-
-setupApiSideEffects(router)
 
 app.mount('#app')
 registerAnimatedIconElement()

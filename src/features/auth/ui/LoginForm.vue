@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-import { AnimatedPersonCyclingIcon, Checkbox, GooeyActionButton, Input } from '@/shared/components/base'
+import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -29,13 +29,11 @@ const toast = useToast()
 const form = reactive<LoginFormValues>({
   account: '',
   password: '',
-  rememberMe: true,
 })
 
 const touched = reactive<Record<keyof LoginFormValues, boolean>>({
   account: false,
   password: false,
-  rememberMe: false,
 })
 
 const errors = reactive<AuthFieldErrors<LoginFormValues>>({})
@@ -102,9 +100,7 @@ async function handleSubmit() {
 
   try {
     const result = await authApi.login(mapLoginFormToDto(form))
-    authStore.setAuth(mapAuthRespToSession(result), {
-      persistence: form.rememberMe ? 'local' : 'session',
-    })
+    authStore.setAuth(mapAuthRespToSession(result))
 
     await finishLoadingAnimation
 
@@ -175,10 +171,9 @@ async function handleSubmit() {
     </FormField>
 
     <div class="flex items-center justify-between gap-3">
-      <label class="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-        <Checkbox v-model="form.rememberMe" />
-        <span>记住我</span>
-      </label>
+      <p class="text-xs leading-5 text-[var(--color-text-muted)]">
+        本设备登录状态空闲 30 天失效，绝对上限 90 天。
+      </p>
 
       <button
         type="button"

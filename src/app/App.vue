@@ -515,6 +515,10 @@ watch(
   { deep: true },
 )
 
+async function retryAuthRestore() {
+  await authStore.retrySessionRestore()
+}
+
 function handleAppreciationKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && uiStore.appreciationMode) uiStore.exitAppreciationMode()
 }
@@ -552,6 +556,29 @@ onBeforeUnmount(() => {
       <ClothBackground class="app-silk-background__canvas" />
       <div class="app-silk-background__overlay" />
     </div>
+
+    <Teleport to="body">
+    <div
+      v-if="authStore.sessionRestoreState === 'unavailable'"
+      class="fixed inset-x-0 top-3 z-[90] flex justify-center px-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="surface-1 flex max-w-xl items-center gap-3 rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--color-warning)_30%,var(--color-border))] px-4 py-3 text-sm shadow-[var(--shadow-md)]">
+        <span class="min-w-0 flex-1 text-[var(--color-text-muted)]">
+          {{ authStore.sessionRestoreMessage || '暂时无法恢复本设备登录状态，请检查网络后重试' }}
+        </span>
+        <button
+          type="button"
+          class="shrink-0 font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-strong)]"
+          @click="retryAuthRestore"
+        >
+          重试
+        </button>
+      </div>
+    </div>
+
+    </Teleport>
 
     <div
       class="app-interface relative z-10"

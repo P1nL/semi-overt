@@ -153,7 +153,9 @@ async function handleAuthGuard(
     to: RouteLocationNormalized,
     from: RouteLocationNormalized,
 ) {
-    const { authStore, isAuthenticated } = resolveAuthState()
+    const authStore = useAuthStore(pinia)
+    await authStore.ensureSessionRestored()
+    const { isAuthenticated } = resolveAuthState()
     let role = resolveAuthRole(authStore)
 
     if (to.meta.publicOnly && isAuthenticated) {
@@ -161,6 +163,11 @@ async function handleAuthGuard(
     }
 
     if (to.meta.requiresAuth && !isAuthenticated) {
+        if (authStore.sessionRestoreState === 'unavailable') {
+            persistAuthPromptDestination(to, from)
+            return true
+        }
+
         persistAuthPromptDestination(to, from)
         return {
             path: ROUTE_PATH.HOME,
@@ -170,6 +177,11 @@ async function handleAuthGuard(
 
     if (to.meta.roles?.length) {
         if (!isAuthenticated) {
+            if (authStore.sessionRestoreState === 'unavailable') {
+                persistAuthPromptDestination(to, from)
+                return true
+            }
+
             persistAuthPromptDestination(to, from)
             return {
                 path: ROUTE_PATH.HOME,

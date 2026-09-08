@@ -32,6 +32,7 @@ export interface RequestConfig {
     signal?: AbortSignal
     timeout?: number
     withAuth?: boolean
+    skipAuthRefresh?: boolean
     errorPolicy?: ApiErrorPolicy
     rawResponse?: boolean
 }

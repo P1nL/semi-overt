@@ -6,19 +6,33 @@ import type { ApiResponse, RequestConfig } from '../types/api'
 type RequestParams = object
 type RequestData = unknown
 const SKIP_AUTH_CONFIG_KEY = '__skipAuth'
+const SKIP_REFRESH_CONFIG_KEY = '__skipAuthRefresh'
+const ERROR_POLICY_CONFIG_KEY = '__errorPolicy'
 
-function mergeConfig(config?: RequestConfig): AxiosRequestConfig {
-    const axiosConfig: AxiosRequestConfig = {
+type InternalRequestConfig = AxiosRequestConfig & {
+    [SKIP_AUTH_CONFIG_KEY]?: boolean
+    [SKIP_REFRESH_CONFIG_KEY]?: boolean
+    [ERROR_POLICY_CONFIG_KEY]?: RequestConfig['errorPolicy']
+}
+
+function mergeConfig(config?: RequestConfig): InternalRequestConfig {
+    const axiosConfig: InternalRequestConfig = {
         signal: config?.signal,
         timeout: config?.timeout,
         headers: {
             ...(config?.headers ?? {}),
         },
+        [ERROR_POLICY_CONFIG_KEY]: config?.errorPolicy ?? 'auth',
     }
 
     if (config?.withAuth === false) {
         delete (axiosConfig.headers as Record<string, unknown>).Authorization
-        ;(axiosConfig as AxiosRequestConfig & { [SKIP_AUTH_CONFIG_KEY]?: boolean })[SKIP_AUTH_CONFIG_KEY] = true
+        axiosConfig[SKIP_AUTH_CONFIG_KEY] = true
+        axiosConfig[SKIP_REFRESH_CONFIG_KEY] = true
+    }
+
+    if (config?.skipAuthRefresh) {
+        axiosConfig[SKIP_REFRESH_CONFIG_KEY] = true
     }
 
     return axiosConfig

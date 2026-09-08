@@ -267,20 +267,28 @@ export function normalizeAuthResp(raw: BackendAuthResp): AuthRespDto {
     }
 }
 
-export function normalizeProfileDto(raw: BackendUserInfoResp): ProfileDto & {
+export function normalizeProfileDto(
+    raw: BackendUserInfoResp,
+    options: { includeEmail?: boolean } = {},
+): ProfileDto & {
     email?: string | null
     role?: string
 } {
-    return {
+    const profile: ProfileDto & { email?: string | null; role?: string } = {
         id: raw.userId ?? raw.id ?? 0,
         username: raw.username,
         nickname: raw.nickname ?? raw.username,
         role: raw.role ?? 'USER',
-        email: raw.email ?? null,
         avatarUrl: resolveAssetUrl(raw.avatarUrl),
         coverUrl: resolveAssetUrl(raw.coverUrl),
         signature: raw.signature ?? null,
     }
+
+    if (options.includeEmail !== false) {
+        profile.email = raw.email ?? null
+    }
+
+    return profile
 }
 
 export function normalizeArticleDetailDto(raw: BackendArticleDetailResp): ArticleDetailRespDto & { draftVisible: boolean } {
@@ -315,7 +323,7 @@ export function normalizeUserProfileResp(raw: BackendUserProfileResp): UserProfi
     const profile = raw.profile ?? raw.user
     const list = raw.list ?? raw.articles ?? []
     return {
-        profile: normalizeProfileDto(profile ?? { id: 0, username: 'user' }),
+        profile: normalizeProfileDto(profile ?? { id: 0, username: 'user' }, { includeEmail: false }),
         stats: {
             approved: raw.stats?.approved ?? 0,
             pending: raw.stats?.pending ?? 0,
