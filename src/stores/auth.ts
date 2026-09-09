@@ -249,7 +249,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         clearAuth({ skipRuntime: true })
-        sessionRestoreMessage.value = '服务器尚未确认退出；自动登录已暂停，请联网后重试退出'
+        if (event.type === 'logout-pending') {
+            sessionRestoreMessage.value = event.message
+            sessionRestoreState.value = 'unavailable'
+            return
+        }
+        sessionRestoreMessage.value = ''
         sessionRestoreState.value = hasPendingLogout() ? 'unavailable' : 'unauthorized'
     }
 

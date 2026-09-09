@@ -6,10 +6,12 @@ import type { ApiResponse, AuthRespDto } from '@/shared/types/api'
 import { clearLegacyAuthStorage } from '@/shared/utils/authStorage'
 
 const DEFAULT_TIMEOUT = 15_000
+const LOGOUT_TIMEOUT = 5_000
 const REFRESH_LOCK_NAME = 'semi-overt-auth-refresh'
 const REFRESH_COORDINATION_CHANNEL = 'now.auth.session.v1'
 const LOGOUT_MARKER_KEY = 'now.auth.logout.v1'
 const PENDING_LOGOUT_KEY = 'now.auth.pending-logout.v1'
+const LOGOUT_RETRY_DELAYS_MS = [250, 750] as const
 
 clearLegacyAuthStorage()
 
@@ -46,6 +48,7 @@ export class AuthRefreshError extends Error {
 export type AuthRuntimeEvent =
     | { type: 'refreshed'; session: AuthRespDto }
     | { type: 'remote-logout' }
+    | { type: 'logout-pending'; message: string }
 
 type AuthRuntimeMessage =
     | { type: 'logout'; sourceId: string; marker: string }
@@ -331,20 +334,104 @@ export function hasPendingLogout(): boolean {
     return Boolean(readCoordinationValue(PENDING_LOGOUT_KEY))
 }
 
+function waitForLogoutRetry(delayMs: number): Promise<void> {
+    return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs))
+}
+
+function isRetryableLogoutError(error: unknown): boolean {
+    if (error instanceof AuthRefreshError) {
+        return error.kind === 'transient'
+            && (error.status === undefined || error.status >= 500 || (error.code ?? 0) >= 500)
+    }
+    if (!axios.isAxiosError(error)) return false
+    const status = error.response?.status
+    return status === undefined || status >= 500
+}
+
+function toLogoutError(error: unknown): AuthRefreshError {
+    if (error instanceof AuthRefreshError) return error
+    if (axios.isAxiosError(error)) {
+        const status = error.response?.status
+        const payload = error.response?.data
+        if (!error.response) {
+            return new AuthRefreshError(
+                '退出结果暂时无法确认；可能是连接中断或超时。自动登录已暂停，请重试退出。',
+                { kind: 'transient', cause: error },
+            )
+        }
+        return new AuthRefreshError(
+            getResponseMessage(payload, status === 429
+                ? '退出请求过于频繁，请稍后重试。'
+                : status !== undefined && status >= 500
+                    ? '服务器暂时无法处理退出，请稍后重试。'
+                    : `退出请求失败（HTTP ${status ?? '未知'}），请重试。`),
+            {
+                kind: status !== undefined && status >= 500 ? 'transient' : 'permanent',
+                status,
+                code: payload && typeof payload === 'object' && 'code' in payload
+                    && typeof (payload as { code?: unknown }).code === 'number'
+                    ? (payload as { code: number }).code
+                    : status,
+                details: payload,
+                cause: error,
+            },
+        )
+    }
+    return new AuthRefreshError('退出过程中发生异常；自动登录已暂停，请重试退出。', {
+        kind: 'permanent',
+        cause: error,
+    })
+}
+
+async function requestLogout(): Promise<void> {
+    const response = await axios.post<ApiResponse<null>>(
+        `${ENV.apiBaseUrl || '/api/v1'}/auth/logout`, undefined, { timeout: LOGOUT_TIMEOUT, withCredentials: true },
+    )
+    if (response.data?.code !== 200) {
+        const code = typeof response.data?.code === 'number' ? response.data.code : response.status
+        throw new AuthRefreshError(
+            getResponseMessage(response.data, '服务器未确认退出，请重试。'),
+            {
+                kind: code >= 500 ? 'transient' : 'permanent',
+                status: response.status,
+                code,
+                details: response.data?.data,
+            },
+        )
+    }
+}
+
 /** The cookie mutation must run AFTER any already-running refresh response. */
 export async function flushPendingLogout(): Promise<void> {
     if (logoutPromise) return logoutPromise
     logoutPromise = withRefreshLock(async () => {
         if (!hasPendingLogout()) return
-        const response = await axios.post<ApiResponse<null>>(
-            `${ENV.apiBaseUrl || '/api/v1'}/auth/logout`, undefined, { timeout: DEFAULT_TIMEOUT, withCredentials: true },
-        )
-        if (response.data?.code !== 200) throw new Error('服务器尚未确认退出，请重试')
+        let lastError: unknown
+        for (let attempt = 0; attempt <= LOGOUT_RETRY_DELAYS_MS.length; attempt += 1) {
+            try {
+                await requestLogout()
+                lastError = undefined
+                break
+            } catch (error) {
+                lastError = error
+                if (!isRetryableLogoutError(error) || attempt >= LOGOUT_RETRY_DELAYS_MS.length) break
+                await waitForLogoutRetry(LOGOUT_RETRY_DELAYS_MS[attempt]!)
+            }
+        }
+        if (lastError !== undefined) throw lastError
+
         removeCoordinationValue(PENDING_LOGOUT_KEY)
+        if (hasPendingLogout()) {
+            throw new AuthRefreshError(
+                '服务器已完成退出，但浏览器无法清除本地退出标记。请允许网站存储后刷新页面。',
+                { kind: 'permanent', status: 200, code: 200 },
+            )
+        }
         emit({ type: 'remote-logout' })
-        if (hasPendingLogout()) throw new Error('无法保存退出确认，请检查浏览器存储设置')
     }).catch((error) => {
-        throw new AuthRefreshError('服务器尚未确认退出；自动登录已暂停，请联网后重试退出', { kind: 'transient', cause: error })
+        const failure = toLogoutError(error)
+        emit({ type: 'logout-pending', message: failure.message })
+        throw failure
     }).finally(() => { logoutPromise = null })
     return logoutPromise
 }
