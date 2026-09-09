@@ -176,7 +176,6 @@ async function handleSubmit() {
       <Checkbox
         v-model="form.rememberMe"
         label="记住我"
-        description="勾选后最长保持 90 天；不勾选则关闭浏览器后失效"
       />
 
       <button
