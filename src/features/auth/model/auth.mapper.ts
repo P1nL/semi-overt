@@ -11,6 +11,7 @@ export function mapLoginFormToDto(values: LoginFormValues) {
     return {
         account: values.account.trim(),
         password: values.password,
+        rememberMe: values.rememberMe,
     }
 }
 

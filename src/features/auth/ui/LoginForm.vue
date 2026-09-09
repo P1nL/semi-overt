@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
+import { AnimatedPersonCyclingIcon, Checkbox, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -29,11 +29,13 @@ const toast = useToast()
 const form = reactive<LoginFormValues>({
   account: '',
   password: '',
+  rememberMe: true,
 })
 
 const touched = reactive<Record<keyof LoginFormValues, boolean>>({
   account: false,
   password: false,
+  rememberMe: false,
 })
 
 const errors = reactive<AuthFieldErrors<LoginFormValues>>({})
@@ -171,9 +173,11 @@ async function handleSubmit() {
     </FormField>
 
     <div class="flex items-center justify-between gap-3">
-      <p class="text-xs leading-5 text-[var(--color-text-muted)]">
-        本设备登录状态空闲 30 天失效，绝对上限 90 天。
-      </p>
+      <Checkbox
+        v-model="form.rememberMe"
+        label="记住我"
+        description="勾选后最长保持 90 天；不勾选则关闭浏览器后失效"
+      />
 
       <button
         type="button"
