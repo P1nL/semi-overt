@@ -254,8 +254,11 @@ export const useAuthStore = defineStore('auth', () => {
             sessionRestoreState.value = 'unavailable'
             return
         }
+        // A deliberate local/remote logout is not an error. The pending marker
+        // only prevents a reload from restoring the session while confirmation
+        // is in flight; it must not display the failure banner by itself.
         sessionRestoreMessage.value = ''
-        sessionRestoreState.value = hasPendingLogout() ? 'unavailable' : 'unauthorized'
+        sessionRestoreState.value = 'unauthorized'
     }
 
     subscribeAuthRuntime(handleRuntimeEvent)

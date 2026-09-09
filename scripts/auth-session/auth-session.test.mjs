@@ -69,6 +69,8 @@ test('offline restore remains unavailable instead of becoming unauthorized', asy
   assert.match(guards, /return true/)
   assert.match(app, /暂时无法恢复本设备登录状态/)
   assert.match(app, /retryAuthRestore/)
+  assert.match(app, /actionLabel: '重试'/)
+  assert.doesNotMatch(app, /fixed inset-x-0 top-3/)
 })
 
 test('refresh updates auth state without clearing query/editor state', async () => {
@@ -99,4 +101,21 @@ test('public profile projection strips email while private profile remains expli
   assert.match(controller, /toPublicResponse\(user\)/)
   assert.match(publicResponse, /PublicUserProfileDto/)
   assert.doesNotMatch(publicResponse, /String email/)
+})
+
+test('logout failure reuses the global bottom-right toast with a retry action', async () => {
+  const app = await source('src/app/App.vue')
+  const header = await source('src/widgets/app-header/AppHeaderActions.vue')
+  const stack = await source('src/widgets/toast-stack/ToastStack.vue')
+  const store = await source('src/stores/auth.ts')
+
+  assert.match(app, /toast.error/)
+  assert.match(app, /duration: 0/)
+  assert.match(app, /actionLabel: '重试'/)
+  assert.match(stack, /position="bottom-right"/)
+  assert.match(stack, /@action="handleAction"/)
+  assert.ok(!header.includes('toast.error'))
+  assert.ok(!app.includes('服务器尚未确认退出'))
+  assert.match(store, /event.type === 'logout-pending'/)
+  assert.match(store, /sessionRestoreMessage.value = event.message/)
 })

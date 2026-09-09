@@ -31,6 +31,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update:toasts', value: ToastItem[]): void
   (e: 'remove', id: string | number): void
+  (e: 'action', id: string | number): void
 }>()
 
 const internalToasts = ref<ToastItem[]>([])
@@ -227,11 +228,12 @@ defineExpose({
             </p>
 
             <button
-                v-if="$slots.action"
+                v-if="toast.actionText || $slots.action"
                 type="button"
-                class="mt-2 text-sm font-medium text-[var(--color-primary)]"
+                class="mt-2 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-strong)]"
+                @click="emit('action', toast.id)"
             >
-              <slot name="action" :toast="toast" />
+              <slot name="action" :toast="toast">{{ toast.actionText }}</slot>
             </button>
           </div>
 

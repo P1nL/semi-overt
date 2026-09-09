@@ -20,6 +20,14 @@ if (import.meta.env.DEV) {
   })
 }
 
+function handleAction(id: string | number) {
+  const item = toast.toasts.value.find(candidate => candidate.id === Number(id))
+  if (!item?.onAction) return
+
+  toast.remove(item.id)
+  void Promise.resolve(item.onAction()).catch(() => undefined)
+}
+
 const hostToasts = computed(() =>
     toast.toasts.value.map((item): ToastItem => {
       let variant: ToastItem['variant'] = 'info'
@@ -33,6 +41,7 @@ const hostToasts = computed(() =>
         title: item.title,
         description: item.message,
         duration: item.duration,
+        actionText: item.actionLabel,
         variant,
         closable: true,
       }
@@ -46,5 +55,6 @@ const hostToasts = computed(() =>
       position="bottom-right"
       :max="3"
       @remove="toast.remove(Number($event))"
+      @action="handleAction"
   />
 </template>

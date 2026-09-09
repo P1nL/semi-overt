@@ -7,12 +7,16 @@ export interface ToastItem {
     title?: string
     message: string
     duration: number
+    actionLabel?: string
+    onAction?: () => void | Promise<void>
     createdAt: number
 }
 
 export interface ShowToastOptions {
     title?: string
     duration?: number
+    actionLabel?: string
+    onAction?: () => void | Promise<void>
 }
 
 let toastSeed = 0
@@ -38,6 +42,8 @@ export function useToast() {
             title: options.title,
             message,
             duration,
+            actionLabel: options.actionLabel,
+            onAction: options.onAction,
             createdAt: Date.now(),
         }
 

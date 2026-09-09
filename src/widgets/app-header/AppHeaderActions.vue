@@ -24,10 +24,8 @@ import { queryKeys } from '@/shared/api/queryKeys'
 import { AnimatedPersonExitIcon, Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
-import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { UI_TIMING } from '@/shared/constants/ui'
-import { getErrorMessage } from '@/shared/utils/error'
 import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -43,7 +41,6 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
 const route = useRoute()
-const toast = useToast()
 const queryClient = useQueryClient()
 
 const authDialogOpen = ref(false)
@@ -474,8 +471,9 @@ async function handleLogout() {
   try {
     beginLogout()
     await authApi.logout()
-  } catch (error) {
-    toast.error(getErrorMessage(error, '服务器尚未确认退出，请联网后重试。'))
+  } catch {
+    // authStore receives the runtime failure event; App.vue reuses the global
+    // bottom-right Toast stack so this action does not create a duplicate.
   } finally {
     authStore.clearAuth({ skipRuntime: true })
     userMenuOpen.value = false

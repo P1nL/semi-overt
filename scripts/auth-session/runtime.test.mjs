@@ -92,3 +92,13 @@ test('logout automatically retries transient response loss but not deterministic
  await assert.rejects(rejected.api.logoutDevice(),e=>e.kind==='permanent'&&e.status===400&&e.message==='退出参数无效')
  assert.equal(clientCalls,1); assert.ok(store2.getItem(pending))
 })
+
+test('successful deliberate logout is not presented as a pending failure', async()=>{
+ const store=storage(), lock=locks(); const runtimeEvents=[]
+ const active=await runtime(store,lock,async()=>({data:{code:200}}))
+ active.api.subscribe(event=>runtimeEvents.push(event))
+ await active.api.logoutDevice()
+ assert.equal(store.getItem(pending),null)
+ assert.deepEqual(runtimeEvents.map(event=>event.type),['remote-logout','remote-logout'])
+ assert.ok(runtimeEvents.every(event=>event.type!=='logout-pending'))
+})
