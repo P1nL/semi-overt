@@ -83,13 +83,13 @@ test('refresh updates auth state without clearing query/editor state', async () 
   assert.match(store, /function clearAuth\(/)
 })
 
-test('login UI no longer implies local bearer persistence', async () => {
+test('remember-me chooses cookie persistence without local bearer storage', async () => {
   const login = await source('src/features/auth/ui/LoginForm.vue')
   const mapper = await source('src/features/auth/model/auth.mapper.ts')
 
-  assert.doesNotMatch(login, /rememberMe|Checkbox/)
-  assert.match(login, /空闲 30 天失效，绝对上限 90 天/)
-  assert.doesNotMatch(mapper, /rememberMe/)
+  assert.match(login, /v-model="form\.rememberMe"/)
+  assert.match(login, /label="记住我"/)
+  assert.match(mapper, /rememberMe: values\.rememberMe/)
 })
 
 test('public profile projection strips email while private profile remains explicit', async () => {
