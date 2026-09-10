@@ -21,7 +21,7 @@ import { beginLogout } from '@/shared/api/authRuntime'
 import { reviewApi } from '@/shared/api/modules/review'
 import { userApi } from '@/shared/api/modules/user'
 import { queryKeys } from '@/shared/api/queryKeys'
-import { AnimatedPersonExitIcon, Avatar } from '@/shared/components/base'
+import { Avatar } from '@/shared/components/base'
 import AnimatedAttributionIcon from '@/shared/components/base/AnimatedAttributionIcon.vue'
 import AnimatedDraftBoxIcon from '@/shared/components/base/AnimatedDraftBoxIcon.vue'
 import { ROUTE_NAME } from '@/shared/constants/routes'
@@ -57,9 +57,29 @@ const themeEntryRef = ref<HTMLElement | null>(null)
 const draftEntryRef = ref<HTMLElement | null>(null)
 const draftMenuRef = ref<HTMLElement | null>(null)
 const userTriggerRef = ref<HTMLButtonElement | null>(null)
+const authTriggerRef = ref<HTMLButtonElement | null>(null)
+const logoutCoinRef = ref<HTMLElement | null>(null)
+const authLoginIconFrameRef = ref<HTMLElement | null>(null)
+const authLoginIconRef = ref<InstanceType<typeof AnimatedAttributionIcon> | null>(null)
 const userMenuRef = ref<HTMLElement | null>(null)
 const userMenuItemRefs = ref<HTMLButtonElement[]>([])
 const loggingOut = ref(false)
+const logoutHolding = ref(false)
+const logoutFlipping = ref(false)
+const suppressProfileClick = ref(false)
+const postLogoutIconExpanded = ref(false)
+const logoutProgressStrokeRef = ref<SVGCircleElement | null>(null)
+const LOGOUT_ACTIVATION_MS = 280
+const LOGOUT_PROGRESS_MS = 900
+const LOGOUT_FLIP_MS = 560
+let logoutHoldTimer: number | null = null
+let logoutFlipTimer: number | null = null
+let logoutProgressAnimation: Animation | null = null
+let logoutProgressRun = 0
+let removePostLogoutPointerMove: (() => void) | null = null
+let postLogoutSizeFrame = 0
+let heldLoginVisualSize = 40
+let postLogoutHoverBounds: DOMRect | null = null
 const showThemeMenuItem = useMediaQuery('(max-width: 767px)')
 
 const draftMenuId = 'header-draft-box'
@@ -308,8 +328,159 @@ async function openDraftEditor(item: { id: number }) {
 }
 
 async function gotoProfile() {
+  if (suppressProfileClick.value || logoutHolding.value || logoutFlipping.value || loggingOut.value) return
   closeUserMenu()
   await router.push(profileRoute.value)
+}
+
+function resetLogoutProgress() {
+  logoutProgressRun += 1
+  logoutProgressAnimation?.cancel()
+  logoutProgressAnimation = null
+  logoutHolding.value = false
+  window.setTimeout(() => { suppressProfileClick.value = false }, 0)
+}
+
+function clearLogoutTimers() {
+  if (logoutHoldTimer !== null) { window.clearTimeout(logoutHoldTimer); logoutHoldTimer = null }
+  if (logoutFlipTimer !== null) { window.clearTimeout(logoutFlipTimer); logoutFlipTimer = null }
+  logoutProgressAnimation?.cancel()
+  logoutProgressAnimation = null
+}
+
+function cancelLogoutHold() {
+  if (logoutFlipping.value || loggingOut.value) return
+  if (logoutHoldTimer !== null) {
+    window.clearTimeout(logoutHoldTimer)
+    logoutHoldTimer = null
+  }
+  if (!logoutProgressAnimation) return
+  const animation = logoutProgressAnimation
+  const run = ++logoutProgressRun
+  animation.reverse()
+  void animation.finished.then(() => {
+    if (run !== logoutProgressRun || logoutProgressAnimation !== animation) return
+    resetLogoutProgress()
+  }).catch(() => undefined)
+}
+
+async function activateLogoutProgress() {
+  logoutHoldTimer = null
+  logoutHolding.value = true
+  suppressProfileClick.value = true
+  await nextTick()
+  const stroke = logoutProgressStrokeRef.value
+  if (!stroke) { resetLogoutProgress(); return }
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const animation = stroke.animate(
+    [{ strokeDashoffset: '135.1' }, { strokeDashoffset: '0' }],
+    { duration: reducedMotion ? 1 : LOGOUT_PROGRESS_MS, easing: 'linear', fill: 'forwards' },
+  )
+  logoutProgressAnimation = animation
+  const run = ++logoutProgressRun
+  void animation.finished.then(() => {
+    if (run !== logoutProgressRun || logoutProgressAnimation !== animation || animation.playbackRate < 0) return
+    animation.cancel()
+    logoutProgressAnimation = null
+    logoutHolding.value = false
+    void playLogoutSequence()
+  }).catch(() => undefined)
+}
+
+function startLogoutHold(event: PointerEvent | KeyboardEvent) {
+  if (loggingOut.value || logoutFlipping.value || logoutHoldTimer !== null || logoutProgressAnimation) return
+  if (event instanceof PointerEvent && event.button !== 0) return
+  if (event instanceof KeyboardEvent && (!['Enter', ' '].includes(event.key) || event.repeat)) return
+  if (event instanceof KeyboardEvent) event.preventDefault()
+  logoutHoldTimer = window.setTimeout(() => { void activateLogoutProgress() }, LOGOUT_ACTIVATION_MS)
+}
+
+function finishLogoutKeyHold(event: KeyboardEvent) {
+  if (!['Enter', ' '].includes(event.key)) return
+  if (logoutFlipping.value || loggingOut.value) { event.preventDefault(); return }
+  cancelLogoutHold()
+}
+
+async function playLogoutSequence() {
+  if (logoutFlipping.value || loggingOut.value) return
+  // Capture the unrotated, magnified avatar before the flip or draft reflow.
+  heldLoginVisualSize = logoutCoinRef.value?.getBoundingClientRect().width || 40
+  postLogoutHoverBounds = userTriggerRef.value?.getBoundingClientRect() ?? null
+  logoutFlipping.value = true
+  postLogoutIconExpanded.value = true
+  maintainPostLogoutIconVisualSize()
+  userMenuOpen.value = false
+  logoutFlipTimer = window.setTimeout(async () => {
+    logoutFlipTimer = null
+    // The pointer is stationary during the flip, so no native mouseenter is
+    // guaranteed. Animate the existing player without replacing or resetting it.
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      authLoginIconRef.value?.playHoverAnimation()
+    }
+    await handleLogout()
+    logoutFlipping.value = false
+    await nextTick()
+    maintainPostLogoutIconVisualSize()
+    armPostLogoutIconRelease()
+    window.setTimeout(() => { suppressProfileClick.value = false }, 0)
+  }, LOGOUT_FLIP_MS)
+}
+
+
+function stopMaintainingPostLogoutIconSize() {
+  if (postLogoutSizeFrame) {
+    window.cancelAnimationFrame(postLogoutSizeFrame)
+    postLogoutSizeFrame = 0
+  }
+}
+
+function maintainPostLogoutIconVisualSize() {
+  stopMaintainingPostLogoutIconSize()
+  const update = () => {
+    const frame = authLoginIconFrameRef.value
+    const dock = frame?.closest<HTMLElement>('[data-header-dock-button]')
+    if (!frame || !dock || !postLogoutIconExpanded.value) return
+    const transform = getComputedStyle(dock).transform
+    const scale = transform === 'none' ? 1 : new DOMMatrixReadOnly(transform).a || 1
+    const compensatedSize = heldLoginVisualSize / scale
+    frame.style.width = compensatedSize + 'px'
+    frame.style.height = compensatedSize + 'px'
+    postLogoutSizeFrame = window.requestAnimationFrame(update)
+  }
+  update()
+}
+
+function releasePostLogoutIcon() {
+  const frame = authLoginIconFrameRef.value
+  stopMaintainingPostLogoutIconSize()
+  postLogoutIconExpanded.value = false
+  postLogoutHoverBounds = null
+  removePostLogoutPointerMove?.()
+  removePostLogoutPointerMove = null
+  if (frame) {
+    window.requestAnimationFrame(() => {
+      frame.style.removeProperty('width')
+      frame.style.removeProperty('height')
+    })
+  }
+}
+
+function armPostLogoutIconRelease() {
+  removePostLogoutPointerMove?.()
+  const onPointerMove = (event: PointerEvent) => {
+    if (event.pointerType !== 'mouse') return
+    // Removing drafts can move the target underneath a stationary pointer.
+    // Keep the original hover footprint valid until the user leaves it too.
+    const bounds = postLogoutHoverBounds
+    if (bounds && event.clientX >= bounds.left && event.clientX <= bounds.right
+      && event.clientY >= bounds.top && event.clientY <= bounds.bottom) return
+    const trigger = authTriggerRef.value
+    const hoveredElement = document.elementFromPoint(event.clientX, event.clientY)
+    if (trigger && hoveredElement && trigger.contains(hoveredElement)) return
+    releasePostLogoutIcon()
+  }
+  window.addEventListener('pointermove', onPointerMove, { passive: true })
+  removePostLogoutPointerMove = () => window.removeEventListener('pointermove', onPointerMove)
 }
 
 function toggleThemeMode() {
@@ -461,6 +632,9 @@ watch(
 onBeforeUnmount(() => {
   stopAppreciationMoveSubscription()
   clearScheduledWarmUserSurfaces()
+  clearLogoutTimers()
+  removePostLogoutPointerMove?.()
+  stopMaintainingPostLogoutIconSize()
 })
 
 async function handleLogout() {
@@ -493,7 +667,7 @@ async function handleLogout() {
         data-header-dock-button
         :show-label="false"
         :appreciation-enabled="appreciationEnabled"
-        class="header-theme-switch hidden md:inline-flex"
+        class="header-theme-switch inline-flex"
       />
     </div>
 
@@ -536,98 +710,74 @@ async function handleLogout() {
     </Transition>
 
     <div class="header-auth-identity-slot" data-header-dock-item="identity" :aria-hidden="uiStore.appreciationMode ? 'true' : undefined">
-      <Transition
-        name="header-auth-identity"
-        mode="out-in"
-        :appear="authStore.isAuthenticated"
-      >
+      <div class="header-auth-identity-dock" data-header-dock-button>
         <div
-          v-if="showAuthenticatedActions"
-          key="authenticated"
+          v-show="showAuthenticatedActions"
           ref="userMenuRef"
-          class="relative"
+          class="relative flex items-center justify-center"
         >
         <button
           ref="userTriggerRef"
-          data-header-dock-button
+
           type="button"
-          class="user-trigger"
-          :aria-expanded="userMenuOpen"
-          :aria-controls="userMenuId"
-          aria-haspopup="menu"
-          aria-label="打开用户菜单"
-          @click="toggleUserMenu"
-          @keydown="onUserTriggerKeydown"
+          class="user-trigger user-profile-trigger"
+          :class="{
+            'user-profile-trigger--holding': logoutHolding,
+            'user-profile-trigger--flipping': logoutFlipping,
+          }"
+          aria-label="进入个人页；长按退出登录"
+          title="点击进入个人页，长按退出登录"
+          :disabled="loggingOut"
+          @click="gotoProfile"
+          @pointerdown="startLogoutHold"
+          @pointerup="cancelLogoutHold"
+          @pointercancel="cancelLogoutHold"
+          @pointerleave="cancelLogoutHold"
+          @contextmenu.prevent
+          @keydown="startLogoutHold"
+          @keyup="finishLogoutKeyHold"
+          @blur="cancelLogoutHold"
         >
-          <Avatar
-            :src="authStore.user?.avatar || undefined"
-            :name="userLabel"
-            :fallback="avatarFallback"
-            size="md"
-            loading="eager"
-            fetchpriority="high"
-            class="user-avatar"
-          />
+          <span ref="logoutCoinRef" class="logout-coin">
+            <span class="logout-coin__face logout-coin__front">
+              <Avatar
+                :src="authStore.user?.avatar || undefined"
+                :name="userLabel"
+                :fallback="avatarFallback"
+                size="md"
+                loading="eager"
+                fetchpriority="high"
+                class="user-avatar"
+              />
+            </span>
+          </span>
+          <svg class="logout-progress" viewBox="0 0 48 48" aria-hidden="true">
+            <circle ref="logoutProgressStrokeRef" class="logout-progress__stroke" cx="24" cy="24" r="21.5" />
+          </svg>
         </button>
-
-        <LiquidPanelTransition name="header-user-panel">
-          <div
-            v-if="userMenuOpen"
-            :id="userMenuId"
-            class="header-menu-panel surface-1 absolute right-0 top-[calc(100%+0.75rem)] z-50 min-w-44 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:w-[min(18rem,calc(100vw-1.5rem))]"
-            role="menu"
-            aria-label="用户菜单"
-            @keydown="onUserMenuKeydown"
-          >
-            <button
-              v-if="showThemeMenuItem"
-              :ref="(element) => setUserMenuItemRef(element, 0)"
-              type="button"
-              class="menu-item"
-              role="menuitem"
-              @click="toggleThemeMode"
-            >
-              {{ themeMenuLabel }}
-            </button>
-
-            <button
-              :ref="(element) => setUserMenuItemRef(element, 1)"
-              type="button"
-              class="menu-item"
-              role="menuitem"
-              @click="gotoProfile"
-            >
-              {{ userLabel }}
-            </button>
-
-            <button
-              :ref="(element) => setUserMenuItemRef(element, 2)"
-              type="button"
-              class="menu-item menu-item-danger"
-              role="menuitem"
-              :aria-label="loggingOut ? '退出中' : '退出登录'"
-              :title="loggingOut ? '退出中' : '退出登录'"
-              :disabled="loggingOut"
-              @click="handleLogout"
-            >
-              <AnimatedPersonExitIcon size="1.35rem" :decorative="true" />
-            </button>
-          </div>
-        </LiquidPanelTransition>
         </div>
 
         <button
-          v-else
-          key="anonymous"
-          data-header-dock-button
+          ref="authTriggerRef"
           type="button"
           class="tool-icon-button auth-trigger-button"
+          :class="{
+            'auth-trigger-button--avatar-sized': postLogoutIconExpanded,
+            'auth-trigger-button--concealed': showAuthenticatedActions && !logoutFlipping,
+            'auth-trigger-button--flipping': logoutFlipping,
+          }"
+          :aria-hidden="showAuthenticatedActions ? 'true' : undefined"
+          :tabindex="showAuthenticatedActions ? -1 : undefined"
+          :disabled="showAuthenticatedActions"
           aria-label="登录 / 注册"
           @click="authDialogOpen = true"
         >
-          <AnimatedAttributionIcon :size="28" title="登录 / 注册" :decorative="false" />
+          <span ref="authLoginIconFrameRef" class="auth-login-icon-frame">
+            <AnimatedAttributionIcon ref="authLoginIconRef" size="100%" title="登录 / 注册" :decorative="false" trigger="hover" />
+          </span>
         </button>
-      </Transition>
+
+      </div>
     </div>
 
     <AuthDialog v-model="authDialogOpen" initial-mode="login" />
@@ -746,6 +896,17 @@ async function handleLogout() {
   transform: translateX(0.35rem) scale(0.94);
 }
 
+.header-auth-identity-dock {
+  position: relative;
+  perspective: 420px;
+  display: flex;
+  width: 2.85rem;
+  height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+}
+
 .header-auth-identity-slot {
   display: flex;
   width: var(--header-dock-width, 2.85rem);
@@ -817,12 +978,53 @@ async function handleLogout() {
 }
 
 .auth-trigger-button {
+  position: absolute;
+  inset: 0;
   min-height: 2.85rem;
   min-width: 2.85rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: rotateY(0deg);
+}
+
+/* One persistent player is both the flip's reverse face and the login action. */
+.auth-trigger-button--concealed {
+  visibility: hidden;
+  pointer-events: none;
+  transform: rotateY(-180deg);
+}
+
+.auth-trigger-button--flipping {
+  pointer-events: none;
+  transition: transform 560ms cubic-bezier(0.2, 0.86, 0.28, 1);
+}
+
+.auth-trigger-button--avatar-sized {
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-trigger-button--flipping { transition: none; }
 }
 
 .auth-trigger-button:hover {
   background: transparent;
+}
+
+.auth-login-icon-frame {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  transition:
+    width 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auth-trigger-button--avatar-sized .auth-login-icon-frame {
+  width: 2.5rem;
+  height: 2.5rem;
+  transition: none;
 }
 
 .tool-icon-button:active,
@@ -833,6 +1035,71 @@ async function handleLogout() {
 
 .user-avatar:deep(*) {
   border: 0;
+}
+
+.user-profile-trigger {
+  position: relative;
+  perspective: 420px;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.logout-coin {
+  position: relative;
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  transform-style: preserve-3d;
+  transition: transform 560ms cubic-bezier(0.2, 0.86, 0.28, 1);
+}
+
+.user-profile-trigger--flipping .logout-coin {
+  transform: rotateY(180deg);
+}
+
+.logout-coin__face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.logout-progress {
+  position: absolute;
+  inset: -0.075rem;
+  width: calc(100% + 0.15rem);
+  height: calc(100% + 0.15rem);
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+
+.logout-progress circle {
+  fill: none;
+  stroke-width: 2;
+}
+
+.logout-progress__stroke {
+  stroke: var(--color-danger);
+  stroke-linecap: round;
+  stroke-dasharray: 135.1;
+  stroke-dashoffset: 135.1;
+}
+
+.user-profile-trigger--holding .logout-progress__stroke {
+  animation: logout-progress 1100ms linear forwards;
+}
+
+.user-profile-trigger--flipping .logout-progress {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+@keyframes logout-progress {
+  to { stroke-dashoffset: 0; }
 }
 
 .menu-item {
@@ -890,7 +1157,7 @@ async function handleLogout() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .header-draft-state-enter-active,
+  .logout-coin { transition: none; }\n  .user-profile-trigger--holding .logout-progress__stroke { animation: none; stroke-dashoffset: 0; }\n\n  .header-draft-state-enter-active,
   .header-draft-state-leave-active,
   .header-auth-identity-enter-active,
   .header-auth-identity-leave-active,

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import type { Element as LordIconElement } from '@lordicon/element'
 import attributionAnimationUrl from '@/shared/assets/lottie/login-attribution.json?url'
 
 withDefaults(
@@ -6,13 +8,33 @@ withDefaults(
     size?: number | string
     decorative?: boolean
     title?: string
+    trigger?: 'hover' | 'in' | 'loop'
   }>(),
   {
     size: 24,
     decorative: true,
     title: '',
+    trigger: 'hover',
   },
 )
+const playerRef = ref<LordIconElement | null>(null)
+let playWhenReady = false
+
+function playHoverAnimation() {
+  const player = playerRef.value?.playerInstance
+  if (!player?.isReady) {
+    playWhenReady = true
+    return
+  }
+  playWhenReady = false
+  if (!player.isPlaying) player.playFromBeginning()
+}
+
+function onPlayerReady() {
+  if (playWhenReady) playHoverAnimation()
+}
+
+defineExpose({ playHoverAnimation })
 </script>
 
 <template>
@@ -26,9 +48,11 @@ withDefaults(
     :role="decorative ? undefined : 'img'"
   >
     <lord-icon
+      ref="playerRef"
+      @ready="onPlayerReady"
       class="animated-attribution-icon__player current-color"
       :src="attributionAnimationUrl"
-      trigger="hover"
+      :trigger="trigger"
       state="hover-attribution"
       :title="!decorative && title ? title : undefined"
     />
