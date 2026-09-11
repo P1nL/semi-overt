@@ -15,9 +15,8 @@ import { calcReadMinutes, resolveDurationCategory } from '@/shared/utils/article
 
 const DRAFT_STATUS_PRIORITY: Record<string, number> = {
     [ARTICLE_STATUS.DRAFT]: 1,
-    [ARTICLE_STATUS.REJECTED]: 2,
-    [ARTICLE_STATUS.RETURNED]: 3,
-    [ARTICLE_STATUS.PENDING]: 4,
+    [ARTICLE_STATUS.RETURNED]: 2,
+    [ARTICLE_STATUS.PENDING]: 3,
 }
 
 function toSortTimestamp(value?: string | null): number {
@@ -67,6 +66,8 @@ function dedupeDraftCards(nextItems: ArticleCardVm[]): ArticleCardVm[] {
     const itemById = new Map<number, ArticleCardVm>()
 
     for (const item of nextItems) {
+        if (getDraftCardStatusPriority(item) === 0) continue
+
         const current = itemById.get(item.id)
         if (!current || shouldUseNextDraftCard(current, item)) {
             itemById.set(item.id, item)
@@ -93,6 +94,8 @@ function dedupeDraftDtos(drafts: DraftItemRespDto[]): DraftItemRespDto[] {
     const draftById = new Map<number, DraftItemRespDto>()
 
     for (const draft of drafts) {
+        if (getDraftStatusPriority(draft.status) === 0) continue
+
         const current = draftById.get(draft.id)
         if (!current || shouldUseNextDraftDto(current, draft)) {
             draftById.set(draft.id, draft)

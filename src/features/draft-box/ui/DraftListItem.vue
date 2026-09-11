@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const hasReviewFeedback = computed(() => {
   const status = props.item.status.value
-  return status === ARTICLE_STATUS.RETURNED || status === ARTICLE_STATUS.REJECTED
+  return status === ARTICLE_STATUS.RETURNED
 })
 const canDelete = computed(() => props.item.canDelete)
 const titleText = computed(() => props.item.title?.trim() || '未命名文章')

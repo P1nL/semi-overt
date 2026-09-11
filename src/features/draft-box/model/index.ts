@@ -22,9 +22,8 @@ function toSortTimestamp(value?: string | null): number {
 
 const DRAFT_STATUS_PRIORITY: Record<string, number> = {
   [ARTICLE_STATUS.DRAFT]: 1,
-  [ARTICLE_STATUS.REJECTED]: 2,
-  [ARTICLE_STATUS.RETURNED]: 3,
-  [ARTICLE_STATUS.PENDING]: 4,
+  [ARTICLE_STATUS.RETURNED]: 2,
+  [ARTICLE_STATUS.PENDING]: 3,
 }
 
 function getDraftStatusPriority(status?: string | null): number {
@@ -46,6 +45,8 @@ function dedupeDraftBoxItems(items: DraftBoxItem[]): DraftBoxItem[] {
   const itemById = new Map<number, DraftBoxItem>()
 
   for (const item of items) {
+    if (getDraftStatusPriority(item.status.value) === 0) continue
+
     const current = itemById.get(item.id)
     if (!current || shouldUseNextDraftItem(current, item)) {
       itemById.set(item.id, item)

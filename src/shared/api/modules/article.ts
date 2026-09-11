@@ -24,7 +24,6 @@ const DRAFT_BOX_STATUSES = new Set<string>([
     ARTICLE_STATUS.DRAFT,
     ARTICLE_STATUS.PENDING,
     ARTICLE_STATUS.RETURNED,
-    ARTICLE_STATUS.REJECTED,
 ])
 
 function isDraftBoxStatus(status?: string | null): boolean {
