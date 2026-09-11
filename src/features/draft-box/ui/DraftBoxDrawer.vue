@@ -72,6 +72,22 @@ function mapCachedDraftToItem(item: ArticleCardVm): DraftBoxItem {
   }
 }
 
+function syncCachedDraftDetails(drafts: DraftBoxItem[]) {
+  for (const item of drafts) {
+    const cached = editorStore.getCachedArticleDetail(item.id)
+    if (!cached) continue
+
+    const statusChanged = cached.status.value !== item.status.value
+    const reasonChanged = cached.latestReviewReason !== item.latestReason
+    if (!statusChanged && !reasonChanged) continue
+
+    editorStore.patchCachedArticleDetail(item.id, {
+      status: item.status,
+      latestReviewReason: item.latestReason,
+    })
+  }
+}
+
 function syncItemsFromDraftStore() {
   if (!draftStore.initialized) {
     if (draftStore.items.length === 0) {
@@ -81,6 +97,7 @@ function syncItemsFromDraftStore() {
   }
 
   items.value = draftStore.items.map(mapCachedDraftToItem)
+  syncCachedDraftDetails(items.value)
   prefetchRecentDraftDetails(items.value)
 }
 
@@ -131,6 +148,7 @@ async function loadDrafts(options: { background?: boolean } = {}) {
     const result = await loadDraftBoxItems(username)
     items.value = result.items
     pendingWarning.value = result.pendingWarning
+    syncCachedDraftDetails(result.items)
     syncDraftStore(draftStore, result.items)
     draftStore.initialized = true
     prefetchRecentDraftDetails(result.items)
