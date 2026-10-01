@@ -94,8 +94,8 @@ test('remember-me chooses cookie persistence without local bearer storage', asyn
 
 test('public profile projection strips email while private profile remains explicit', async () => {
   const adapters = await source('src/shared/api/adapters.ts')
-  const controller = await source('../semi-overt-springboot/src/main/java/com/platform/semiovert/auth/api/user/UserProfileController.java')
-  const publicResponse = await source('../semi-overt-springboot/src/main/java/com/platform/semiovert/auth/api/user/PublicUserProfileResponse.java')
+  const controller = await source('../semi-overt-backend/src/main/java/com/platform/semiovert/auth/api/user/UserProfileController.java')
+  const publicResponse = await source('../semi-overt-backend/src/main/java/com/platform/semiovert/auth/api/user/PublicUserProfileResponse.java')
 
   assert.match(adapters, /includeEmail: false/)
   assert.match(controller, /toPublicResponse\(user\)/)

@@ -185,6 +185,11 @@ function shouldUseNativeNavigation(event: MouseEvent) {
 }
 
 async function onItemClick(event: MouseEvent, item: ArticleCardVm) {
+  // 临时预览卡片保留悬停效果，不请求不存在的文章详情。
+  if (import.meta.env.DEV && item.id < 0) {
+    event.preventDefault()
+    return
+  }
   if (shouldUseNativeNavigation(event)) return
   if (!isDesktopRail.value || hoveredIndex.value === null) return
 

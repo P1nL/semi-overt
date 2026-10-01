@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
-import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { onClickOutside } from '@vueuse/core'
+import { onClickOutside, useMediaQuery } from '@vueuse/core'
+import { useMagneticButton } from '@/shared/composables/useMagneticButton'
 
 import { mapCategoryValueToVm } from '@/entities/category'
 import { CATEGORY_ORDER } from '@/entities/category'
 import CategoryFolderIcon from '@/shared/components/base/CategoryFolderIcon.vue'
-import Icon from '@/shared/components/base/Icon.vue'
 
 const props = withDefaults(
     defineProps<{
@@ -18,17 +17,32 @@ const props = withDefaults(
     },
 )
 
+const emit = defineEmits<{ 'magnetic-move': [offset: { x: number; y: number }] }>()
 const route = useRoute()
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
+const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
+const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+const magneticEnabled = computed(() => finePointer.value && !reducedMotion.value)
+const { offset: magneticOffset, deformation, style: magneticStyle, surfaceStyle, onPointerMove: onMagneticPointerMove, returnToRest: returnMagneticToRest } = useMagneticButton(
+  rootRef, magneticEnabled, offset => emit('magnetic-move', offset),
+)
+const magneticBackgroundTransform = computed(() => {
+  const { a, b, c, d } = deformation.value
+  return `matrix(${a} ${b} ${c} ${d} ${magneticOffset.value.x} ${magneticOffset.value.y})`
+})
 const open = ref(false)
 const triggerHovered = ref(false)
 const triggerFocused = ref(false)
 const itemRefs = ref<HTMLAnchorElement[]>([])
-const panelId = 'header-category-menu'
-const HOVER_CLOSE_DELAY_MS = 140
-let hoverCloseTimer: number | null = null
-
+const instanceId = useId().replace(/:/g, '-')
+const panelId = 'header-category-menu-' + instanceId
+const gooFilterId = 'category-goo-' + instanceId
+const nodePositions = [{ x: -54, y: 66 }, { x: 0, y: 92 }, { x: 54, y: 66 }]
+function nodeStyle(index: number) {
+  const point = nodePositions[index % nodePositions.length]!
+  return { '--node-x': point.x + 'px', '--node-y': point.y + 'px', '--node-delay': index * 35 + 'ms' }
+}
 const currentCategory = computed(() => {
   if (props.activeCategory) return props.activeCategory
   if (route.name === 'category') return String(route.params.tab || '')
@@ -51,41 +65,7 @@ function getTimerIconVariant(category: string | null | undefined): 'quick' | 'sh
   }
 }
 
-function supportsHoverMenu() {
-  return window.matchMedia('(hover: hover) and (pointer: fine)').matches
-}
-
-function cancelHoverClose() {
-  if (hoverCloseTimer === null) return
-  window.clearTimeout(hoverCloseTimer)
-  hoverCloseTimer = null
-}
-
-function openMenuFromHover() {
-  if (!supportsHoverMenu()) return
-  cancelHoverClose()
-  open.value = true
-}
-
-function scheduleMenuCloseFromHover() {
-  if (!supportsHoverMenu()) return
-  cancelHoverClose()
-  hoverCloseTimer = window.setTimeout(() => {
-    hoverCloseTimer = null
-    closeMenu()
-  }, HOVER_CLOSE_DELAY_MS)
-}
-
 function toggleMenu() {
-  cancelHoverClose()
-
-  // Hover-capable devices have already opened the panel on pointer entry.
-  // Keep click as an explicit open action there, while touch devices retain toggle behavior.
-  if (supportsHoverMenu()) {
-    open.value = true
-    return
-  }
-
   open.value = !open.value
 }
 
@@ -114,7 +94,6 @@ async function openMenuWithKeyboard(index = 0) {
 }
 
 function closeMenu(eventOrOptions?: PointerEvent | { restoreFocus?: boolean }) {
-  cancelHoverClose()
   open.value = false
 
   const restoreFocus = eventOrOptions && !(eventOrOptions instanceof Event) && eventOrOptions.restoreFocus
@@ -158,13 +137,13 @@ function onPanelKeydown(event: KeyboardEvent) {
 
   if (!items.length) return
 
-  if (event.key === 'ArrowDown') {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
     event.preventDefault()
     focusItem(currentIndex < 0 ? 0 : currentIndex + 1)
     return
   }
 
-  if (event.key === 'ArrowUp') {
+  if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
     event.preventDefault()
     focusItem(currentIndex < 0 ? items.length - 1 : currentIndex - 1)
     return
@@ -183,13 +162,19 @@ function onPanelKeydown(event: KeyboardEvent) {
 }
 
 onClickOutside(rootRef, closeMenu)
-onBeforeUnmount(cancelHoverClose)
+watch(() => route.fullPath, () => closeMenu())
+function onFocusOut(event: FocusEvent) {
+  if (event.relatedTarget instanceof Node && !rootRef.value?.contains(event.relatedTarget)) {
+    closeMenu()
+  }
+}
+
 
 watch(open, async (isOpen) => {
+  returnMagneticToRest()
   if (!isOpen) {
     triggerHovered.value = false
     triggerFocused.value = false
-    itemRefs.value = []
     return
   }
 
@@ -199,63 +184,53 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <div
-    ref="rootRef"
-    class="relative flex h-[2.85rem] w-auto items-center"
-    @mouseenter="openMenuFromHover"
-    @mouseleave="scheduleMenuCloseFromHover"
-  >
+  <div ref="rootRef" class="category-orbit" :class="{ 'is-open': open }" @focusout="onFocusOut" @pointermove="onMagneticPointerMove" @pointerleave="returnMagneticToRest">
+    <!-- Only the colored silhouettes are filtered: labels and icons stay sharp. -->
+    <svg class="category-goo" width="240" height="200" viewBox="-120 -40 240 200" aria-hidden="true" focusable="false">
+      <defs>
+        <filter :id="gooFilterId" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+          <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="goo" />
+          <feComposite in="SourceGraphic" in2="goo" operator="over" />
+        </filter>
+      </defs>
+      <g :filter="`url(#${gooFilterId})`">
+        <circle class="category-goo-main" cx="0" cy="0" r="26.8" :transform="magneticBackgroundTransform" />
+        <circle v-for="(item, index) in items" :key="item.value" class="category-goo-node" cx="0" cy="0" r="22" :style="nodeStyle(index)" />
+      </g>
+    </svg>
     <button
-        ref="triggerRef"
-        type="button"
-        class="surface-2 flex h-11 items-center justify-between gap-2 rounded-(--radius-pill) px-3 text-sm font-medium tracking-[-0.01em] text-(--color-text) transition-all duration-300 hover:border-(--color-border-strong) md:h-9 md:px-4"
-        :aria-expanded="open ? 'true' : 'false'"
-        :aria-controls="panelId"
-        aria-label="栏目"
-        aria-haspopup="true"
-        @mouseenter="triggerHovered = true"
-        @mouseleave="triggerHovered = false"
-        @focus="triggerFocused = triggerRef?.matches(':focus-visible') ?? false"
-        @blur="triggerFocused = false"
-        @click="toggleMenu"
-        @keydown="onTriggerKeydown"
+      ref="triggerRef"
+      type="button"
+      class="category-menu-trigger"
+      :style="magneticStyle"
+      :aria-expanded="open"
+      :aria-controls="panelId"
+      aria-label="选择分类"
+      aria-haspopup="true"
+      @mouseenter="triggerHovered = true"
+      @mouseleave="triggerHovered = false"
+      @focus="triggerFocused = triggerRef?.matches(':focus-visible') ?? false"
+      @blur="triggerFocused = false"
+      @click="toggleMenu"
+      @keydown="onTriggerKeydown"
     >
-      <CategoryFolderIcon
-          class="category-menu-trigger__icon"
-          :active="open || triggerHovered || triggerFocused"
-      />
-      <Icon
-          name="chevron-down"
-          :size="16"
-          class="transition-transform duration-200 ease-out"
-          :class="open ? 'rotate-180' : 'rotate-0'"
-      />
+      <span class="category-menu-trigger__surface" :style="surfaceStyle" aria-hidden="true" />
+      <CategoryFolderIcon class="category-menu-trigger__icon" :active="open || triggerHovered || triggerFocused" />
     </button>
-
-    <LiquidPanelTransition name="category-panel">
-      <nav
-          v-if="open"
-          :id="panelId"
-          class="category-menu-panel surface-1 absolute left-1/2 top-[calc(100%+0.75rem)] z-50 w-[120px] -translate-x-1/2 rounded-[var(--radius-xl)] p-3 shadow-[var(--shadow-lg)] max-md:fixed max-md:left-3 max-md:top-20 max-md:translate-x-0"
-          aria-label="栏目导航"
-          @mouseenter="cancelHoverClose"
-          @keydown="onPanelKeydown"
-      >
-        <ul class="m-0 list-none p-0">
-          <li v-for="(item, index) in items" :key="item.value">
-            <RouterLink
-                :ref="(element) => setItemRef(element, index)"
-                :to="item.path"
-                :aria-label="item.label"
-                :title="item.label"
-                class="category-menu-item flex h-12 items-center justify-center rounded-lg px-3 transition-colors duration-200"
-                :class="
-                  item.isActive
-                    ? 'bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-surface)_90%)] text-(--color-primary)'
-                    : 'text-(--color-text) hover:bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_72%,transparent)]'
-                "
-                @click="closeMenu()"
-            >
+    <nav :id="panelId" class="category-orbit-panel" :aria-hidden="!open" :inert="!open" aria-label="栏目导航" @keydown="onPanelKeydown">
+      <ul class="category-orbit-list">
+        <li v-for="(item, index) in items" :key="item.value" class="category-orbit-node" :style="nodeStyle(index)">
+          <RouterLink
+            :ref="(element) => setItemRef(element, index)"
+            :to="item.path"
+            :tabindex="open ? 0 : -1"
+            :aria-label="item.label"
+            :aria-current="item.isActive ? 'page' : undefined"
+            class="category-menu-item"
+            :class="{ 'is-active': item.isActive }"
+            @click="closeMenu()"
+          >
               <svg
                   class="category-menu-item__icon"
                   viewBox="0 0 24 24"
@@ -275,76 +250,172 @@ watch(open, async (isOpen) => {
                     :y2="getTimerIconVariant(item.value) === 'short' ? 16.5 : 12"
                 />
               </svg>
-            </RouterLink>
-          </li>
-        </ul>
-      </nav>
-    </LiquidPanelTransition>
+            <span class="category-orbit-label">{{ item.label }}</span>
+          </RouterLink>
+        </li>
+      </ul>
+    </nav>
   </div>
 </template>
 
 <style scoped>
-.category-menu-trigger__icon {
-  width: 1.75rem;
-  height: 1.75rem;
-  display: block;
-  flex: 0 0 auto;
+.category-orbit {
+  position: relative;
+  width: 3.35rem;
+  height: 3.35rem;
+  flex: none;
+  isolation: isolate;
+  --orbit-duration: 520ms;
+  --orbit-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --orbit-radius: 1.675rem;
 }
-
-.category-menu-panel {
-  background: var(--color-surface-panel);
-  border-color: var(--color-border-panel);
-  -webkit-backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
-  backdrop-filter: blur(var(--backdrop-blur-panel)) saturate(180%);
-}
-
-.category-panel-enter-active {
-  transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.category-panel-leave-active {
+/* Only the main button and its background follow the pointer.
+   The radial links and their background circles stay in the stationary orbit. */
+.category-orbit:hover .category-menu-trigger { will-change: transform; }
+.category-goo {
+  position: absolute;
+  left: calc(50% - 120px);
+  top: calc(50% - 40px);
+  width: 240px;
+  height: 200px;
+  /* The fixed SVG viewport must not inherit the global media max-width: 100%. */
+  max-width: none;
+  max-height: none;
+  overflow: visible;
   pointer-events: none;
-  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  fill: var(--color-brand-logo-bg);
+  z-index: 0;
 }
-
-.category-panel-enter-from,
-.category-panel-leave-to {
-  opacity: 0;
-  transform: translateY(0.25rem);
+.category-goo-main { r: var(--orbit-radius); }
+.category-goo-node {
+  transform: translate(0, 0) scale(0.3);
+  transition: transform var(--orbit-duration) var(--orbit-easing);
+  transition-delay: var(--node-delay);
 }
-
-.category-menu-item:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+.is-open .category-goo-node {
+  transform: translate(var(--node-x), var(--node-y)) scale(1);
 }
-
+.category-menu-trigger {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-brand-logo-fg);
+  cursor: pointer;
+}
+.category-menu-trigger__surface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-brand-logo-bg);
+  transform-origin: center;
+  pointer-events: none;
+}
+.category-menu-trigger__icon { position: relative; z-index: 1; }
+.category-orbit:hover .category-menu-trigger__surface { will-change: transform; }
+.category-menu-trigger__icon,
 .category-menu-item__icon {
+  display: block;
+  flex: none;
   width: 1.75rem;
   height: 1.75rem;
-  display: block;
-  flex: 0 0 auto;
 }
-.minute-hand,
-.hour-hand {
-  transform-origin: 12px 12px;
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+.category-orbit-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility 0s linear 600ms;
 }
-.hour-hand { transition-duration: 0.5s; transition-timing-function: ease-in-out; }
+.is-open .category-orbit-panel { visibility: visible; transition-delay: 0s; }
+.category-orbit-list { margin: 0; padding: 0; list-style: none; }
+.category-orbit-node {
+  position: absolute;
+  left: calc(50% - 22px);
+  top: calc(50% - 22px);
+  width: 44px;
+  height: 44px;
+  transform: translate(0, 0) scale(0.3);
+  transition: transform var(--orbit-duration) var(--orbit-easing);
+  transition-delay: var(--node-delay);
+}
+.is-open .category-orbit-node { transform: translate(var(--node-x), var(--node-y)) scale(1); }
+.category-menu-item {
+  position: relative;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-brand-logo-bg);
+  color: var(--color-brand-logo-fg);
+  opacity: 0;
+  transition: opacity 100ms ease;
+  pointer-events: none;
+  text-decoration: none;
+}
+.is-open .category-menu-item {
+  opacity: 1;
+  transition-delay: calc(170ms + var(--node-delay));
+  pointer-events: auto;
+}
+.category-menu-item.is-active { box-shadow: inset 0 0 0 1.5px var(--color-brand-logo-fg); }
+.category-menu-item:hover { box-shadow: none; }
+.category-menu-trigger:focus-visible,
+.category-menu-item:focus-visible { outline: 2px solid var(--color-brand-logo-fg); outline-offset: 3px; }
+.category-orbit-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease, visibility 120ms ease;
+}
+.is-open .category-menu-item:focus-visible .category-orbit-label {
+  opacity: 1;
+  visibility: visible;
+}
+@media (hover: hover) {
+  .is-open .category-menu-item:hover .category-orbit-label {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+.minute-hand, .hour-hand { transform-origin: 12px 12px; transition: transform 600ms ease; }
 .category-menu-item:hover .minute-hand,
 .category-menu-item:focus-visible .minute-hand { transform: rotate(360deg); }
 .category-menu-item:hover .hour-hand,
 .category-menu-item:focus-visible .hour-hand { transform: rotate(30deg); }
+@media (max-width: 767px) {
+  .category-orbit { width: 3.125rem; height: 3.125rem; --orbit-radius: 1.5625rem; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .minute-hand, .hour-hand { transition: none; transform: none !important; }
-  .category-panel-enter-active,
-  .category-panel-leave-active {
-    transition-duration: 1ms;
-  }
-
-  .category-panel-enter-from,
-  .category-panel-leave-to {
-    transform: none;
-  }
+  .category-goo-node, .category-orbit-node, .category-menu-item, .category-orbit-label,
+  .category-orbit-panel, .minute-hand, .hour-hand { transition: none; }
+  .is-open .category-menu-item, .is-open .category-orbit-label { transition-delay: 0s; }
+}
+@media (forced-colors: active) {
+  .category-goo { display: none; }
+  .category-menu-trigger__surface { display: none; }
+  .category-menu-trigger, .category-menu-item { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; }
+  .category-menu-trigger:focus-visible, .category-menu-item:focus-visible { outline-color: Highlight; }
 }
 </style>
-

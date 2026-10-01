@@ -10,7 +10,10 @@ const filterId = 'header-glass-' + useId().replace(/:/g, '-')
 const supportsRefraction = ref(false)
 const optical = computed(() => props.refract && supportsRefraction.value && Boolean(mapUrl.value))
 const filterStyle = computed(() => optical.value
-  ? { backdropFilter: 'url("#' + filterId + '") saturate(1.12)' }
+  ? {
+      backdropFilter: 'url("#' + filterId + '") blur(0.6px) saturate(1.35)',
+      WebkitBackdropFilter: 'url("#' + filterId + '") blur(0.6px) saturate(1.35)',
+    }
   : undefined)
 let observer: ResizeObserver | undefined
 let frame = 0
@@ -29,7 +32,7 @@ function updateMap() {
   if (!ctx) return
   const image = ctx.createImageData(width, height)
   const radius = Math.min(parseFloat(getComputedStyle(surface.value).borderRadius) || 28, height / 2)
-  const band = Math.min(11, height / 3)
+  const band = Math.min(18, height * 0.38)
   // Rounded-rectangle distance field: neutral center, displacement only at the rim.
   // No turbulence, DOM screenshots, per-scroll updates, or animation loop.
   for (let y = 0; y < height; y++) {
@@ -43,12 +46,14 @@ function updateMap() {
       const length = Math.hypot(ox, oy)
       const distance = length + Math.min(Math.max(qx, qy), 0) - radius
       const depth = -distance
-      const lens = depth > 0 && depth < band ? Math.sin(Math.PI * depth / band) : 0
+      // A rounded lens shoulder, strongest near the edge and flat at the center.
+      const t = Math.max(0, Math.min(1, depth / band))
+      const lens = depth > 0 && depth < band ? Math.pow(Math.sin(Math.PI * t), 0.75) : 0
       const nx = length > 0 ? ox / length : Number(qx > qy)
       const ny = length > 0 ? oy / length : Number(qy >= qx)
       const offset = (y * width + x) * 4
-      image.data[offset] = Math.round(128 - Math.sign(px) * nx * lens * 112)
-      image.data[offset + 1] = Math.round(128 - Math.sign(py) * ny * lens * 112)
+      image.data[offset] = Math.round(128 - Math.sign(px) * nx * lens * 120)
+      image.data[offset + 1] = Math.round(128 - Math.sign(py) * ny * lens * 120)
       image.data[offset + 2] = 128
       image.data[offset + 3] = 255
     }
@@ -78,13 +83,22 @@ onBeforeUnmount(() => {
   <div ref="surface" class="header-glass" aria-hidden="true" :data-optical="optical">
     <svg v-if="optical" class="header-glass-defs" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter :id="filterId" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <filter
+          :id="filterId"
+          filterUnits="userSpaceOnUse"
+          primitiveUnits="userSpaceOnUse"
+          x="0" y="0"
+          :width="dimensions.width"
+          :height="dimensions.height"
+          color-interpolation-filters="sRGB"
+        >
           <feImage :href="mapUrl" :width="dimensions.width" :height="dimensions.height" preserveAspectRatio="none" result="rim" />
-          <feDisplacementMap in="SourceGraphic" in2="rim" scale="14" xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="rim" scale="28" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
     </svg>
     <div class="header-glass-lens" :style="filterStyle" />
+    <div class="header-glass-reflection" />
     <div class="header-glass-rim" />
   </div>
 </template>
@@ -100,15 +114,30 @@ onBeforeUnmount(() => {
 }
 .header-glass-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
 .header-glass-lens,
+.header-glass-reflection,
 .header-glass-rim { position: absolute; inset: 0; border-radius: inherit; }
 .header-glass-lens {
   background: var(--nav-glass-tint);
-  -webkit-backdrop-filter: blur(var(--nav-glass-blur)) saturate(1.12);
-  backdrop-filter: blur(var(--nav-glass-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--nav-glass-blur)) saturate(1.35);
+  backdrop-filter: blur(var(--nav-glass-blur)) saturate(1.35);
+}
+.header-glass-reflection {
+  background: var(--nav-glass-reflection);
 }
 .header-glass-rim {
-  border: 1px solid var(--nav-glass-border);
-  background: var(--nav-glass-reflection);
+  padding: 1.5px;
+  background: var(--nav-glass-edge);
+  /* Restrict specular light to the curved rim, not a milky full-surface overlay. */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.header-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   box-shadow: var(--nav-glass-rim-shadow);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -123,6 +152,8 @@ onBeforeUnmount(() => {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
-  .header-glass-rim { background: none; }
+  .header-glass-reflection { background: none; }
+  .header-glass-rim { background: none; border: 1px solid currentColor; mask: none; -webkit-mask: none; }
+  .header-glass::after { box-shadow: none; }
 }
 </style>
