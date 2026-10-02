@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { Orbit, Rows3 } from 'lucide-vue-next'
 
+import { Tooltip } from '@/shared/components/base'
+
 import { RESULT_VIEW_MODE, type ResultViewMode } from './result-view'
 
 const props = defineProps<{
@@ -44,20 +46,26 @@ function updateValue(value: ResultViewMode) {
     :style="{ '--result-view-active-index': activeIndex }"
   >
     <span class="result-view-toggle__thumb" aria-hidden="true" />
-    <button
+    <Tooltip
       v-for="option in options"
       :key="option.value"
-      type="button"
-      class="result-view-toggle__button"
-      :class="option.value === modelValue && 'result-view-toggle__button--active'"
-      :aria-label="option.label"
-      :aria-selected="option.value === modelValue"
-      :title="option.label"
-      role="tab"
-      @click="updateValue(option.value)"
+      :text="option.label"
+      placement="bottom"
+      :open-delay="600"
+      class="result-view-toggle__hint"
     >
-      <component :is="option.icon" :size="16" :stroke-width="1.9" />
-    </button>
+      <button
+        type="button"
+        class="result-view-toggle__button"
+        :class="option.value === modelValue && 'result-view-toggle__button--active'"
+        :aria-label="option.label"
+        :aria-selected="option.value === modelValue"
+        role="tab"
+        @click="updateValue(option.value)"
+      >
+        <component :is="option.icon" :size="16" :stroke-width="1.9" />
+      </button>
+    </Tooltip>
   </div>
 </template>
 
@@ -79,6 +87,11 @@ function updateValue(value: ResultViewMode) {
     0 1px 2px rgb(15 23 42 / 0.03),
     0 8px 18px rgb(15 23 42 / 0.04);
   backdrop-filter: blur(var(--backdrop-blur-soft)) saturate(130%);
+}
+
+.result-view-toggle__hint {
+  position: relative;
+  z-index: 1;
 }
 
 .result-view-toggle__thumb {
