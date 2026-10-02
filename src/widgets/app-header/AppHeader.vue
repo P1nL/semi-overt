@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 
 import Icon from '@/shared/components/base/Icon.vue'
-import HeaderGlass from '@/shared/components/effects/HeaderGlass.vue'
 import { Container } from '@/shared/components/layout'
 import { useDockMagnification } from '@/shared/composables/useDockMagnification'
 import { ROUTE_NAME } from '@/shared/constants/routes'
@@ -13,6 +12,8 @@ import { useUiStore } from '@/stores/ui'
 import { CategoryMenu } from '@/widgets/category-menu'
 import AppHeaderActions from './AppHeaderActions.vue'
 import AppHeaderLogo from './AppHeaderLogo.vue'
+import { createLiquidBridgePath } from './model/liquidBridge'
+import { createMagneticDeformation } from '@/shared/utils/magneticSpring'
 
 withDefaults(
   defineProps<{
@@ -37,6 +38,12 @@ const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
 const headerRef = ref<HTMLElement | null>(null)
 const navigationReady = ref(false)
+const leadingRef = ref<HTMLElement | null>(null)
+const leadingSize = ref({ width: 119.2, height: 53.6 })
+const categoryOffset = ref({ x: 0, y: 0 })
+let leadingObserver: ResizeObserver | undefined
+const liquidBridgeViewBox = computed(() => `-16 -16 ${leadingSize.value.width + 32} ${leadingSize.value.height + 32}`)
+const liquidBridgePath = computed(() => createLiquidBridgePath(leadingSize.value.width, leadingSize.value.height, categoryOffset.value, createMagneticDeformation(categoryOffset.value)))
 const dockOverlayOpen = ref(false)
 const { returnToRest: returnDockToRest } = useDockMagnification(
   headerRef,
@@ -107,9 +114,15 @@ function waitForNavigationIcons() {
 
 onMounted(() => {
   void nextTick(waitForNavigationIcons)
+  leadingObserver = new ResizeObserver(entries => {
+    const rect = entries[0]?.contentRect
+    if (rect && rect.width > 0 && rect.height > 0) leadingSize.value = { width: rect.width, height: rect.height }
+  })
+  if (leadingRef.value) leadingObserver.observe(leadingRef.value)
 })
 
 onBeforeUnmount(() => {
+  leadingObserver?.disconnect()
   searchTransitionRevision++
   searchAnimation?.cancel()
   clearNavigationReadyWaiters()
@@ -247,113 +260,126 @@ async function submitSearch() {
   <div class="header-shell" :class="uiStore.appreciationMode ? 'header-shell--appreciation' : ''">
     <header
       ref="headerRef"
-      class="fixed inset-x-0 top-0 z-40 px-3 pt-3 md:px-4"
+      class="fixed inset-x-0 top-[10px] z-40 px-3 pt-3 md:px-4"
       :data-navigation-ready="navigationReady ? 'true' : 'false'"
     >
       <Container class="app-header-container">
         <div
-          data-panel-origin-surface
-          class="app-header-surface app-header-surface--glass surface-1 flex min-h-13 items-center gap-2 rounded-[var(--radius-xl)] px-3 py-2 md:gap-3 md:px-4"
+          class="app-header-surface app-header-surface--glass surface-1 flex items-center justify-between gap-2 md:gap-4"
           :class="navigationReady ? 'app-header-surface--ready' : ''"
         >
-          <HeaderGlass v-if="!uiStore.appreciationMode" :refract="true" />
-          <div class="header-leading flex shrink-0 items-center gap-2 md:gap-3" :class="leftSectionClass">
-            <AppHeaderLogo />
-            <div class="hidden h-5 w-px bg-[color-mix(in_srgb,var(--color-border)_60%,transparent)] md:block" />
-            <CategoryMenu :active-category="activeCategory" />
-          </div>
-
-          <div class="header-search-region relative flex min-w-0 flex-1 items-center justify-end">
-            <div
-              ref="searchWrapRef"
-              data-header-dock-item="search"
-              class="absolute right-0 top-1/2 -translate-y-1/2"
-              :class="[searchWrapClass, { 'header-search-wrap--transitioning': searchTransitioning }, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
+          <div
+            ref="leadingRef"
+            class="header-leading flex shrink-0 items-center"
+            :class="leftSectionClass"
+          >
+            <svg
+              v-if="!uiStore.appreciationMode"
+              class="header-liquid-bridge"
+              :viewBox="liquidBridgeViewBox"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+              focusable="false"
             >
-              <form
-                class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
-                :class="searchOpen ? 'header-search-shell-open' : 'header-search-shell-closed'"
-                @submit.prevent="submitSearch"
-              >
-                <button
-                  ref="searchButtonRef"
-                  data-header-dock-button
-                  type="button"
-                  class="tool-icon-button flex h-[2.85rem] w-[2.85rem] shrink-0 items-center justify-center text-[var(--color-text-muted)]"
-                  :class="searchOpen ? 'tool-icon-button-open' : ''"
-                  :aria-label="searchOpen ? '提交搜索' : '打开搜索'"
-                  :aria-expanded="searchOpen"
-                  aria-controls="header-search-input"
-                  @click="searchOpen ? submitSearch() : toggleSearch()"
-                >
-                  <Icon name="search" :size="24" />
-                </button>
-
-                <input
-                  v-if="searchOpen"
-                  id="header-search-input"
-                  ref="searchInputRef"
-                  v-model="keyword"
-                  type="search"
-                  placeholder="搜索文章或作者"
-                  aria-label="搜索文章或作者"
-                  class="header-search-input min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
-                  @keydown.esc.prevent="closeSearch({ restoreFocus: true })"
-                />
-              </form>
-
-              <!-- 搜索建议下拉框 -->
-              <LiquidPanelTransition variant="search"
-                enter-active-class="transition duration-150 ease-out"
-                enter-from-class="opacity-0 translate-y-1"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition duration-100 ease-in"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 translate-y-1"
-              >
-                <div
-                  v-if="showDropdown"
-                  class="search-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_97%,transparent)] py-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
-                  role="listbox"
-                  aria-label="搜索建议"
-                >
-                  <button
-                    type="button"
-                    class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
-                    role="option"
-                    @click="navigateToArticleSearch"
-                  >
-                    <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]">
-                      <Icon name="search" size="0.85rem" />
-                    </span>
-                    <span class="min-w-0 flex-1">
-                      <span class="block text-xs text-[var(--color-text-muted)]">文章</span>
-                      <span class="block truncate text-sm font-medium text-[var(--color-text)]">具有「{{ trimmedKeyword }}」的文章</span>
-                    </span>
-                  </button>
-
-                  <div class="mx-4 h-px bg-[var(--color-border)]" />
-
-                  <button
-                    type="button"
-                    class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
-                    role="option"
-                    @click="navigateToAuthorSearch"
-                  >
-                    <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-text-muted)_10%,transparent)] text-[var(--color-text-muted)]">
-                      <Icon name="user" size="0.85rem" />
-                    </span>
-                    <span class="min-w-0 flex-1">
-                      <span class="block text-xs text-[var(--color-text-muted)]">作者</span>
-                      <span class="block truncate text-sm font-medium text-[var(--color-text)]">包含「{{ trimmedKeyword }}」的作者</span>
-                    </span>
-                  </button>
-                </div>
-              </LiquidPanelTransition>
-            </div>
+              <path :d="liquidBridgePath" />
+            </svg>
+            <AppHeaderLogo />
+            <CategoryMenu :active-category="activeCategory" @magnetic-move="categoryOffset = $event" />
           </div>
 
-          <AppHeaderActions :class="actionSectionClass" @dock-blocked="dockOverlayOpen = $event" />
+          <div data-panel-origin-surface class="header-tools header-capsule relative flex min-h-[3.125rem] min-w-0 items-center gap-1 rounded-full px-2 py-0.5 md:min-h-[3.35rem] md:gap-2 md:py-1" :class="searchOpen ? 'max-md:flex-1' : ''">
+            <div class="header-search-region relative flex min-w-0 flex-none items-center justify-end" :class="searchOpen ? 'max-md:flex-1' : ''">
+              <div
+                ref="searchWrapRef"
+                data-header-dock-item="search"
+                class="relative"
+                :class="[searchWrapClass, { 'header-search-wrap--transitioning': searchTransitioning }, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
+              >
+                <form
+                  class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
+                  :class="searchOpen ? 'header-search-shell-open' : 'header-search-shell-closed'"
+                  @submit.prevent="submitSearch"
+                >
+                  <button
+                    ref="searchButtonRef"
+                    data-header-dock-button
+                    type="button"
+                    class="tool-icon-button flex h-[2.85rem] w-[2.85rem] shrink-0 items-center justify-center text-[var(--color-text-muted)]"
+                    :class="searchOpen ? 'tool-icon-button-open' : ''"
+                    :aria-label="searchOpen ? '提交搜索' : '打开搜索'"
+                    :aria-expanded="searchOpen"
+                    aria-controls="header-search-input"
+                    @click="searchOpen ? submitSearch() : toggleSearch()"
+                  >
+                    <Icon name="search" :size="24" />
+                  </button>
+
+                  <input
+                    v-if="searchOpen"
+                    id="header-search-input"
+                    ref="searchInputRef"
+                    v-model="keyword"
+                    type="search"
+                    placeholder="搜索文章或作者"
+                    aria-label="搜索文章或作者"
+                    class="header-search-input min-w-0 flex-1 border-0 bg-transparent pr-3 text-sm text-[var(--color-text)] outline-none ring-0 shadow-none [-webkit-appearance:none] appearance-none placeholder:text-[var(--color-text-faint)] focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none"
+                    @keydown.esc.prevent="closeSearch({ restoreFocus: true })"
+                  />
+                </form>
+
+                <!-- 搜索建议下拉框 -->
+                <LiquidPanelTransition variant="search"
+                  enter-active-class="transition duration-150 ease-out"
+                  enter-from-class="opacity-0 translate-y-1"
+                  enter-to-class="opacity-100 translate-y-0"
+                  leave-active-class="transition duration-100 ease-in"
+                  leave-from-class="opacity-100 translate-y-0"
+                  leave-to-class="opacity-0 translate-y-1"
+                >
+                  <div
+                    v-if="showDropdown"
+                    class="search-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_97%,transparent)] py-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
+                    role="listbox"
+                    aria-label="搜索建议"
+                  >
+                    <button
+                      type="button"
+                      class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
+                      role="option"
+                      @click="navigateToArticleSearch"
+                    >
+                      <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]">
+                        <Icon name="search" size="0.85rem" />
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-xs text-[var(--color-text-muted)]">文章</span>
+                        <span class="block truncate text-sm font-medium text-[var(--color-text)]">具有「{{ trimmedKeyword }}」的文章</span>
+                      </span>
+                    </button>
+
+                    <div class="mx-4 h-px bg-[var(--color-border)]" />
+
+                    <button
+                      type="button"
+                      class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
+                      role="option"
+                      @click="navigateToAuthorSearch"
+                    >
+                      <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-text-muted)_10%,transparent)] text-[var(--color-text-muted)]">
+                        <Icon name="user" size="0.85rem" />
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-xs text-[var(--color-text-muted)]">作者</span>
+                        <span class="block truncate text-sm font-medium text-[var(--color-text)]">包含「{{ trimmedKeyword }}」的作者</span>
+                      </span>
+                    </button>
+                  </div>
+                </LiquidPanelTransition>
+              </div>
+            </div>
+
+            <AppHeaderActions :class="actionSectionClass" @dock-blocked="dockOverlayOpen = $event" />
+          </div>
         </div>
       </Container>
     </header>
@@ -413,7 +439,7 @@ async function submitSearch() {
 }
 
 .header-shell :deep(.app-header-container) {
-  width: min(100% - 1.5rem, 1216px);
+  width: min(100% - 1.5rem, 880px);
 }
 
 /* Keep backdrop filtering on a separate layer: content and menus stay sharp. */
@@ -429,6 +455,54 @@ async function submitSearch() {
 .app-header-surface--glass > :deep(.header-actions:not(.header-actions--appreciation)) {
   position: relative;
   z-index: 1;
+}
+
+/* Broad concave shoulders meet the circular silhouettes at near-tangent angles. */
+.header-leading {
+  --leading-button-gap: 0.5rem;
+  gap: var(--leading-button-gap);
+}
+.header-liquid-bridge {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
+  max-width: none;
+  overflow: visible;
+  fill: var(--color-brand-logo-bg);
+  pointer-events: none;
+  z-index: 0;
+}
+@media (min-width: 768px) {
+  .header-leading {
+    --leading-button-gap: 0.75rem;
+  }
+}
+
+/* Compact solid navigation shells; icon and hit-target sizes stay unchanged. */
+.header-capsule {
+  position: relative;
+  background: var(--color-brand-logo-bg);
+  color: var(--color-brand-logo-fg);
+}
+.header-capsule > :deep(*) { position: relative; z-index: 1; }
+.header-capsule :deep(.category-menu-trigger),
+.header-capsule :deep(.tool-icon-button),
+.header-capsule :deep(.user-trigger),
+.header-capsule :deep(.theme-switch-button) {
+  color: var(--color-brand-logo-fg);
+}
+.header-capsule :deep(.category-menu-trigger) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding-inline: 0.5rem;
+}
+.header-shell--appreciation .header-capsule { background: transparent; }
+.header-shell--appreciation .header-capsule :deep(.theme-switch-button) {
+  color: var(--color-text-muted);
 }
 
 /* Widths really participate in layout; button scaling fills the expanded slots. */
@@ -548,6 +622,19 @@ input[type="search"]::selection {
   background: transparent;
 }
 
+.header-tools .header-search-input {
+  color: var(--color-brand-logo-fg);
+  caret-color: var(--color-brand-logo-fg);
+}
+.header-tools .header-search-input::placeholder {
+  color: color-mix(in srgb, var(--color-brand-logo-fg) 65%, transparent);
+}
+.header-tools .header-search-shell::before {
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .header-search-shell::before { transition: none; }
   .app-header-surface--glass .header-search-region > div { transition: none; }

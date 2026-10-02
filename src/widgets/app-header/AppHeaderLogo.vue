@@ -125,7 +125,7 @@ onBeforeUnmount(stopAnimation)
 <template>
   <RouterLink
     :to="{ name: ROUTE_NAME.HOME }"
-    class="brand-home-link inline-flex items-center rounded-[var(--radius-pill)] px-2 py-1.5 text-[var(--color-text)]"
+    class="brand-home-link relative inline-flex shrink-0 items-center justify-center rounded-full"
     aria-label="返回首页"
     @mouseenter="startHoverRotation"
     @mouseleave="stopHoverRotation"
@@ -156,16 +156,32 @@ onBeforeUnmount(stopAnimation)
 </template>
 
 <style scoped>
-.brand-home-link:hover .brand-cube {
-  color: var(--color-text);
+.brand-home-link {
+  width: 3.35rem;
+  height: 3.35rem;
+  background: var(--color-brand-logo-bg);
+  color: var(--color-brand-logo-fg);
+}
+.brand-home-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+@media (max-width: 767px) {
+  .brand-home-link { width: 3.125rem; height: 3.125rem; }
 }
 
 .brand-cube {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
   display: block;
   width: 3rem;
   height: 3rem;
   flex-shrink: 0;
-  color: var(--color-text);
+  /* Align the complete SVG with the circular button, independent of doorway weight. */
+  transform: translate(calc(-50% + 0.5px), -50%);
+  color: inherit;
   transition: color var(--cube-transition-duration) ease;
 }
 
