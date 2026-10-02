@@ -81,6 +81,17 @@
     --backdrop-blur-panel: 26px;
     --backdrop-blur-card: 16px;
 
+    /* Shared hover-copy material; the navigation theme hint is the visual baseline. */
+    --hover-copy-background: var(--color-surface-panel);
+    --hover-copy-border: var(--color-border-panel);
+    --hover-copy-color: var(--color-text-muted);
+    --hover-copy-strong-color: var(--color-text);
+    --hover-copy-shadow: var(--shadow-xs);
+    --hover-copy-radius: var(--radius-sm);
+    --hover-copy-blur: var(--backdrop-blur-panel);
+    --hover-copy-font-size: 0.6875rem;
+    --hover-copy-line-height: 1.4;
+
     --header-height: 5.5rem;
     --header-height-md: 5.75rem;
 

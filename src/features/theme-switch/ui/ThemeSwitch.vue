@@ -218,7 +218,7 @@ onBeforeUnmount(() => {
     </span>
     <span
       v-if="showTooltip"
-      class="theme-switch-tooltip"
+      class="hover-copy-surface theme-switch-tooltip"
       aria-hidden="true"
     ><strong>切换主题</strong> · 长按进入<strong>ZEN</strong></span>
   </button>
@@ -242,26 +242,14 @@ onBeforeUnmount(() => {
   top: calc(100% + 1.5rem / var(--header-dock-scale, 1));
   left: 50%;
   z-index: 50;
-  padding: 0.25rem 0.5rem;
   /* Keep the hint centered and at its own size while the Dock scales the button. */
   transform: translateX(-50%) scale(calc(1 / var(--header-dock-scale, 1)));
   transform-origin: top center;
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-panel);
-  color: var(--color-text-muted);
-  box-shadow: var(--shadow-xs);
-  backdrop-filter: blur(var(--backdrop-blur-panel));
-  font-size: 0.6875rem;
-  font-weight: 400;
-  line-height: 1.4;
-  white-space: nowrap;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transition: opacity 150ms ease, visibility 0s linear 150ms;
 }
-.theme-switch-tooltip strong { color: var(--color-text); font-weight: 600; }
 .theme-switch-root:focus-visible .theme-switch-tooltip {
   opacity: 1;
   visibility: visible;

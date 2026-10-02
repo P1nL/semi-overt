@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import gsap from 'gsap'
 
+import { Tooltip } from '@/shared/components/base'
+
 const props = defineProps<{
   visible: boolean
 }>()
@@ -126,11 +128,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <button
+  <Tooltip
+    :text="visible ? '隐藏密码' : '显示密码'"
+    placement="top"
+    :open-delay="600"
+    class="password-toggle-hint"
+  >
+    <button
     ref="btnEl"
     type="button"
+    :aria-label="visible ? '隐藏密码' : '显示密码'"
     :aria-pressed="visible"
-    :title="visible ? '隐藏密码' : '显示密码'"
     class="password-toggle-btn"
     @click="handleClick"
   >
@@ -186,22 +194,28 @@ onUnmounted(() => {
       </g>
     </svg>
 
-    <span class="sr-only">{{ visible ? '隐藏密码' : '显示密码' }}</span>
-  </button>
+      <span class="sr-only">{{ visible ? '隐藏密码' : '显示密码' }}</span>
+    </button>
+  </Tooltip>
 </template>
 
 <style scoped>
-.password-toggle-btn {
+.password-toggle-hint {
   position: absolute;
   right: 0;
   top: 50%;
   translate: 0 -50%;
   z-index: 2;
-
-  display: grid;
-  place-items: center;
   height: 100%;
   aspect-ratio: 1;
+}
+
+.password-toggle-btn {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
 
   padding: 0;
   border: 6px solid transparent;

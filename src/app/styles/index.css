@@ -4,6 +4,29 @@
 @import "./base.css";
 @import "./prose.css";
 
+@layer components {
+    .hover-copy-surface {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--hover-copy-border);
+        border-radius: var(--hover-copy-radius);
+        background: var(--hover-copy-background);
+        color: var(--hover-copy-color);
+        box-shadow: var(--hover-copy-shadow);
+        backdrop-filter: blur(var(--hover-copy-blur));
+        -webkit-backdrop-filter: blur(var(--hover-copy-blur));
+        font-size: var(--hover-copy-font-size);
+        font-weight: 400;
+        line-height: var(--hover-copy-line-height);
+        letter-spacing: 0;
+        white-space: nowrap;
+    }
+
+    .hover-copy-surface strong {
+        color: var(--hover-copy-strong-color);
+        font-weight: 600;
+    }
+}
+
 @layer base {
     html {
         background-color: var(--color-bg);

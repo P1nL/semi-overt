@@ -2263,15 +2263,19 @@ defineExpose({
   opacity: 0;
   pointer-events: none;
   z-index: 12;
-  padding: 0.38rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-text);
-  color: var(--color-surface);
-  font-size: 0.72rem;
-  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--hover-copy-border);
+  border-radius: var(--hover-copy-radius);
+  background: var(--hover-copy-background);
+  color: var(--hover-copy-color);
+  box-shadow: var(--hover-copy-shadow);
+  backdrop-filter: blur(var(--hover-copy-blur));
+  -webkit-backdrop-filter: blur(var(--hover-copy-blur));
+  font-size: var(--hover-copy-font-size);
+  font-weight: 400;
+  line-height: var(--hover-copy-line-height);
   letter-spacing: 0;
   white-space: nowrap;
-  box-shadow: var(--shadow-sm);
   transition:
     opacity 140ms ease,
     transform 160ms ease;

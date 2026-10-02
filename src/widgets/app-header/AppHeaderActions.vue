@@ -693,7 +693,7 @@ async function handleLogout() {
             @keydown="onDraftTriggerKeydown"
           >
             <AnimatedDraftBoxIcon size="1.55rem" class="draft-box-icon" />
-
+            <span class="hover-copy-surface header-action-tooltip" aria-hidden="true">草稿箱</span>
           </button>
 
           <AsyncDraftBoxDrawer
@@ -726,7 +726,6 @@ async function handleLogout() {
             'user-profile-trigger--flipping': logoutFlipping,
           }"
           aria-label="进入个人页；长按退出登录"
-          title="点击进入个人页，长按退出登录"
           :disabled="loggingOut"
           @click="gotoProfile"
           @pointerdown="startLogoutHold"
@@ -754,6 +753,7 @@ async function handleLogout() {
           <svg class="logout-progress" viewBox="0 0 48 48" aria-hidden="true">
             <circle ref="logoutProgressStrokeRef" class="logout-progress__stroke" cx="24" cy="24" r="21.5" />
           </svg>
+          <span class="hover-copy-surface header-action-tooltip" aria-hidden="true"><strong>个人主页</strong> · 长按退出登录</span>
         </button>
         </div>
 
@@ -773,8 +773,9 @@ async function handleLogout() {
           @click="authDialogOpen = true"
         >
           <span ref="authLoginIconFrameRef" class="auth-login-icon-frame">
-            <AnimatedAttributionIcon ref="authLoginIconRef" size="100%" title="登录 / 注册" :decorative="false" trigger="hover" />
+            <AnimatedAttributionIcon ref="authLoginIconRef" size="100%" :decorative="true" trigger="hover" />
           </span>
+          <span class="hover-copy-surface header-action-tooltip" aria-hidden="true">登录 / 注册</span>
         </button>
 
       </div>
@@ -969,6 +970,39 @@ async function handleLogout() {
 .header-draft-entry .tool-icon-button:hover,
 .user-trigger:hover {
   background: transparent;
+}
+
+.header-action-tooltip {
+  position: absolute;
+  top: calc(100% + 1.5rem / var(--header-dock-scale, 1));
+  left: 50%;
+  z-index: 50;
+  transform: translateX(-50%) scale(calc(1 / var(--header-dock-scale, 1)));
+  transform-origin: top center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 0s linear 150ms;
+}
+
+.tool-icon-button:focus-visible > .header-action-tooltip,
+.user-trigger:focus-visible > .header-action-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tool-icon-button:hover:not(:disabled) > .header-action-tooltip,
+  .user-trigger:hover:not(:disabled):not(.user-profile-trigger--holding):not(.user-profile-trigger--flipping) > .header-action-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 600ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-action-tooltip { transition-duration: 0s; }
 }
 
 .draft-box-icon {
