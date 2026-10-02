@@ -3,6 +3,7 @@ import { computed, nextTick, ref, useId, watch, type ComponentPublicInstance } f
 import { useRoute } from 'vue-router'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 import { useMagneticButton } from '@/shared/composables/useMagneticButton'
+import { createLiquidButtonPath, type LiquidButtonMotion } from '@/shared/utils/magneticSpring'
 
 import { mapCategoryValueToVm } from '@/entities/category'
 import { CATEGORY_ORDER } from '@/entities/category'
@@ -17,20 +18,19 @@ const props = withDefaults(
     },
 )
 
-const emit = defineEmits<{ 'magnetic-move': [offset: { x: number; y: number }] }>()
+const emit = defineEmits<{ 'magnetic-move': [offset: LiquidButtonMotion] }>()
 const route = useRoute()
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 const magneticEnabled = computed(() => finePointer.value && !reducedMotion.value)
-const { offset: magneticOffset, deformation, style: magneticStyle, surfaceStyle, onPointerMove: onMagneticPointerMove, returnToRest: returnMagneticToRest } = useMagneticButton(
+const { offset: magneticOffset, style: magneticStyle, onPointerMove: onMagneticPointerMove, returnToRest: returnMagneticToRest } = useMagneticButton(
   rootRef, magneticEnabled, offset => emit('magnetic-move', offset),
 )
-const magneticBackgroundTransform = computed(() => {
-  const { a, b, c, d } = deformation.value
-  return `matrix(${a} ${b} ${c} ${d} ${magneticOffset.value.x} ${magneticOffset.value.y})`
-})
+const compactNavigation = useMediaQuery('(max-width: 767px)')
+const liquidButtonPath = computed(() => createLiquidButtonPath(compactNavigation.value ? 25 : 26.8, magneticOffset.value))
+const magneticBackgroundTransform = computed(() => `translate(${magneticOffset.value.x} ${magneticOffset.value.y})`)
 const open = ref(false)
 const triggerHovered = ref(false)
 const triggerFocused = ref(false)
@@ -184,7 +184,7 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <div ref="rootRef" class="category-orbit" :class="{ 'is-open': open }" @focusout="onFocusOut" @pointermove="onMagneticPointerMove" @pointerleave="returnMagneticToRest">
+  <div ref="rootRef" class="category-orbit" :class="{ 'is-open': open }" @focusout="onFocusOut">
     <!-- Only the colored silhouettes are filtered: labels and icons stay sharp. -->
     <svg class="category-goo" width="240" height="200" viewBox="-120 -40 240 200" aria-hidden="true" focusable="false">
       <defs>
@@ -195,7 +195,7 @@ watch(open, async (isOpen) => {
         </filter>
       </defs>
       <g :filter="`url(#${gooFilterId})`">
-        <circle class="category-goo-main" cx="0" cy="0" r="26.8" :transform="magneticBackgroundTransform" />
+        <path class="category-goo-main" :d="liquidButtonPath" :transform="magneticBackgroundTransform" />
         <circle v-for="(item, index) in items" :key="item.value" class="category-goo-node" cx="0" cy="0" r="22" :style="nodeStyle(index)" />
       </g>
     </svg>
@@ -203,11 +203,14 @@ watch(open, async (isOpen) => {
       ref="triggerRef"
       type="button"
       class="category-menu-trigger"
-      :style="magneticStyle"
       :aria-expanded="open"
       :aria-controls="panelId"
       aria-label="选择分类"
       aria-haspopup="true"
+      @pointerenter="onMagneticPointerMove"
+      @pointermove="onMagneticPointerMove"
+      @pointerleave="returnMagneticToRest"
+      @pointercancel="returnMagneticToRest"
       @mouseenter="triggerHovered = true"
       @mouseleave="triggerHovered = false"
       @focus="triggerFocused = triggerRef?.matches(':focus-visible') ?? false"
@@ -215,8 +218,9 @@ watch(open, async (isOpen) => {
       @click="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <span class="category-menu-trigger__surface" :style="surfaceStyle" aria-hidden="true" />
-      <CategoryFolderIcon class="category-menu-trigger__icon" :active="open || triggerHovered || triggerFocused" />
+      <span class="category-menu-trigger__visual" :style="magneticStyle">
+        <CategoryFolderIcon class="category-menu-trigger__icon" :active="open || triggerHovered || triggerFocused" />
+      </span>
     </button>
     <nav :id="panelId" class="category-orbit-panel" :aria-hidden="!open" :inert="!open" aria-label="栏目导航" @keydown="onPanelKeydown">
       <ul class="category-orbit-list">
@@ -269,9 +273,9 @@ watch(open, async (isOpen) => {
   --orbit-easing: cubic-bezier(0.22, 1, 0.36, 1);
   --orbit-radius: 1.675rem;
 }
-/* Only the main button and its background follow the pointer.
+/* Keep the circular hit target stationary; only its visuals follow the pointer.
    The radial links and their background circles stay in the stationary orbit. */
-.category-orbit:hover .category-menu-trigger { will-change: transform; }
+.category-menu-trigger:hover .category-menu-trigger__visual { will-change: transform; }
 .category-goo {
   position: absolute;
   left: calc(50% - 120px);
@@ -286,7 +290,6 @@ watch(open, async (isOpen) => {
   fill: var(--color-brand-logo-bg);
   z-index: 0;
 }
-.category-goo-main { r: var(--orbit-radius); }
 .category-goo-node {
   transform: translate(0, 0) scale(0.3);
   transition: transform var(--orbit-duration) var(--orbit-easing);
@@ -310,16 +313,16 @@ watch(open, async (isOpen) => {
   color: var(--color-brand-logo-fg);
   cursor: pointer;
 }
-.category-menu-trigger__surface {
+.category-menu-trigger__visual {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--color-brand-logo-bg);
-  transform-origin: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
 }
 .category-menu-trigger__icon { position: relative; z-index: 1; }
-.category-orbit:hover .category-menu-trigger__surface { will-change: transform; }
 .category-menu-trigger__icon,
 .category-menu-item__icon {
   display: block;

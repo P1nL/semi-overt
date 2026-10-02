@@ -12,8 +12,8 @@ import { useUiStore } from '@/stores/ui'
 import { CategoryMenu } from '@/widgets/category-menu'
 import AppHeaderActions from './AppHeaderActions.vue'
 import AppHeaderLogo from './AppHeaderLogo.vue'
+import type { LiquidButtonMotion } from '@/shared/utils/magneticSpring'
 import { createLiquidBridgePath } from './model/liquidBridge'
-import { createMagneticDeformation } from '@/shared/utils/magneticSpring'
 
 withDefaults(
   defineProps<{
@@ -40,10 +40,10 @@ const headerRef = ref<HTMLElement | null>(null)
 const navigationReady = ref(false)
 const leadingRef = ref<HTMLElement | null>(null)
 const leadingSize = ref({ width: 119.2, height: 53.6 })
-const categoryOffset = ref({ x: 0, y: 0 })
+const categoryOffset = ref<LiquidButtonMotion>({ x: 0, y: 0 })
 let leadingObserver: ResizeObserver | undefined
 const liquidBridgeViewBox = computed(() => `-16 -16 ${leadingSize.value.width + 32} ${leadingSize.value.height + 32}`)
-const liquidBridgePath = computed(() => createLiquidBridgePath(leadingSize.value.width, leadingSize.value.height, categoryOffset.value, createMagneticDeformation(categoryOffset.value)))
+const liquidBridgePath = computed(() => createLiquidBridgePath(leadingSize.value.width, leadingSize.value.height, categoryOffset.value))
 const dockOverlayOpen = ref(false)
 const { returnToRest: returnDockToRest } = useDockMagnification(
   headerRef,
