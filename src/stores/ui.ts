@@ -4,15 +4,19 @@ import { defineStore } from 'pinia'
 import { UI_TIMING } from '@/shared/constants/ui'
 import { STORAGE_KEY } from '@/shared/constants/storage'
 import { localStore } from '@/shared/utils/storage'
+import { resolveDarkPreference } from '@/shared/utils/themePreference'
 
 export type DrawerType = 'menu' | 'search' | null
 
 function readDarkModeFromStorage() {
-    return localStore?.get<boolean>(STORAGE_KEY.DARK_MODE, false) ?? false
+    const systemDark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches
+    try { return resolveDarkPreference(window.localStorage.getItem(STORAGE_KEY.DARK_MODE), systemDark) }
+    catch { return systemDark }
 }
 
 function writeDarkModeToStorage(enabled: boolean) {
-    localStore?.set(STORAGE_KEY.DARK_MODE, enabled)
+    try { localStore?.set(STORAGE_KEY.DARK_MODE, enabled) }
+    catch { /* A blocked/full store must not prevent the in-memory theme change. */ }
 }
 
 function readSearchQueryFromStorage() {
@@ -26,6 +30,7 @@ function writeSearchQueryToStorage(value: string) {
 function applyDarkMode(enabled: boolean) {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('dark', enabled)
+    document.documentElement.style.removeProperty('color-scheme')
 }
 
 function applyAppreciationMode(enabled: boolean) {

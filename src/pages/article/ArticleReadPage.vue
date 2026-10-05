@@ -26,7 +26,10 @@ const mainRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
 
 function onLoaded(article: ArticleDetailVm) {
-  setDocumentTitle(article.title)
+  // Late reader responses must not overwrite the background title on close.
+  if (route.name === ROUTE_NAME.ARTICLE_READ && String(article.id) === articleId.value) {
+    setDocumentTitle(article.title)
+  }
   tocSyncKey.value = `${articleId.value}-${Date.now()}`
 }
 
@@ -75,7 +78,7 @@ watch(
   <div class="relative flex h-full min-h-0 flex-col">
     <main
       ref="mainRef"
-      class="flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-6 md:pb-12 md:pt-6 xl:px-8"
+      class="app-scrollbar flex-1 overflow-y-auto px-4 pb-10 pt-5 md:px-6 md:pb-12 md:pt-6 xl:px-8"
       @scroll.passive="handleScroll"
     >
       <div class="mx-auto grid w-full max-w-[1440px] gap-6 lg:grid-cols-[12rem_minmax(0,54rem)_12rem] lg:justify-center xl:gap-10">

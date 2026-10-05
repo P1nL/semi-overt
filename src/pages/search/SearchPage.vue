@@ -6,7 +6,6 @@ import { useIntersectionObserver } from '@vueuse/core'
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteSearchArticlesQuery, useInfiniteSearchUsersQuery } from '@/entities/queries'
 import { Avatar, EmptyState } from '@/shared/components/base'
-import { SectionHeader } from '@/shared/components/layout'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
@@ -14,8 +13,10 @@ import {
   ArticleResultStream,
   RESULT_VIEW_MODE,
   ResultViewToggle,
+  ResultListHeading,
   isResultViewMode,
   normalizeResultViewMode,
+  type ResultViewMode,
 } from '@/widgets/article-result-stream'
 
 const props = withDefaults(
@@ -28,6 +29,7 @@ const props = withDefaults(
 )
 
 const route = useRoute()
+const emit = defineEmits<{ 'result-layout': [view: ResultViewMode] }>()
 const router = useRouter()
 const pageSize = 10
 const userSearchLimit = 10
@@ -105,9 +107,12 @@ const searchTitle = computed(() => {
   return isUserSearch.value ? `作者：${activeKeyword.value}` : activeKeyword.value
 })
 const documentTitle = computed(() => activeKeyword.value || searchTitle.value)
-const isArticleInfiniteView = computed(
-  () => !isUserSearch.value && resultView.value === RESULT_VIEW_MODE.INFINITE,
-)
+const layoutView = ref(resultView.value)
+watch(layoutView, view => emit('result-layout', view), { immediate: true })
+const isInfiniteLayout = computed(() => !isUserSearch.value && layoutView.value === RESULT_VIEW_MODE.INFINITE)
+watch(() => [resultView.value, contentState.value, isUserSearch.value] as const, ([view, state, users]) => {
+  if (state !== 'content' || users) layoutView.value = view
+})
 const resultSummary = computed(() => {
   if (!activeKeyword.value) return ''
   if (isUserSearch.value) {
@@ -118,7 +123,7 @@ const resultSummary = computed(() => {
 })
 const showArticleFooter = computed(
   () =>
-    resultView.value !== RESULT_VIEW_MODE.INFINITE ||
+    layoutView.value !== RESULT_VIEW_MODE.INFINITE ||
     articleSearchQuery.isFetchingNextPage.value ||
     articleSearchQuery.hasNextPage.value,
 )
@@ -139,9 +144,9 @@ const emptyStateDescription = computed(() => {
 })
 
 watch(
-  () => [currentRoute.value.fullPath, documentTitle.value] as const,
+  () => [route.fullPath, currentRoute.value.fullPath, documentTitle.value] as const,
   () => {
-    setDocumentTitle(documentTitle.value)
+    if (route.name === ROUTE_NAME.SEARCH) setDocumentTitle(documentTitle.value)
   },
   { immediate: true },
 )
@@ -198,7 +203,7 @@ useIntersectionObserver(
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main
       class="page-container search-page-main"
-      :class="isArticleInfiniteView ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'"
+      :class="isInfiniteLayout ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'"
     >
       <div
         v-if="!isUserSearch && contentState === 'content'"
@@ -207,18 +212,7 @@ useIntersectionObserver(
         <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
       </div>
 
-      <section v-if="!isArticleInfiniteView" class="px-1 py-2 md:px-2 md:py-3">
-        <div class="search-page-heading">
-          <SectionHeader
-            class="search-page-header"
-            :title="searchTitle"
-            :description="resultSummary"
-            align="center"
-            compact
-          />
-
-        </div>
-      </section>
+      <ResultListHeading v-if="!isInfiniteLayout" :title="searchTitle" :description="resultSummary" />
 
       <section class="space-y-5">
         <Transition name="content-fade" mode="out-in">
@@ -275,10 +269,11 @@ useIntersectionObserver(
                 :items="articleList"
                 :view="resultView"
                 fullscreen
-                :center-label="isArticleInfiniteView ? activeKeyword : ''"
+                :center-label="isInfiniteLayout ? activeKeyword : ''"
                 :result-count="total"
                 :show-view-toggle="false"
                 @update:view="onViewChange"
+                @layout:view="layoutView = $event"
               />
 
               <section
@@ -294,7 +289,7 @@ useIntersectionObserver(
                 <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
                   继续滚动，自动载入
                 </p>
-                <p v-else-if="resultView !== RESULT_VIEW_MODE.INFINITE" class="text-sm text-[var(--color-text-muted)]">
+                <p v-else-if="layoutView !== RESULT_VIEW_MODE.INFINITE" class="text-sm text-[var(--color-text-muted)]">
                   END
                 </p>
               </section>
@@ -322,20 +317,9 @@ useIntersectionObserver(
   position: absolute;
   top: 1.25rem;
   right: 0;
-  z-index: 60;
+  z-index: 20;
   display: flex;
   justify-content: flex-end;
-}
-
-.search-page-header :deep(h2) {
-  font-size: clamp(2.35rem, 5vw, 3.8rem);
-  line-height: 1.08;
-  letter-spacing: -0.06em;
-}
-
-.search-page-header :deep(p) {
-  margin-inline: auto;
-  text-align: center;
 }
 
 .search-page-load-sentinel {

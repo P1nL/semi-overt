@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import LiquidPanelTransition from '@/shared/components/base/LiquidPanelTransition.vue'
+import SearchSuggestions from './SearchSuggestions.vue'
+import { createSearchCloseSequence } from './model/searchCloseSequence'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
@@ -12,6 +13,8 @@ import { useUiStore } from '@/stores/ui'
 import { CategoryMenu } from '@/widgets/category-menu'
 import AppHeaderActions from './AppHeaderActions.vue'
 import AppHeaderLogo from './AppHeaderLogo.vue'
+import HeaderIntroEffects from './HeaderIntroEffects.vue'
+import { useHeaderIntro } from './model/useHeaderIntro'
 import type { LiquidButtonMotion } from '@/shared/utils/magneticSpring'
 import { createLiquidBridgePath } from './model/liquidBridge'
 
@@ -32,11 +35,29 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchButtonRef = ref<HTMLButtonElement | null>(null)
 const searchOpen = ref(false)
 const searchTransitioning = ref(false)
+const searchClosing = ref(false)
+const searchPanelLeaving = ref(false)
+let clearSearchOnCollapse = false
+const searchCloseSequence = createSearchCloseSequence({
+  retract() { searchClosing.value = true; dropdownVisible.value = false },
+  collapse(restoreFocus) {
+    searchClosing.value = false
+    searchOpen.value = false
+    dropdownVisible.value = false
+    if (clearSearchOnCollapse) {
+      clearSearchOnCollapse = false
+      keyword.value = ''
+      uiStore.clearSearchQuery()
+    }
+    if (restoreFocus) void nextTick(() => searchButtonRef.value?.focus())
+  },
+})
 let searchAnimation: Animation | null = null
 let searchTransitionRevision = 0
 const keyword = ref(uiStore.searchQuery)
 const dropdownVisible = ref(false)
 const headerRef = ref<HTMLElement | null>(null)
+const headerIntro = useHeaderIntro(headerRef)
 const navigationReady = ref(false)
 const leadingRef = ref<HTMLElement | null>(null)
 const leadingSize = ref({ width: 119.2, height: 53.6 })
@@ -47,7 +68,7 @@ const liquidBridgePath = computed(() => createLiquidBridgePath(leadingSize.value
 const dockOverlayOpen = ref(false)
 const { returnToRest: returnDockToRest } = useDockMagnification(
   headerRef,
-  computed(() => navigationReady.value && !uiStore.appreciationMode),
+  computed(() => navigationReady.value && !uiStore.appreciationMode && !headerIntro.active.value),
   computed(() => searchOpen.value || searchTransitioning.value || dockOverlayOpen.value),
 )
 
@@ -123,6 +144,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   leadingObserver?.disconnect()
+  searchCloseSequence.cancel()
   searchTransitionRevision++
   searchAnimation?.cancel()
   clearNavigationReadyWaiters()
@@ -176,7 +198,7 @@ watch(searchOpen, async (value) => {
     const animation = element.animate([
       { width: from.width + 'px', transform: 'translateX(' + (from.right - to.right) + 'px)' },
       { width: to.width + 'px', transform: 'translateX(0px)' },
-    ], { duration: 360, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
+    ], { duration: value ? 360 : 240, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
     searchAnimation = animation
     animation.onfinish = () => {
       if (revision !== searchTransitionRevision) return
@@ -190,6 +212,7 @@ watch(searchOpen, async (value) => {
 })
 
 watch(trimmedKeyword, (value) => {
+  if (searchClosing.value) resumeSearch()
   dropdownVisible.value = value.length > 0
 })
 
@@ -207,15 +230,25 @@ function toggleSearch() {
   searchOpen.value = !searchOpen.value
 }
 
-function closeSearch(options: { restoreFocus?: boolean } = {}) {
-  searchOpen.value = false
-  dropdownVisible.value = false
-
-  if (options.restoreFocus) {
-    void nextTick(() => {
-      searchButtonRef.value?.focus()
-    })
-  }
+function resumeSearch() {
+  clearSearchOnCollapse = false
+  searchCloseSequence.cancel()
+  searchClosing.value = false
+  searchOpen.value = true
+  dropdownVisible.value = trimmedKeyword.value.length > 0
+  void nextTick(() => searchInputRef.value?.focus())
+}
+function onSearchButtonClick() {
+  if (searchClosing.value || (!searchOpen.value && searchTransitioning.value)) { resumeSearch(); return }
+  if (searchOpen.value) void submitSearch()
+  else toggleSearch()
+}
+function onSuggestionsClosed() {
+  searchPanelLeaving.value = false
+  searchCloseSequence.complete()
+}
+function closeSearch(options: { restoreFocus?: boolean; immediate?: boolean } = {}) {
+  searchCloseSequence.request(showDropdown.value || searchPanelLeaving.value, options)
 }
 
 async function navigateToArticleSearch() {
@@ -228,8 +261,7 @@ async function navigateToArticleSearch() {
     query: { keyword: normalized },
   })
 
-  keyword.value = ''
-  uiStore.clearSearchQuery()
+  clearSearchOnCollapse = true
   closeSearch()
 }
 
@@ -246,8 +278,7 @@ async function navigateToAuthorSearch() {
     },
   })
 
-  keyword.value = ''
-  uiStore.clearSearchQuery()
+  clearSearchOnCollapse = true
   closeSearch()
 }
 
@@ -257,9 +288,11 @@ async function submitSearch() {
 </script>
 
 <template>
-  <div class="header-shell" :class="uiStore.appreciationMode ? 'header-shell--appreciation' : ''">
+  <div class="header-shell" :class="[uiStore.appreciationMode ? 'header-shell--appreciation' : '', { 'header-shell--intro': headerIntro.active.value, 'header-shell--intro-settled': headerIntro.participated.value }]" :style="headerIntro.style.value">
+    <HeaderIntroEffects v-if="headerIntro.active.value" />
     <header
       ref="headerRef"
+      :inert="!headerIntro.ready.value"
       class="fixed inset-x-0 top-[10px] z-40 px-3 pt-3 md:px-4"
       :data-navigation-ready="navigationReady ? 'true' : 'false'"
     >
@@ -287,13 +320,13 @@ async function submitSearch() {
             <CategoryMenu :active-category="activeCategory" @magnetic-move="categoryOffset = $event" />
           </div>
 
-          <div data-panel-origin-surface class="header-tools header-capsule relative flex min-h-[3.125rem] min-w-0 items-center gap-1 rounded-full px-2 py-0.5 md:min-h-[3.35rem] md:gap-2 md:py-1" :class="searchOpen ? 'max-md:flex-1' : ''">
+          <div data-panel-origin-surface data-intro-anchor="tools" class="header-tools header-capsule relative flex min-h-[3.125rem] min-w-0 items-center gap-1 rounded-full px-2 py-0.5 md:min-h-[3.35rem] md:gap-2 md:py-1" :class="searchOpen ? 'max-md:flex-1' : ''">
             <div class="header-search-region relative flex min-w-0 flex-none items-center justify-end" :class="searchOpen ? 'max-md:flex-1' : ''">
               <div
                 ref="searchWrapRef"
                 data-header-dock-item="search"
                 class="relative"
-                :class="[searchWrapClass, { 'header-search-wrap--transitioning': searchTransitioning }, showDropdown || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
+                :class="[searchWrapClass, { 'header-search-wrap--transitioning': searchTransitioning }, showDropdown || searchPanelLeaving || searchClosing || !searchOpen ? 'overflow-visible' : 'overflow-hidden']"
               >
                 <form
                   class="header-search-shell flex h-[2.85rem] items-center rounded-[var(--radius-pill)]"
@@ -309,7 +342,7 @@ async function submitSearch() {
                     :aria-label="searchOpen ? '提交搜索' : '打开搜索'"
                     :aria-expanded="searchOpen"
                     aria-controls="header-search-input"
-                    @click="searchOpen ? submitSearch() : toggleSearch()"
+                    @click="onSearchButtonClick"
                   >
                     <Icon name="search" :size="24" />
                   </button>
@@ -319,6 +352,8 @@ async function submitSearch() {
                     id="header-search-input"
                     ref="searchInputRef"
                     v-model="keyword"
+                    :class="{ 'header-search-input--closing': searchClosing }"
+                    @pointerdown="searchClosing && resumeSearch()"
                     type="search"
                     placeholder="搜索文章或作者"
                     aria-label="搜索文章或作者"
@@ -327,54 +362,15 @@ async function submitSearch() {
                   />
                 </form>
 
-                <!-- 搜索建议下拉框 -->
-                <LiquidPanelTransition variant="search"
-                  enter-active-class="transition duration-150 ease-out"
-                  enter-from-class="opacity-0 translate-y-1"
-                  enter-to-class="opacity-100 translate-y-0"
-                  leave-active-class="transition duration-100 ease-in"
-                  leave-from-class="opacity-100 translate-y-0"
-                  leave-to-class="opacity-0 translate-y-1"
-                >
-                  <div
-                    v-if="showDropdown"
-                    class="search-dropdown absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_97%,transparent)] py-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
-                    role="listbox"
-                    aria-label="搜索建议"
-                  >
-                    <button
-                      type="button"
-                      class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
-                      role="option"
-                      @click="navigateToArticleSearch"
-                    >
-                      <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]">
-                        <Icon name="search" size="0.85rem" />
-                      </span>
-                      <span class="min-w-0 flex-1">
-                        <span class="block text-xs text-[var(--color-text-muted)]">文章</span>
-                        <span class="block truncate text-sm font-medium text-[var(--color-text)]">具有「{{ trimmedKeyword }}」的文章</span>
-                      </span>
-                    </button>
-
-                    <div class="mx-4 h-px bg-[var(--color-border)]" />
-
-                    <button
-                      type="button"
-                      class="search-dropdown-item flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary)_6%,transparent)]"
-                      role="option"
-                      @click="navigateToAuthorSearch"
-                    >
-                      <span class="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--color-text-muted)_10%,transparent)] text-[var(--color-text-muted)]">
-                        <Icon name="user" size="0.85rem" />
-                      </span>
-                      <span class="min-w-0 flex-1">
-                        <span class="block text-xs text-[var(--color-text-muted)]">作者</span>
-                        <span class="block truncate text-sm font-medium text-[var(--color-text)]">包含「{{ trimmedKeyword }}」的作者</span>
-                      </span>
-                    </button>
-                  </div>
-                </LiquidPanelTransition>
+                <SearchSuggestions
+                  :open="showDropdown"
+                  :keyword="trimmedKeyword"
+                  @article="navigateToArticleSearch"
+                  @author="navigateToAuthorSearch"
+                  @close="closeSearch({ restoreFocus: true })"
+                  @leaving="searchPanelLeaving = $event"
+                  @closed="onSuggestionsClosed"
+                />
               </div>
             </div>
 
@@ -389,6 +385,12 @@ async function submitSearch() {
 </template>
 
 <style scoped>
+.header-shell--intro-settled .app-header-surface { visibility: visible; opacity: 1; transform: none; transition: none; }
+.header-shell--intro :deep(.brand-home-link) { opacity: var(--intro-home-opacity, 0); transform: scale(var(--intro-home-scale, .5)); }
+.header-shell--intro .header-liquid-bridge { opacity: var(--intro-bridge-opacity, 0); }
+.header-shell--intro .header-capsule { background: transparent; }
+.header-shell--intro .header-capsule::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--color-brand-logo-bg); opacity: var(--intro-capsule-opacity, 0); }
+.header-shell--intro :deep([data-header-dock-item]) { opacity: clamp(0, calc((var(--intro-icon-clock, 0) - var(--intro-icon-start, 5800)) / var(--intro-icon-fade, 240)), 1); }
 .header-shell--appreciation .app-header-surface {
   pointer-events: none;
   transform: none !important;
@@ -462,6 +464,9 @@ async function submitSearch() {
   --leading-button-gap: 0.5rem;
   gap: var(--leading-button-gap);
 }
+/* The home disc masks the category silhouette and icon while they emerge. */
+.header-leading > :deep(.brand-home-link) { z-index: 2; }
+.header-leading > :deep(.category-orbit) { z-index: 1; }
 .header-liquid-bridge {
   position: absolute;
   left: -16px;
@@ -486,7 +491,8 @@ async function submitSearch() {
   background: var(--color-brand-logo-bg);
   color: var(--color-brand-logo-fg);
 }
-.header-capsule > :deep(*) { position: relative; z-index: 1; }
+/* ZEN actions must retain viewport-fixed positioning for their move animation. */
+.header-capsule > :deep(:not(.header-actions--appreciation)) { position: relative; z-index: 1; }
 .header-capsule :deep(.category-menu-trigger),
 .header-capsule :deep(.tool-icon-button),
 .header-capsule :deep(.user-trigger),
@@ -501,7 +507,8 @@ async function submitSearch() {
   padding-inline: 0.5rem;
 }
 .header-shell--appreciation .header-capsule { background: transparent; }
-.header-shell--appreciation .header-capsule :deep(.theme-switch-button) {
+.header-shell--appreciation .header-capsule :deep(.theme-switch-button),
+.header-shell--appreciation .header-capsule :deep(.header-draft-entry .tool-icon-button) {
   color: var(--color-text-muted);
 }
 
@@ -517,6 +524,9 @@ async function submitSearch() {
   transform: translateY(var(--header-dock-lift, 0px)) scale(var(--header-dock-scale, 1));
   transform-origin: center;
 }
+
+.header-search-input { transition: opacity 80ms linear; }
+.header-search-input--closing { opacity: 0; transition-delay: 240ms; }
 
 .header-search-shell {
   position: relative;

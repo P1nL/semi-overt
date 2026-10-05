@@ -9,6 +9,7 @@ import type { UserProfileVm } from '@/entities/user'
 import { cancelReviewByArticleId } from '@/features/article-cancel-review'
 import {
   ArticleEditorForm,
+  EditorSaveIcon,
   createEmptyEditorFormValues,
   mapArticleDetailVmToEditorFormValues,
   type EditorDraftSavedPayload,
@@ -71,8 +72,15 @@ const publishConfirming = ref(false)
 const cancelConfirming = ref(false)
 const publishCooldownRevealed = ref(false)
 const saveFeedback = ref<'idle' | 'saved' | 'error'>('idle')
+const saveFlipPhase = ref<'out' | 'in' | null>(null)
 const manualSaving = ref(false)
-const lastManualSavedAt = ref('')
+const saveIconHovered = ref(false)
+const saveLoadingFinishRequested = ref(false)
+let finishLoadingCycle: (() => void) | null = null
+let saveAnimationDisposed = false
+function onSaveLoadingCycleComplete() {
+  if (saveLoadingFinishRequested.value) finishLoadingCycle?.()
+}
 const submitError = ref('')
 const nowTimestamp = ref(Date.now())
 const publishCooldownUntil = ref(0)
@@ -106,7 +114,17 @@ let publishCooldownRevealTimer: ReturnType<typeof setTimeout> | null = null
 let saveFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 let publishCooldownTimer: ReturnType<typeof setInterval> | null = null
 
-const articleId = computed(() => String(route.params.id || ''))
+const articleId = ref(String(route.params.id || ''))
+watch(
+  () => [route.name, route.params.id] as const,
+  ([name, id]) => {
+    // The sheet stays mounted while closing after the live route has changed.
+    // Background route params must not reset its form or mark it dirty.
+    if (name === ROUTE_NAME.ARTICLE_EDITOR || name === ROUTE_NAME.ARTICLE_EDITOR_NEW) {
+      articleId.value = String(id || '')
+    }
+  },
+)
 const hasRouteArticleId = computed(() => Boolean(articleId.value))
 const currentArticle = computed(() => editorStore.currentArticle)
 const currentRouteArticle = computed(() => {
@@ -304,7 +322,9 @@ const editorDocumentTitle = computed(() => {
 watch(
   () => [route.fullPath, editorDocumentTitle.value] as const,
   () => {
-    setDocumentTitle(editorDocumentTitle.value)
+    if (route.name === ROUTE_NAME.ARTICLE_EDITOR || route.name === ROUTE_NAME.ARTICLE_EDITOR_NEW) {
+      setDocumentTitle(editorDocumentTitle.value)
+    }
   },
   { immediate: true },
 )
@@ -329,16 +349,17 @@ const saveStatus = computed(() => {
       text: `${currentStatusLabel.value}（只读）`,
     }
   }
-  if (editorStore.dirty) {
+  if (editorStore.manualSavePending || editorStore.dirty) {
     return { dotColor: 'var(--color-warning)', textColor: 'var(--color-text-faint)', text: '有未保存的更改' }
   }
 
-  const savedTime = formatSavedTime(lastManualSavedAt.value)
+  const receipt = editorStore.getDraftSaveReceipt(articleId.value || editorStore.currentArticle?.id || '')
+  const savedTime = formatSavedTime(receipt?.savedAt ?? '')
   if (savedTime) {
     return {
       dotColor: 'var(--color-success)',
       textColor: 'var(--color-text-faint)',
-      text: `上次保存于 ${savedTime}`,
+      text: `上次${receipt?.kind === 'auto' ? '自动' : receipt?.kind === 'manual' ? '手动' : ''}保存于 ${savedTime}`,
     }
   }
 
@@ -446,12 +467,33 @@ function armPublishCooldownRevealTimeout() {
 
 function setSaveFeedback(state: 'idle' | 'saved' | 'error', duration = 0) {
   clearSaveFeedbackTimer()
+  saveFlipPhase.value = null
   saveFeedback.value = state
 
   if (duration > 0) {
     saveFeedbackTimer = setTimeout(() => {
       saveFeedback.value = 'idle'
     }, duration)
+  }
+}
+
+function onSaveCheckmarkComplete() {
+  if (saveAnimationDisposed || saveFeedback.value !== 'saved' || saveFlipPhase.value) return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setSaveFeedback('idle')
+    return
+  }
+  saveFlipPhase.value = 'out'
+}
+
+function onSaveFlipEnd(event: AnimationEvent) {
+  if (event.target !== event.currentTarget || saveAnimationDisposed) return
+  if (saveFlipPhase.value === 'out' && event.animationName.startsWith('editor-save-flip-out')) {
+    // Swap the stable icon component while the button is edge-on.
+    setSaveFeedback('idle')
+    saveFlipPhase.value = 'in'
+  } else if (saveFlipPhase.value === 'in' && event.animationName.startsWith('editor-save-flip-in')) {
+    saveFlipPhase.value = null
   }
 }
 
@@ -533,15 +575,24 @@ function handleCancelAction() {
 }
 
 async function handleSaveDraft() {
-  if (!showSaveAction.value || manualSaving.value || isReadOnly.value) return
+  if (!showSaveAction.value || manualSaving.value || isReadOnly.value || saveFeedback.value === 'saved' || saveFlipPhase.value) return
 
   manualSaving.value = true
+  const revision = editorStore.changeRevision
+  saveLoadingFinishRequested.value = false
+  const loadingCompleted = new Promise<void>(resolve => { finishLoadingCycle = resolve })
 
   try {
     const saved = await editorFormRef.value?.saveDraft('manual')
-    lastManualSavedAt.value = saved && !editorStore.dirty ? editorStore.lastSavedAt : ''
-    setSaveFeedback(saved ? 'saved' : 'error', saved ? 900 : 1400)
+    if (saved && !saveAnimationDisposed) editorStore.acknowledgeManualSave(revision)
+    saveLoadingFinishRequested.value = true
+    if (saved) await loadingCompleted
+    if (saveAnimationDisposed) return
+    setSaveFeedback(saved ? 'saved' : 'error', saved ? 0 : 1400)
   } finally {
+    finishLoadingCycle?.()
+    finishLoadingCycle = null
+    saveLoadingFinishRequested.value = false
     manualSaving.value = false
   }
 }
@@ -839,18 +890,10 @@ watch(
 )
 
 watch(articleId, () => {
-  lastManualSavedAt.value = ''
   publishCooldownUntil.value = articleId.value
     ? readPersistedPublishCooldownUntil(articleId.value)
     : 0
 }, { immediate: true })
-
-watch(
-  () => editorStore.dirty,
-  (dirty) => {
-    if (dirty) lastManualSavedAt.value = ''
-  },
-)
 
 watch(
   () => [showPublishAction.value, lastSubmittedAtTimestamp.value, publishCooldownUntil.value] as const,
@@ -904,6 +947,8 @@ watch(isPublishCooldownActive, (value) => {
 })
 
 onBeforeUnmount(() => {
+  saveAnimationDisposed = true
+  finishLoadingCycle?.()
   clearPublishConfirmTimer()
   clearCancelConfirmTimer()
   clearPublishCooldownRevealTimer()
@@ -931,9 +976,13 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="editor-topbar__right">
-        <span v-if="saveStatus" class="editor-save-pill" :style="{ color: saveStatus.textColor }">
-          <span class="editor-save-pill__dot" :style="{ background: saveStatus.dotColor }" />
-          <span>{{ saveStatus.text }}</span>
+        <span class="editor-save-status" role="status" aria-live="polite" aria-atomic="true">
+          <Transition name="editor-save-status">
+            <span v-if="saveStatus" :key="saveStatus.text" class="editor-save-pill" :style="{ color: saveStatus.textColor }">
+              <span class="editor-save-pill__dot" :style="{ background: saveStatus.dotColor }" />
+              <span>{{ saveStatus.text }}</span>
+            </span>
+          </Transition>
         </span>
 
         <Transition name="editor-save-slot">
@@ -944,68 +993,23 @@ onBeforeUnmount(() => {
               :class="{
                 'is-saved': saveFeedback === 'saved',
                 'is-error': saveFeedback === 'error',
+                'is-flipping-out': saveFlipPhase === 'out',
+                'is-flipping-in': saveFlipPhase === 'in',
               }"
               :disabled="manualSaving"
+              :aria-disabled="manualSaving || saveFeedback === 'saved' || Boolean(saveFlipPhase)"
               :title="saveButtonTitle"
+              :aria-label="saveButtonTitle"
+              @mouseenter="saveIconHovered = true"
+              @mouseleave="saveIconHovered = false"
+              @focus="saveIconHovered = true"
+              @blur="saveIconHovered = false"
               @click="handleSaveDraft"
+              @animationend="onSaveFlipEnd"
             >
-              <Transition name="editor-save-icon" mode="out-in">
-                <span :key="saveVisualState" class="editor-icon-btn__glyph">
-                  <svg
-                    v-if="saveVisualState === 'saving'"
-                    class="spin"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                  >
-                    <path d="M8 2a6 6 0 0 1 6 6" opacity=".9" />
-                    <path d="M14 8a6 6 0 0 1-6 6" opacity=".5" />
-                    <path d="M8 14a6 6 0 0 1-6-6" opacity=".25" />
-                  </svg>
-
-                  <svg
-                    v-else-if="saveVisualState === 'saved'"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
-                  </svg>
-
-                  <svg
-                    v-else-if="saveVisualState === 'error'"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M8 3 13 12H3L8 3Z" />
-                    <path d="M8 6.2v2.8" />
-                    <circle cx="8" cy="11.1" r="0.6" fill="currentColor" stroke="none" />
-                  </svg>
-
-                  <svg
-                    v-else
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M13.5 14h-11a.5.5 0 0 1-.5-.5V2.5a.5.5 0 0 1 .5-.5H11l3 3v8.5a.5.5 0 0 1-.5.5z" />
-                    <rect x="4.5" y="2" width="5.5" height="3.5" rx="0.3" />
-                    <rect x="3" y="9.5" width="10" height="4" rx="0.3" />
-                  </svg>
-                </span>
-              </Transition>
+              <span class="editor-icon-btn__glyph" :class="{ 'editor-icon-btn__glyph--loading': saveVisualState === 'saving' }">
+                <EditorSaveIcon :state="saveVisualState" :animate="saveIconHovered && !saveFlipPhase" :finish-loading="saveLoadingFinishRequested" @loading-cycle-complete="onSaveLoadingCycleComplete" @saved-complete="onSaveCheckmarkComplete" />
+              </span>
             </button>
           </div>
         </Transition>
@@ -1181,6 +1185,31 @@ onBeforeUnmount(() => {
   gap: 0.55rem;
 }
 
+.editor-save-status {
+  display: inline-grid;
+  align-items: center;
+  justify-items: end;
+}
+
+.editor-save-status > .editor-save-pill {
+  grid-area: 1 / 1;
+}
+
+.editor-save-status > .editor-save-status-enter-active,
+.editor-save-status > .editor-save-status-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.editor-save-status-enter-from {
+  opacity: 0;
+  transform: translateY(3px);
+}
+
+.editor-save-status-leave-to {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
 .editor-save-pill {
   display: inline-flex;
   align-items: center;
@@ -1224,6 +1253,7 @@ onBeforeUnmount(() => {
 }
 
 .editor-icon-btn {
+  position: relative;
   display: inline-flex;
   width: 2.125rem;
   height: 2.125rem;
@@ -1250,9 +1280,21 @@ onBeforeUnmount(() => {
 }
 
 .editor-icon-btn__glyph {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.editor-icon-btn__glyph--loading {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 .editor-icon-btn:hover:not(:disabled) {
@@ -1266,16 +1308,44 @@ onBeforeUnmount(() => {
   transform: scale(0.96);
 }
 
+.editor-icon-btn.is-flipping-out {
+  animation: editor-save-flip-out 220ms ease-in both;
+}
+
+.editor-icon-btn.is-flipping-in {
+  animation: editor-save-flip-in 260ms ease-out both;
+}
+
+@keyframes editor-save-flip-out {
+  from { transform: perspective(240px) rotateY(0deg); }
+  to { transform: perspective(240px) rotateY(90deg); }
+}
+
+@keyframes editor-save-flip-in {
+  from { transform: perspective(240px) rotateY(-90deg); }
+  to { transform: perspective(240px) rotateY(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-save-status > .editor-save-status-enter-active,
+  .editor-save-status > .editor-save-status-leave-active {
+    transition: none;
+  }
+
+  .editor-save-status-enter-from,
+  .editor-save-status-leave-to {
+    transform: none;
+  }
+
+  .editor-icon-btn.is-flipping-out,
+  .editor-icon-btn.is-flipping-in {
+    animation-duration: 1ms;
+  }
+}
+
 .editor-icon-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.editor-icon-btn.is-saved {
-  color: var(--color-success);
-  border-color: color-mix(in srgb, var(--color-success) 50%, transparent);
-  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-success) 18%, transparent);
 }
 
 .editor-icon-btn.is-error {
@@ -1492,7 +1562,7 @@ onBeforeUnmount(() => {
     gap: 0.5rem;
   }
 
-  .editor-save-pill {
+  .editor-save-status {
     display: none;
   }
 

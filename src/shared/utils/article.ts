@@ -19,6 +19,9 @@ export function toPlainArticleText(content?: string | null): string {
     if (!content) return ''
 
     return content
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+        .replace(/^[\t ]{0,3}(?:`{3,}|~{3,})[^\r\n]*(?:\r?\n|$)/gm, ' ')
         .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
         .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/<\/?(?:img|hr)[^>]*>/gi, ' ')
@@ -28,11 +31,13 @@ export function toPlainArticleText(content?: string | null): string {
         .replace(/^[\t ]{0,3}(#{1,6}|\>|\-|\+|\*|\d+\.)[\t ]+/gm, '')
         .replace(/[*_~]/g, '')
         .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/&amp;/gi, '&')
-        .replace(/&lt;/gi, '<')
-        .replace(/&gt;/gi, '>')
-        .replace(/&quot;/gi, '"')
+        .replace(/&(?:nbsp|amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (entity) => {
+            const named: Record<string, string> = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" }
+            const normalized = entity.toLowerCase()
+            if (normalized in named) return named[normalized]!
+            const code = normalized.startsWith('&#x') ? parseInt(normalized.slice(3), 16) : parseInt(normalized.slice(2), 10)
+            return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : entity
+        })
         .replace(/\s+/g, ' ')
         .trim()
 }

@@ -5,6 +5,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  provide,
   ref,
   shallowRef,
   watch,
@@ -12,14 +13,18 @@ import {
 } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { RouterView, useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { resolvePageScrollMode } from '@/app/model/pageScrollMode'
 
 import { fetchArticleDetailVm } from '@/entities/queries'
 import { queryKeys } from '@/shared/api/queryKeys'
+import { PageScrollbar } from '@/shared/components/base'
 import { useToast } from '@/shared/composables/useToast'
+import { animationSceneKey } from '@/shared/composables/useAnimationVisibility'
 import { ROUTE_NAME, ROUTE_PATH } from '@/shared/constants/routes'
 import { UI_TIMING } from '@/shared/constants/ui'
 import { ApiBusinessError } from '@/shared/types/api'
 import { getErrorMessage } from '@/shared/utils/error'
+import { beginPageScrollTransition, finishPageScrollTransition, getPageScrollPosition, setPageScrollContainer } from '@/shared/utils/pageScroll'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
@@ -27,6 +32,7 @@ import { AppHeader } from '@/widgets/app-header'
 import { AuthDialog } from '@/widgets/auth-dialog'
 import { PageSheet } from '@/widgets/page-sheet'
 import { ToastStack } from '@/widgets/toast-stack'
+import { provideHomeIntro, HomeIntroOverlay, HOME_INTRO } from '@/features/home-intro'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +41,13 @@ const toast = useToast()
 const authStore = useAuthStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
+const homeIntro = provideHomeIntro(router.resolve(location.pathname + location.search).name === ROUTE_NAME.HOME)
+watch(() => route.fullPath, () => {
+  if (homeIntro.active.value && route.name && route.name !== ROUTE_NAME.HOME) homeIntro.finish()
+})
+const pageScrollRef = ref<HTMLElement | null>(null)
+watch(pageScrollRef, setPageScrollContainer, { flush: 'post' })
+onBeforeUnmount(() => setPageScrollContainer(null))
 const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
 const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
@@ -76,6 +89,14 @@ const shouldRenderBaseRoute = computed(
   () => !displayedSheetRoute.value || !!backgroundRoute.value,
 )
 
+const basePageScrollMode = ref(resolvePageScrollMode(baseRenderRoute.value))
+watch(() => [baseRenderRoute.value.path, baseRenderRoute.value.query.type] as const, () => {
+  basePageScrollMode.value = resolvePageScrollMode(baseRenderRoute.value)
+})
+function onResultLayout(view: 'infinite' | 'list') {
+  if (resolvePageScrollMode(baseRenderRoute.value) !== 'page') basePageScrollMode.value = view
+}
+
 const shouldAnimateBaseRoute = computed(
   () => !displayedSheetRoute.value && !uiStore.suppressNextPageTransition,
 )
@@ -95,13 +116,19 @@ const activeSheetVariant = computed<'default' | 'full'>(() =>
   displayedSheetRoute.value?.meta.sheetVariant === 'full' ? 'full' : 'default',
 )
 
-const activeSheetInset = computed<'default' | 'article'>(() =>
-  displayedSheetRoute.value?.meta.sheetInset === 'article' ? 'article' : 'default',
-)
+const activeSheetInset = computed<'default' | 'article' | 'editor'>(() => {
+  const inset = displayedSheetRoute.value?.meta.sheetInset
+  return inset === 'article' || inset === 'editor' ? inset : 'default'
+})
 
 const activeSheetScroll = computed<'sheet' | 'content'>(() =>
   displayedSheetRoute.value?.meta.sheetScroll === 'content' ? 'content' : 'sheet',
 )
+
+provide(animationSceneKey, {
+  content: computed(() => (!homeIntro.active.value || homeIntro.time.value >= HOME_INTRO.rise) && !sheetVisible.value && !(uiStore.appreciationMode && baseRenderRoute.value.name === ROUTE_NAME.HOME)),
+  background: computed(() => (!homeIntro.active.value || homeIntro.time.value >= HOME_INTRO.open) && !(sheetVisible.value && activeSheetVariant.value === 'full')),
+})
 
 function snapshotRoute(
   targetRoute: RouteLocationNormalizedLoaded | null | undefined,
@@ -126,7 +153,8 @@ function getRouteViewKey(targetRoute: RouteLocationNormalizedLoaded): string {
 function getRouteViewProps(targetRoute: RouteLocationNormalizedLoaded) {
   if (
     targetRoute.name === ROUTE_NAME.CATEGORY ||
-    targetRoute.name === ROUTE_NAME.SEARCH
+    targetRoute.name === ROUTE_NAME.SEARCH ||
+    targetRoute.name === ROUTE_NAME.PROFILE
   ) {
     return {
       routeOverride: targetRoute,
@@ -362,10 +390,10 @@ async function syncSheetRouteState(
     const requestId = ++sheetOpenRequestId
 
     if (!previousIsSheet && typeof window !== 'undefined') {
-      // 路由的滚动处理和 Sheet 内部组件挂载都可能改变 window.scrollY。
-      // 在同步路由 watcher 中先保存背景页位置，再交给 PageSheet 锁定和恢复。
-      sheetBackgroundScrollX.value = window.scrollX
-      sheetBackgroundScrollY.value = window.scrollY
+      // 在打开 Sheet 前保存应用内滚动位置；浏览器视口始终不参与页面滚动。
+      const position = getPageScrollPosition()
+      sheetBackgroundScrollX.value = position.left
+      sheetBackgroundScrollY.value = position.top
     }
 
     if (!previousIsSheet && isAuthRoute(previousRoute)) {
@@ -566,7 +594,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div id="app" class="relative min-h-screen overflow-x-hidden text-[var(--color-text)]">
+  <div
+    id="app"
+    :data-home-intro="homeIntro.active.value ? homeIntro.phase.value : undefined"
+    ref="pageScrollRef"
+    class="app-shell app-scrollbar relative text-[var(--color-text)]"
+    :class="{
+      'app-shell--home': baseRenderRoute.name === ROUTE_NAME.HOME,
+      'app-shell--infinite': basePageScrollMode === 'infinite',
+      'app-shell--results-list': basePageScrollMode === 'list',
+      'app-shell--locked': !!displayedSheetRoute || sheetOpening || authDialogOpen,
+    }"
+    :inert="!!displayedSheetRoute || sheetOpening || authDialogOpen"
+  >
     <div
       aria-hidden="true"
       class="app-theme-background app-waves-background"
@@ -580,7 +620,7 @@ onBeforeUnmount(() => {
       class="app-theme-background app-silk-background"
       :class="uiStore.darkMode ? 'app-theme-background--visible' : 'app-theme-background--hidden'"
     >
-      <ClothBackground class="app-silk-background__canvas" />
+      <ClothBackground :active="uiStore.darkMode" class="app-silk-background__canvas" />
       <div class="app-silk-background__overlay" />
     </div>
 
@@ -592,6 +632,7 @@ onBeforeUnmount(() => {
       <AppHeader
         v-if="shouldShowAppHeader"
         :active-category="activeHeaderCategory"
+        @click.capture="homeIntro.active.value && homeIntro.finish()"
       />
 
       <RouterView v-if="shouldRenderBaseRoute" v-slot="{ Component, route: currentRoute }" :route="baseRenderRoute">
@@ -599,15 +640,23 @@ onBeforeUnmount(() => {
           name="page-fade"
           mode="out-in"
           :css="shouldAnimateBaseRoute"
+          @before-leave="beginPageScrollTransition"
+          @after-enter="finishPageScrollTransition"
+          @leave-cancelled="finishPageScrollTransition"
         >
-          <div :key="getRouteViewKey(currentRoute)" class="min-h-0">
+          <div :key="getRouteViewKey(currentRoute)" class="app-route-view relative z-0 min-h-0">
             <component
               :is="resolveRouteViewComponent(Component)"
               v-bind="getRouteViewProps(currentRoute)"
+              @result-layout="onResultLayout"
             />
           </div>
         </Transition>
       </RouterView>
+      <PageScrollbar
+        :container="pageScrollRef"
+        :active="baseRenderRoute.name !== ROUTE_NAME.HOME && basePageScrollMode !== 'infinite' && !displayedSheetRoute && !sheetOpening && !authDialogOpen"
+      />
     </div>
 
     <Transition
@@ -658,10 +707,37 @@ onBeforeUnmount(() => {
 
     <AuthDialog v-model="authDialogOpen" initial-mode="login" />
     <ToastStack />
+    <HomeIntroOverlay />
   </div>
 </template>
 
 <style scoped>
+#app.app-shell {
+  block-size: 100svh;
+  min-block-size: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* The overlay scrollbar never reserves width, including during view switches. */
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+
+/* Only the home stage is clipped; sheets keep their own internal scroll regions. */
+#app.app-shell--home,
+#app.app-shell--infinite {
+  overflow: hidden;
+  overflow: clip;
+  scrollbar-gutter: auto;
+  overscroll-behavior: none;
+}
+
+#app.app-shell::-webkit-scrollbar { width: 0; height: 0; }
+
+#app.app-shell--locked:not(.app-shell--home):not(.app-shell--infinite) {
+  overflow-y: hidden;
+}
+
 .app-interface > :not(:first-child) {
   transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }

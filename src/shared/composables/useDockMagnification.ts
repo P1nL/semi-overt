@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
+import { HEADER_DOCK_LAYOUT_EVENT } from '@/shared/utils/headerDockLayout'
 
 type DockItem = {
   slot: HTMLElement
@@ -57,6 +58,7 @@ export function useDockMagnification(
   }
 
   function reset() {
+    const hadItems = items.length > 0
     stopFrame()
     for (const item of items) clearStyle(item)
     items = []
@@ -66,6 +68,7 @@ export function useDockMagnification(
     pressed = false
     bounds = null
     clickHold = null
+    if (hadItems) host?.dispatchEvent(new Event(HEADER_DOCK_LAYOUT_EVENT))
   }
 
   function returnToRest() {
@@ -102,7 +105,9 @@ export function useDockMagnification(
   function tick(time: number) {
     frame = 0
     if (!active.value || pressed || clickHold) return
+    const wasDirty = dirty
     if (dirty) collectItems()
+    const previousScales = items.map(item => item.scale)
     const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.032) : 1 / 60
     lastTime = time
 
@@ -161,6 +166,11 @@ export function useDockMagnification(
       item.slot.style.setProperty('--header-dock-lift', liftFor(item).toFixed(3) + 'px')
     }
     if (host) host.dataset.headerDockRunning = String(moving)
+    // Notify after all width/scale writes. Anchored surfaces can read once and
+    // move in this same frame, including the final spring-to-rest frame.
+    if (wasDirty || items.some((item, index) => item.scale !== previousScales[index])) {
+      host?.dispatchEvent(new Event(HEADER_DOCK_LAYOUT_EVENT))
+    }
     if (moving) requestTick()
     else lastTime = 0
   }

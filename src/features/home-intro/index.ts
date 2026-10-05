@@ -1,0 +1,5 @@
+export { provideHomeIntro } from './model/provideHomeIntro'
+export { useHomeIntro, useIntroTarget, useIntroActive } from './model/context'
+export type { IntroRect, HomeIntroContext, HomeIntroContentState } from './model/context'
+export * from './model/choreography'
+export { default as HomeIntroOverlay } from './ui/HomeIntroOverlay.vue'

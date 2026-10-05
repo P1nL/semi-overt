@@ -1,3 +1,12 @@
+/* Local Roboto Flex subset: only the continuous wght axis is retained. */
+@font-face {
+    font-family: 'Hero Pressure';
+    src: url('../../shared/assets/fonts/RobotoFlex-Weight-Latin.woff2') format('woff2');
+    font-style: normal;
+    font-weight: 100 1000;
+    font-display: swap;
+}
+
 @font-face {
     font-family: "Zhaohua Display";
     src: url("../../shared/assets/fonts/ZhaohuaMinB-Black-common.woff2") format("woff2");
@@ -7,6 +16,7 @@
 }
 
 :root {
+    --font-pressure: 'Hero Pressure', sans-serif;
     --font-display:
             "Zhaohua Display",
             "Noto Serif SC",

@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, useTemplateRef } from 'vue'
+import { computed, onMounted, onBeforeUnmount, useTemplateRef, watch } from 'vue'
+import { useAnimationVisibility } from '@/shared/composables/useAnimationVisibility'
 import { Renderer, Camera, Geometry, Program, Mesh } from 'ogl'
 import { World, Body, Particle, DistanceConstraint, Vec3, GSSolver, SAPBroadphase } from 'cannon-es'
 
 // Inspired by Arno Di Nunzio's physics-based cloth:
 // https://tympanus.net/codrops/2020/02/11/how-to-create-a-physics-based-3d-cloth-with-cannon-js-and-three-js/
 // Uses a particle/constraint fabric with OGL rendering, without slideshow images.
+const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true })
 const host = useTemplateRef<HTMLDivElement>('host')
+const { visible, reducedMotion } = useAnimationVisibility(host, 'background')
+const active = computed(() => props.active && visible.value)
 // A decorative background does not need a full-resolution physics mesh.
 const COLS = 24
 const ROWS = 18
@@ -33,7 +37,6 @@ let accumulator = 0
 let elapsed = 0
 let viewWidth = 10
 let viewHeight = 10
-let motion: MediaQueryList | undefined
 let lost = false
 const positions = new Float32Array(COUNT * 3)
 const normals = new Float32Array(COUNT * 3)
@@ -194,7 +197,7 @@ function draw() {
 
 function animate(now: number) {
   frame = 0
-  if (document.hidden || motion?.matches || lost) return
+  if (!active.value || reducedMotion.value || lost) return
   if (now - last < FRAME_INTERVAL_MS - 0.5) {
     frame = requestAnimationFrame(animate)
     return
@@ -220,7 +223,7 @@ function resetPointer() {
   pendingPointer = null
 }
 function move(event: PointerEvent) {
-  if (event.pointerType !== 'mouse' || motion?.matches || document.hidden || lost) return
+  if (event.pointerType !== 'mouse' || reducedMotion.value || !active.value || lost) return
   // Keep only the latest sample; DOM queries and force updates run once per frame.
   pendingPointer = event
 }
@@ -230,7 +233,7 @@ function consumePointer() {
   pendingPointer = null
   if (!event) return
   if (!(event.target instanceof Element) || event.target.closest(
-    'header, nav, article, a, button, input, textarea, select, [role="dialog"], [role="menu"], .surface-1, .surface-2, .prose, [contenteditable]',
+    'header, nav, article, a, button, input, textarea, select, [role="dialog"], [role="menu"], .surface-1, .surface-2, .prose, [contenteditable], [data-draft-interaction-shield]',
   )) { resetPointer(); return }
   const rect = hostRect
   if (!rect || !rect.width || !rect.height) return
@@ -253,9 +256,11 @@ function resume() {
   resetPointer()
   last = performance.now()
   accumulator = 0
-  if (motion?.matches) draw()
-  else if (!document.hidden && !lost) frame = requestAnimationFrame(animate)
+  if (!active.value || lost || !mesh) return
+  if (reducedMotion.value) draw()
+  else frame = requestAnimationFrame(animate)
 }
+watch([active, reducedMotion], resume)
 
 function resize() {
   if (!renderer || !camera || !host.value) return
@@ -302,14 +307,11 @@ onMounted(() => {
     program = new Program(gl, { vertex, fragment, cullFace: null })
     mesh = new Mesh(gl, { geometry, program, frustumCulled: false })
     host.value.appendChild(gl.canvas)
-    motion = matchMedia('(prefers-reduced-motion: reduce)')
-    motion.addEventListener('change', resume)
     window.addEventListener('resize', resize)
     window.addEventListener('pointermove', move, { passive: true })
     window.addEventListener('pointerout', resetPointer)
     window.addEventListener('blur', resetPointer)
-    window.addEventListener('scroll', resetPointer, { passive: true })
-    document.addEventListener('visibilitychange', resume)
+    window.addEventListener('scroll', resetPointer, { passive: true, capture: true })
     gl.canvas.addEventListener('webglcontextlost', contextLost)
     resize()
   } catch (error) {
@@ -321,13 +323,11 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(frame)
   resetPointer()
   hostRect = undefined
-  motion?.removeEventListener('change', resume)
   window.removeEventListener('resize', resize)
   window.removeEventListener('pointermove', move)
   window.removeEventListener('pointerout', resetPointer)
   window.removeEventListener('blur', resetPointer)
-  window.removeEventListener('scroll', resetPointer)
-  document.removeEventListener('visibilitychange', resume)
+  window.removeEventListener('scroll', resetPointer, true)
   renderer?.gl.canvas.removeEventListener('webglcontextlost', contextLost)
   geometry?.remove()
   program?.remove()

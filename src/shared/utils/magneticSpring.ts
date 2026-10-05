@@ -33,7 +33,7 @@ export function stepLiquidRim(state: LiquidRimState, motion: MagneticPoint, seco
       const neighbors = previous[(index + count - 1) % count]! + previous[(index + 1) % count]! - 2 * previous[index]!
       velocity[index] += ((pressure[index]! - average - previous[index]!) * 150 + neighbors * 55 - velocity[index]! * 15) * dt
       const next = previous[index]! + velocity[index]! * dt
-      displacement[index] = Math.max(-0.30, Math.min(0.70, next))
+      displacement[index] = Math.max(-0.30, Math.min(0.60, next))
       if (displacement[index] !== next) velocity[index] = 0
     }
   }

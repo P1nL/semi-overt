@@ -19,6 +19,8 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch, type CSSProperties, useTemplateRef } from 'vue';
+import { useAnimationVisibility } from '@/shared/composables/useAnimationVisibility';
+import { createFrameLimiter } from '@/shared/utils/animationFrame';
 
 class Grad {
   x: number;
@@ -184,6 +186,8 @@ const props = withDefaults(defineProps<WavesProps>(), {
 
 const containerRef = useTemplateRef<HTMLDivElement>('containerRef');
 const canvasRef = useTemplateRef<HTMLCanvasElement>('canvasRef');
+const { visible, reducedMotion } = useAnimationVisibility(containerRef, 'background');
+const limiter = createFrameLimiter(60);
 
 let ctx: CanvasRenderingContext2D | null = null;
 let bounding = { width: 0, height: 0, left: 0, top: 0 };
@@ -214,33 +218,24 @@ let config: Config = {
   yGap: props.yGap
 };
 let frameId: number | null = null;
-let pauseTimer: number | null = null;
 let paused = true;
 let elapsed = 0;
-let previousTime: number | null = null;
 
 const stop = () => {
   paused = true;
   if (frameId !== null) cancelAnimationFrame(frameId);
   frameId = null;
-  previousTime = null;
+  limiter.reset();
 };
 const syncPlayback = () => {
-  if (pauseTimer !== null) window.clearTimeout(pauseTimer);
-  pauseTimer = null;
-  if (document.hidden) { stop(); return; }
-  if (props.active) {
-    if (ctx && paused) {
-      paused = false;
-      previousTime = null;
-      frameId = requestAnimationFrame(tick);
-    }
-  } else if (!paused) {
-    // Match the background's 900ms crossfade before stopping the hidden loop.
-    pauseTimer = window.setTimeout(() => { pauseTimer = null; stop(); }, 900);
+  if (!props.active || !visible.value || reducedMotion.value) { stop(); return; }
+  if (ctx && paused) {
+    paused = false;
+    limiter.reset();
+    frameId = requestAnimationFrame(tick);
   }
 };
-watch(() => props.active, syncPlayback);
+watch([() => props.active, visible, reducedMotion], syncPlayback);
 
 const setSize = () => {
   const container = containerRef.value;
@@ -347,9 +342,10 @@ const drawLines = () => {
 
 const tick = (t: number) => {
   frameId = null;
-  if (paused) return;
-  if (previousTime !== null) elapsed += Math.min(t - previousTime, 50);
-  previousTime = t;
+  if (paused || !props.active || !visible.value || reducedMotion.value) return;
+  const delta = limiter.consume(t);
+  if (delta === null) { frameId = requestAnimationFrame(tick); return; }
+  elapsed += Math.min(delta, 50);
   const container = containerRef.value;
   if (!container) return;
 
@@ -393,6 +389,7 @@ const updateMouse = (x: number, y: number) => {
 };
 
 const onMouseMove = (e: MouseEvent) => {
+  if (e.target instanceof Element && e.target.closest('[data-draft-interaction-shield], .draft-box-panel')) return;
   updateMouse(e.clientX, e.clientY);
 };
 
@@ -414,7 +411,6 @@ onMounted(() => {
   movePoints(elapsed);
   drawLines();
   syncPlayback();
-  document.addEventListener('visibilitychange', syncPlayback);
 
   window.addEventListener('resize', onResize);
   window.addEventListener('mousemove', onMouseMove);
@@ -423,8 +419,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   stop();
-  if (pauseTimer !== null) window.clearTimeout(pauseTimer);
-  document.removeEventListener('visibilitychange', syncPlayback);
   window.removeEventListener('resize', onResize);
   window.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('touchmove', onTouchMove);

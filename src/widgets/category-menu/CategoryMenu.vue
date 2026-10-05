@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { onClickOutside, useMediaQuery } from '@vueuse/core'
 import { useMagneticButton } from '@/shared/composables/useMagneticButton'
 import { createLiquidButtonPath, type LiquidButtonMotion } from '@/shared/utils/magneticSpring'
+import { useHomeIntro, HOME_INTRO, INTRO_MOTION, progress } from '@/features/home-intro'
+import { categoryIntroImpulse } from './introImpulse'
 
 import { mapCategoryValueToVm } from '@/entities/category'
 import { CATEGORY_ORDER } from '@/entities/category'
@@ -23,14 +25,30 @@ const route = useRoute()
 const rootRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
+const intro = useHomeIntro()
+const introActive = computed(() => intro?.active.value ?? false)
+const introTime = computed(() => intro?.time.value ?? HOME_INTRO.end)
 const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
-const magneticEnabled = computed(() => finePointer.value && !reducedMotion.value)
+const magneticEnabled = computed(() => finePointer.value && !reducedMotion.value && !introActive.value)
 const { offset: magneticOffset, style: magneticStyle, onPointerMove: onMagneticPointerMove, returnToRest: returnMagneticToRest } = useMagneticButton(
   rootRef, magneticEnabled, offset => emit('magnetic-move', offset),
 )
 const compactNavigation = useMediaQuery('(max-width: 767px)')
-const liquidButtonPath = computed(() => createLiquidButtonPath(compactNavigation.value ? 25 : 26.8, magneticOffset.value))
-const magneticBackgroundTransform = computed(() => `translate(${magneticOffset.value.x} ${magneticOffset.value.y})`)
+const launchOrigin = computed(() => {
+  const home = intro?.rects.value.home, category = intro?.rects.value.category
+  return home && category ? home.left + home.width / 2 - category.left - category.width / 2 : -56
+})
+const entryPose = computed(() => categoryIntroImpulse(introTime.value, launchOrigin.value))
+const effectiveMotion = computed(() => introActive.value ? entryPose.value : magneticOffset.value)
+const liquidButtonPath = computed(() => createLiquidButtonPath(compactNavigation.value ? 25 : 26.8, effectiveMotion.value))
+const magneticBackgroundTransform = computed(() => introActive.value
+  ? `translate(${entryPose.value.x} ${entryPose.value.y}) scale(${entryPose.value.scaleX} ${entryPose.value.scaleY})`
+  : `translate(${magneticOffset.value.x} ${magneticOffset.value.y})`)
+const visualStyle = computed(() => introActive.value ? {
+  transform: `translateX(${entryPose.value.x}px) scale(${entryPose.value.iconScale})`,
+  opacity: progress(introTime.value, HOME_INTRO.category, INTRO_MOTION.categoryFade),
+} : magneticStyle.value)
+watch(effectiveMotion, value => { if (introActive.value) emit('magnetic-move', value) })
 const open = ref(false)
 const triggerHovered = ref(false)
 const triggerFocused = ref(false)
@@ -184,7 +202,7 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <div ref="rootRef" class="category-orbit" :class="{ 'is-open': open }" @focusout="onFocusOut">
+  <div ref="rootRef" class="category-orbit" data-intro-anchor="category" :style="introActive ? { opacity: introTime >= HOME_INTRO.category ? 1 : 0 } : undefined" :class="{ 'is-open': open }" @focusout="onFocusOut">
     <!-- Only the colored silhouettes are filtered: labels and icons stay sharp. -->
     <svg class="category-goo" width="240" height="200" viewBox="-120 -40 240 200" aria-hidden="true" focusable="false">
       <defs>
@@ -196,7 +214,11 @@ watch(open, async (isOpen) => {
       </defs>
       <g :filter="`url(#${gooFilterId})`">
         <path class="category-goo-main" :d="liquidButtonPath" :transform="magneticBackgroundTransform" />
-        <circle v-for="(item, index) in items" :key="item.value" class="category-goo-node" cx="0" cy="0" r="22" :style="nodeStyle(index)" />
+        <!-- Closed-menu nodes are normally hidden under the resting button.
+             Do not expose their stationary dots while the intro moves it. -->
+        <template v-if="!introActive">
+          <circle v-for="(item, index) in items" :key="item.value" class="category-goo-node" cx="0" cy="0" r="22" :style="nodeStyle(index)" />
+        </template>
       </g>
     </svg>
     <button
@@ -218,7 +240,7 @@ watch(open, async (isOpen) => {
       @click="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <span class="category-menu-trigger__visual" :style="magneticStyle">
+      <span class="category-menu-trigger__visual" :style="visualStyle">
         <CategoryFolderIcon class="category-menu-trigger__icon" :active="open || triggerHovered || triggerFocused" />
       </span>
     </button>

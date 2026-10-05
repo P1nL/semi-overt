@@ -1,8 +1,32 @@
 :root {
+    --color-splash-cover: #fff;
+    --color-intro-seed-light: #4c947f;
+    --color-intro-seed-core: #286553;
+    --color-intro-seed-edge: #123e32;
     color-scheme: light;
 
     --color-brand-logo-bg: #123e32;
     --color-brand-logo-fg: #f2f7f3;
+    --color-draft-star-fill: #006400;
+    --color-draft-star-stroke: #004d00;
+    --color-draft-create-bg: #e2ead9;
+    --color-draft-create-fg: var(--color-brand-logo-bg);
+    --color-draft-create-hover: #edf3e7;
+    --color-draft-delete-bg: color-mix(in srgb, var(--color-danger) 62%, var(--color-brand-logo-bg));
+    --color-draft-delete-fg: var(--color-brand-logo-fg);
+    --color-draft-panel-bg: var(--color-brand-logo-bg);
+    --color-draft-panel-text: var(--color-brand-logo-fg);
+    --color-draft-panel-muted: color-mix(in srgb, var(--color-brand-logo-fg) 72%, var(--color-brand-logo-bg));
+    --color-draft-panel-border: color-mix(in srgb, var(--color-brand-logo-fg) 18%, var(--color-brand-logo-bg));
+    --color-draft-panel-hover: color-mix(in srgb, var(--color-brand-logo-fg) 9%, var(--color-brand-logo-bg));
+    --color-draft-panel-accent: var(--color-brand-logo-fg);
+    --shadow-draft-panel: 0 12px 32px rgb(18 62 50 / 0.10), 0 2px 6px rgb(18 62 50 / 0.06);
+
+    /* Original Snoopy eye demo palette; intentionally unchanged. */
+    --color-snoopy-eye-disc: #a29bfe;
+    --color-snoopy-eye-iris: #6c5ce7;
+    --color-snoopy-eye-ink: #333;
+    --color-snoopy-eye-white: #dfe6e9;
 
     --font-sans:
             "HarmonyOS Sans SC",
@@ -46,9 +70,9 @@
     --color-warning: #b96b00;
     --color-profile-divider: #d97706;
     --color-overlay: rgb(9 12 20 / 0.28);
-    --color-scrollbar-thumb: rgb(29 29 31 / 0.24);
-    --color-scrollbar-thumb-hover: rgb(29 29 31 / 0.36);
-    --color-scrollbar-track: rgb(255 255 255 / 0);
+    --color-scrollbar-thumb: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
+    --color-scrollbar-thumb-hover: color-mix(in srgb, var(--color-text-faint) 62%, transparent);
+    --color-scrollbar-track: transparent;
     --color-selection-bg: rgb(0 113 227 / 0.18);
     --color-selection-text: #1d1d1f;
 
@@ -72,7 +96,7 @@
             0 16px 36px rgb(164 181 201 / 0.16),
             0 5px 12px rgb(164 181 201 / 0.1);
 
-    --scrollbar-size: 0.8rem;
+    --scrollbar-size: 0.35rem;
     --radius-base: 1rem;
     --radius-sm: calc(var(--radius-base) - 0.25rem);
     --radius-md: var(--radius-base);
@@ -111,6 +135,15 @@
 }
 
 html.dark {
+    --color-splash-cover: #000;
+    --color-draft-panel-bg: var(--color-brand-logo-bg);
+    --color-draft-panel-text: var(--color-brand-logo-fg);
+    --color-draft-panel-muted: color-mix(in srgb, var(--color-brand-logo-fg) 72%, var(--color-brand-logo-bg));
+    --color-draft-panel-border: color-mix(in srgb, var(--color-brand-logo-fg) 18%, var(--color-brand-logo-bg));
+    --color-draft-panel-hover: color-mix(in srgb, var(--color-brand-logo-fg) 9%, var(--color-brand-logo-bg));
+    --color-draft-panel-accent: var(--color-brand-logo-fg);
+    --shadow-draft-panel: 0 12px 32px rgb(0 0 0 / 0.20), 0 2px 6px rgb(0 0 0 / 0.12);
+
     color-scheme: dark;
 
     --nav-glass-tint: rgb(8 10 15 / 0.08);
@@ -147,9 +180,9 @@ html.dark {
     --color-warning: #ff9f0a;
     --color-profile-divider: color-mix(in srgb, var(--color-border) 88%, white 10%);
     --color-overlay: rgb(4 6 11 / 0.5);
-    --color-scrollbar-thumb: rgb(255 255 255 / 0.18);
-    --color-scrollbar-thumb-hover: rgb(255 255 255 / 0.28);
-    --color-scrollbar-track: rgb(255 255 255 / 0);
+    --color-scrollbar-thumb: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
+    --color-scrollbar-thumb-hover: color-mix(in srgb, var(--color-text-faint) 62%, transparent);
+    --color-scrollbar-track: transparent;
     --color-selection-bg: rgb(41 151 255 / 0.42);
     --color-selection-text: #f5f5f7;
 

@@ -17,16 +17,15 @@
 
 html {
     min-height: 100%;
-    scroll-behavior: smooth;
     background-color: var(--color-bg);
-    overflow-y: scroll;
-    scrollbar-gutter: stable;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+    height: 100%;
+    overflow: hidden;
 }
 
 body {
-    min-height: 100vh;
+    min-height: 0;
+    height: 100svh;
+    overflow: hidden;
     margin: 0;
     background-color: var(--color-bg);
     color: var(--color-text);
@@ -109,7 +108,8 @@ textarea {
 }
 
 #app {
-    min-height: 100vh;
+    min-height: 0;
+    height: 100%;
     position: relative;
     isolation: isolate;
 }
@@ -175,26 +175,28 @@ html.theme-settling #app::after {
 /* View Transition API 已禁用（见 stores/ui.ts setDarkMode 注释）。
    保留空规则防止未来误用时无样式兜底。 */
 
-html::-webkit-scrollbar {
-    width: var(--scrollbar-size);
+.app-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+    scrollbar-gutter: auto;
 }
 
-html::-webkit-scrollbar-track {
+.app-scrollbar::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
     background: var(--color-scrollbar-track);
 }
 
-html::-webkit-scrollbar-thumb {
-    min-height: 3rem;
-    border: 3px solid transparent;
+.app-scrollbar::-webkit-scrollbar-thumb {
     border-radius: var(--radius-pill);
     background: var(--color-scrollbar-thumb);
-    background-clip: content-box;
-    transition: background-color 180ms ease;
 }
 
-html::-webkit-scrollbar-thumb:hover {
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
     background: var(--color-scrollbar-thumb-hover);
-    background-clip: content-box;
 }
 
 ::selection {
@@ -211,6 +213,16 @@ html::-webkit-scrollbar-thumb:hover {
 html.theme-revealing *,
 html.theme-revealing *::before,
 html.theme-revealing *::after { transition: none !important; }
+
+/* Pre-mount cover: removed by the intro controller, with an HTML watchdog. */
+html[data-intro-boot]::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: var(--color-splash-cover);
+    pointer-events: none;
+}
 html.theme-revealing::view-transition-old(root),
 html.theme-revealing::view-transition-new(root) {
     animation: none;

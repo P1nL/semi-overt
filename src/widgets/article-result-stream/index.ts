@@ -1,3 +1,4 @@
 export { default as ArticleResultStream } from './ArticleResultStream.vue'
 export { default as ResultViewToggle } from './ResultViewToggle.vue'
+export { default as ResultListHeading } from './ResultListHeading.vue'
 export { RESULT_VIEW_MODE, isResultViewMode, normalizeResultViewMode, type ResultViewMode } from './result-view'

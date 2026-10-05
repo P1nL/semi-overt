@@ -682,7 +682,7 @@ onMounted(async () => {
   window.addEventListener('pointermove', onPointerMove, { passive: true })
   window.addEventListener('pointerout', releasePointer)
   window.addEventListener('blur', releasePointer)
-  window.addEventListener('scroll', releasePointer, { passive: true })
+  window.addEventListener('scroll', releasePointer, { passive: true, capture: true })
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
   if (!prefersReducedMotion && !resolveThemeIsDark()) {
@@ -694,7 +694,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerout', releasePointer)
   window.removeEventListener('blur', releasePointer)
-  window.removeEventListener('scroll', releasePointer)
+  window.removeEventListener('scroll', releasePointer, true)
   window.removeEventListener('resize', scheduleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   reducedMotionQuery?.removeEventListener('change', syncReducedMotionPreference)

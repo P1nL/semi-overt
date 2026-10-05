@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncComponent, ref, watch } from 'vue'
 
 import type { DraftBoxItem } from '@/features/draft-box/model'
 import { Button, Icon } from '@/shared/components/base'
@@ -8,7 +8,7 @@ import DraftListItem from './DraftListItem.vue'
 
 const AnimatedList = defineAsyncComponent(() => import('@/shared/components/AnimatedList.vue'))
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: DraftBoxItem[]
     loading?: boolean
@@ -16,6 +16,7 @@ withDefaults(
     warning?: string
     deletingId?: number | string | null
     createLabel?: string
+    active?: boolean
   }>(),
   {
     loading: false,
@@ -23,6 +24,7 @@ withDefaults(
     warning: '',
     deletingId: null,
     createLabel: '新建文章',
+    active: true,
   },
 )
 
@@ -33,6 +35,11 @@ const emit = defineEmits<{
   retry: []
 }>()
 
+const swipeOwnerId = ref<string | null>(null)
+watch(() => props.active, active => { if (!active) swipeOwnerId.value = null })
+watch(() => props.items.map(item => String(item.id)), ids => {
+  if (swipeOwnerId.value && !ids.includes(swipeOwnerId.value)) swipeOwnerId.value = null
+})
 const DRAFT_LIST_VISIBLE_COUNT = 3
 
 function getDraftItemKey(item: DraftBoxItem) {
@@ -42,8 +49,8 @@ function getDraftItemKey(item: DraftBoxItem) {
 
 <template>
   <section class="draft-list-shell space-y-3" :aria-busy="loading">
-    <InlineMessage v-if="error" tone="error" :message="error" />
-    <InlineMessage v-else-if="warning" tone="warning" :message="warning" />
+    <InlineMessage data-draft-reveal v-if="error" tone="error" :message="error" />
+    <InlineMessage data-draft-reveal v-else-if="warning" tone="warning" :message="warning" />
 
     <div class="draft-list-content space-y-3">
       <AnimatedList
@@ -57,6 +64,9 @@ function getDraftItemKey(item: DraftBoxItem) {
         <template #default="{ item }">
           <DraftListItem
             :item="item"
+            :active="active"
+            :swipe-owner="swipeOwnerId === String(item.id)"
+            @claim="swipeOwnerId = String(item.id)"
             :deleting="item.canDelete && String(deletingId) === String(item.id)"
             @open="emit('open', $event)"
             @delete="emit('delete', $event)"
@@ -65,6 +75,7 @@ function getDraftItemKey(item: DraftBoxItem) {
       </AnimatedList>
 
       <Button
+        data-draft-reveal
         type="button"
         variant="ghost"
         block
@@ -98,8 +109,16 @@ function getDraftItemKey(item: DraftBoxItem) {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 0.25rem;
-  scrollbar-gutter: stable;
+  padding-right: 0;
+  scrollbar-gutter: auto;
+}
+
+/* Keep each row's layout box stationary. The panel animates the article inside
+   this clip, so its 8px entrance/exit offset cannot inflate scrollable height. */
+.draft-list :deep(.animated-list__item) {
+  overflow: clip;
+  transform: none;
+  transition-property: opacity;
 }
 
 .draft-create-card,

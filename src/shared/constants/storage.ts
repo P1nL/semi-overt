@@ -5,4 +5,5 @@ export const STORAGE_KEY = {
     SEARCH_QUERY: 'now.searchQuery',
     AUTH_REDIRECT: 'now.authRedirect',
     ARTICLE_PUBLISH_COOLDOWN_PREFIX: 'now.articlePublishCooldown.',
+    ARTICLE_SAVE_RECEIPT_PREFIX: 'now.articleSaveReceipt.',
 } as const

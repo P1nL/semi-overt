@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import VariableProximity from '@/shared/components/VariableProximity.vue'
+import HeroTitleRing from './HeroTitleRing.vue'
+import { useHomeIntro } from '@/features/home-intro'
 
 import type { ArticleCardVm } from '@/entities/article'
 import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
-import { createHomePreviewArticles } from './model/homePreview'
 
 const props = withDefaults(
   defineProps<{
@@ -24,8 +24,16 @@ const props = withDefaults(
   },
 )
 
+const displayTitle = computed(() => {
+  const letters = Array.from(props.title)
+  const separatorIndex = letters.findIndex((letter, index) => letter === '•' && letters[index + 1] === 'O')
+  if (separatorIndex < 0) return { left: props.title, right: '', eye: false }
+  return { left: letters.slice(0, separatorIndex).join(''), right: letters.slice(separatorIndex + 2).join(''), eye: true }
+})
+
 const introRef = ref<HTMLElement | null>(null)
 const measureRef = ref<HTMLElement | null>(null)
+const titleRef = ref<HTMLElement | null>(null)
 const titleSize = ref<number | null>(null)
 let resizeObserver: ResizeObserver | undefined
 let fitFrame = 0
@@ -54,10 +62,7 @@ onBeforeUnmount(() => {
   document.fonts.removeEventListener('loadingdone', scheduleFit)
 })
 
-const HOME_SHOWCASE_PREVIEW_COUNT = 11
-// 临时开关：生产构建始终关闭，预览文章不会替换真实数据。
-const previewEnabled = import.meta.env.DEV
-const previewArticles = previewEnabled ? createHomePreviewArticles() : []
+const HOME_SHOWCASE_MAX_COUNT = 11
 
 const heroItems = computed(() => {
   const list: ArticleCardVm[] = []
@@ -66,33 +71,26 @@ const heroItems = computed(() => {
     list.push(props.primary)
   }
 
-  return list.concat(props.secondary.slice(0, HOME_SHOWCASE_PREVIEW_COUNT - 1))
+  return list.concat(props.secondary).slice(0, HOME_SHOWCASE_MAX_COUNT)
 })
 
-const showcaseItems = computed(() => {
-  const items = heroItems.value
-
-  if (!previewEnabled || items.length >= HOME_SHOWCASE_PREVIEW_COUNT) return items
-  return [...items, ...previewArticles].slice(0, HOME_SHOWCASE_PREVIEW_COUNT)
+const homeIntro = useHomeIntro()
+// Freeze the participating data set during the entrance. If it is empty,
+// leave the bottom blank until completion rather than swapping data mid-flight.
+const introItems = ref<ArticleCardVm[] | null>(null)
+watch(() => homeIntro?.contentLocked.value, locked => {
+  if (locked && introItems.value === null) introItems.value = [...heroItems.value]
 })
-
-const hasCards = computed(() => showcaseItems.value.length > 0)
+const displayedItems = computed(() => homeIntro?.active.value && introItems.value !== null ? introItems.value : heroItems.value)
 </script>
 
 <template>
   <section class="hero-section relative isolate overflow-visible pt-6 md:pt-8 lg:pt-10">
     <div ref="introRef" class="page-container hero-section__intro relative mb-3 space-y-4 md:mb-4">
-      <h1 class="hero-section__title text-[var(--color-text)]" :style="titleSize ? { fontSize: `${titleSize}px` } : undefined">
-        <span ref="measureRef" class="hero-title-measure" aria-hidden="true"><span v-for="(letter, index) in Array.from(title)" :key="index">{{ letter }}</span></span>
-        <VariableProximity
-          :label="title"
-          from-font-variation-settings="'wght' 900"
-          to-font-variation-settings="'wght' 1000"
-          :container-ref="introRef"
-          :radius="180"
-          falloff="exponential"
-          static-font-effect
-        />
+      <h1 ref="titleRef" class="hero-section__title text-[var(--color-text)]" :style="titleSize ? { fontSize: `${titleSize}px` } : undefined">
+        <span ref="measureRef" class="hero-title-measure" aria-hidden="true"><span class="hero-title-pressure-measure">{{ displayTitle.left }}</span><span v-if="displayTitle.eye">O</span><span class="hero-title-pressure-measure">{{ displayTitle.right }}</span></span>
+        <HeroTitleRing :title="title" :container-ref="titleRef" />
+        <span class="sr-only">{{ title }}</span>
       </h1>
       <p v-if="description" class="mx-auto max-w-2xl text-center text-sm leading-[1.65] text-[var(--color-text-muted)] md:text-[1rem]">
         {{ description }}
@@ -100,17 +98,18 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
     </div>
 
     <div
-      v-if="hasCards"
+      v-if="revealed && displayedItems.length"
       class="hero-section__rail"
     >
       <HomeShowcaseRail
-        :items="showcaseItems"
+        :items="displayedItems"
         category-label="day"
         featured
-        :revealed="revealed || previewEnabled"
+        fill-decorative
+        :revealed="revealed"
         :animate-reveal="animateReveal"
         :delay-base="40"
-        :max-visible="HOME_SHOWCASE_PREVIEW_COUNT"
+        :max-visible="HOME_SHOWCASE_MAX_COUNT"
       />
     </div>
   </section>
@@ -121,6 +120,9 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
   margin-top: calc(clamp(3rem, 18svh, 14rem) - 20px);
 }
 .hero-section__title {
+  --hero-title-peak-lift: 0.6em;
+  position: relative;
+  isolation: isolate;
   font-family: var(--font-display);
   font-weight: 900;
   line-height: 1.12;
@@ -141,6 +143,15 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
   pointer-events: none;
 }
 .hero-title-measure > span { display: inline-block; }
+.hero-title-pressure-measure {
+  font-family: var(--font-pressure);
+  font-variation-settings: 'wght' 900;
+  font-synthesis: none;
+}
+
+@media (max-width: 767px) {
+  .hero-section__title { --hero-title-peak-lift: 0.4em; }
+}
 
 @media (min-width: 1024px) {
   .hero-section {
@@ -169,5 +180,6 @@ const hasCards = computed(() => showcaseItems.value.length > 0)
     overflow: visible;
     z-index: 1;
   }
+
 }
 </style>

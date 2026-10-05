@@ -1,11 +1,7 @@
 export function getStorageItem<T>(storage: Storage, key: string, fallback: T): T {
-    const raw = storage.getItem(key)
-
-    if (raw == null) {
-        return fallback
-    }
-
     try {
+        const raw = storage.getItem(key)
+        if (raw == null) return fallback
         return JSON.parse(raw) as T
     } catch {
         return fallback
@@ -34,8 +30,11 @@ export function createStorageNamespace(storage: Storage) {
     }
 }
 
-export const localStore =
-    typeof window !== 'undefined' ? createStorageNamespace(window.localStorage) : null
+function browserStorage(kind: 'localStorage' | 'sessionStorage') {
+    if (typeof window === 'undefined') return null
+    try { return createStorageNamespace(window[kind]) }
+    catch { return null }
+}
 
-export const sessionStore =
-    typeof window !== 'undefined' ? createStorageNamespace(window.sessionStorage) : null
+export const localStore = browserStorage('localStorage')
+export const sessionStore = browserStorage('sessionStorage')

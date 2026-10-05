@@ -5,6 +5,11 @@ import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper
 import type { ArticleDetailVm } from '@/entities/article/model/article.types'
 import { articleApi } from '@/shared/api/modules/article'
 import { canCancelReview, canSubmitArticle } from '@/shared/utils/article'
+import { STORAGE_KEY } from '@/shared/constants/storage'
+import { localStore } from '@/shared/utils/storage'
+import { normalizeBackendDateTime } from '@/shared/utils/dateTime'
+
+type DraftSaveReceipt = { kind: 'auto' | 'manual'; savedAt: string }
 
 export const useEditorStore = defineStore('editor', () => {
     const currentArticle = ref<ArticleDetailVm | null>(null)
@@ -12,6 +17,9 @@ export const useEditorStore = defineStore('editor', () => {
     const articleDetailSavedAt = ref<Record<string, string>>({})
     const intentionallyEmptySummaryArticleIds = ref<Record<string, true>>({})
     const dirty = ref(false)
+    const manualSavePending = ref(false)
+    const changeRevision = ref(0)
+    const saveReceipts = ref<Record<string, DraftSaveReceipt>>({})
     const saving = ref(false)
     const submitting = ref(false)
     const loading = ref(false)
@@ -38,6 +46,10 @@ export const useEditorStore = defineStore('editor', () => {
     }
 
     function setCurrentArticle(article: ArticleDetailVm | null, savedAt = '') {
+        if (article) {
+            const nextId = String(article.id)
+            if (currentArticle.value && String(currentArticle.value.id) !== nextId) changeRevision.value++
+        }
         currentArticle.value = article
         if (article) cacheArticleDetail(article, savedAt)
     }
@@ -88,6 +100,41 @@ export const useEditorStore = defineStore('editor', () => {
         return articleDetailSavedAt.value[String(articleId)] ?? ''
     }
 
+    function recordDraftSave(articleId: number | string, kind: DraftSaveReceipt['kind'], savedAt: string) {
+        if (!savedAt) return
+        const key = String(articleId)
+        const receipt = { kind, savedAt }
+        saveReceipts.value = { ...saveReceipts.value, [key]: receipt }
+        articleDetailSavedAt.value = { ...articleDetailSavedAt.value, [key]: savedAt }
+        if (String(currentArticle.value?.id) === key) lastSavedAt.value = savedAt
+        // Only the save mode/time is persisted, never draft contents.
+        try { localStore?.set(`${STORAGE_KEY.ARTICLE_SAVE_RECEIPT_PREFIX}${key}`, receipt) } catch { /* Storage may be unavailable. */ }
+    }
+
+    function getDraftSaveReceipt(articleId: number | string): { kind: DraftSaveReceipt['kind'] | 'unknown'; savedAt: string } | null {
+        const key = String(articleId)
+        let receipt: DraftSaveReceipt | undefined = saveReceipts.value[key]
+        if (!receipt) {
+            try {
+                const stored = localStore?.get<Partial<DraftSaveReceipt> | null>(`${STORAGE_KEY.ARTICLE_SAVE_RECEIPT_PREFIX}${key}`, null)
+                if (stored && (stored.kind === 'auto' || stored.kind === 'manual') && typeof stored.savedAt === 'string' && Number.isFinite(Date.parse(normalizeBackendDateTime(stored.savedAt) ?? ''))) {
+                    receipt = { kind: stored.kind, savedAt: stored.savedAt }
+                }
+            } catch { /* Fall back to the server timestamp. */ }
+        }
+        const serverSavedAt = getCachedArticleSavedAt(key)
+        // A newer server revision may have been saved on another device. Do not
+        // mislabel it using an older local receipt; old drafts have no mode either.
+        if (receipt && (!serverSavedAt || Date.parse(normalizeBackendDateTime(serverSavedAt) ?? '') <= Date.parse(normalizeBackendDateTime(receipt.savedAt) ?? ''))) return receipt
+        return serverSavedAt ? { kind: 'unknown', savedAt: serverSavedAt } : receipt ?? null
+    }
+
+    function beginEditorSession() {
+        changeRevision.value++
+        dirty.value = false
+        manualSavePending.value = false
+    }
+
     function setSummaryIntentionallyEmpty(articleId: number | string, isEmpty: boolean) {
         const key = String(articleId || '')
         if (!key) return
@@ -119,6 +166,19 @@ export const useEditorStore = defineStore('editor', () => {
         dirty.value = value
     }
 
+    function markChanged() {
+        changeRevision.value++
+        dirty.value = true
+        manualSavePending.value = true
+    }
+
+    function acknowledgeManualSave(revision: number) {
+        if (revision !== changeRevision.value || dirty.value) return false
+        manualSavePending.value = false
+        if (currentArticle.value && lastSavedAt.value) recordDraftSave(currentArticle.value.id, 'manual', lastSavedAt.value)
+        return true
+    }
+
     function setSaving(value: boolean) {
         saving.value = value
     }
@@ -132,6 +192,8 @@ export const useEditorStore = defineStore('editor', () => {
     }
 
     function resetEditorState() {
+        changeRevision.value++
+        manualSavePending.value = false
         currentArticle.value = null
         dirty.value = false
         saving.value = false
@@ -162,7 +224,7 @@ export const useEditorStore = defineStore('editor', () => {
         const cached = getCachedArticleDetail(nextId)
 
         if (!force && cached) {
-            currentArticle.value = cached
+            setCurrentArticle(cached)
             lastLoadedId.value = nextId
             setLastSavedAt(getCachedArticleSavedAt(nextId))
             return cached
@@ -190,6 +252,13 @@ export const useEditorStore = defineStore('editor', () => {
         articleDetailSavedAt,
         intentionallyEmptySummaryArticleIds,
         dirty,
+        manualSavePending,
+        changeRevision,
+        markChanged,
+        acknowledgeManualSave,
+        beginEditorSession,
+        recordDraftSave,
+        getDraftSaveReceipt,
         saving,
         submitting,
         loading,

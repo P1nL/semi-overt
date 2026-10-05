@@ -1,4 +1,5 @@
 import { nextTick } from 'vue'
+import { coveringRadius, RADIAL_REVEAL_DURATION, RADIAL_REVEAL_EASING } from '@/shared/utils/radialReveal'
 
 let switching = false
 
@@ -17,7 +18,7 @@ export async function revealTheme(button: HTMLElement | null, commit: (instant: 
     const bounds = origin.getBoundingClientRect()
     x = bounds.left + bounds.width / 2
     y = bounds.top + bounds.height / 2
-    radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 2
+    radius = coveringRadius(x, y, innerWidth, innerHeight)
     root.style.setProperty('--theme-reveal-x', `${x / innerWidth * 100}%`)
     root.style.setProperty('--theme-reveal-y', `${y / innerHeight * 100}%`)
   }
@@ -40,7 +41,7 @@ export async function revealTheme(button: HTMLElement | null, commit: (instant: 
     const radiusPercent = radius / (Math.hypot(innerWidth, innerHeight) / Math.SQRT2) * 100
     reveal = root.animate(
       { clipPath: [`circle(0% at ${center})`, `circle(${radiusPercent}% at ${center})`] },
-      { duration: 760, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)', fill: 'both' },
+      { duration: RADIAL_REVEAL_DURATION, easing: RADIAL_REVEAL_EASING, pseudoElement: '::view-transition-new(root)', fill: 'both' },
     )
     await reveal.finished
     await transition.finished

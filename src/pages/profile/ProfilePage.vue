@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 
 import { useInfiniteUserProfileQuery, usePendingReviewsQuery } from '@/entities/queries'
 import type { ArticleCardVm } from '@/entities/article'
 import { SectionHeader } from '@/shared/components/layout'
 import { REVIEW_AUTO_REFRESH_INTERVAL_MS } from '@/shared/constants/review'
+import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import type { ProfileArticleTab } from '@/shared/types/profile'
 import { isPublishedArticle } from '@/shared/utils/article'
@@ -18,16 +19,21 @@ import { ProfileTabs } from '@/widgets/profile-tabs'
 import { ProfileWritingCalendar } from '@/widgets/profile-writing-calendar'
 import { ReviewQueueStrip } from '@/widgets/review-queue-strip'
 
+const props = withDefaults(defineProps<{
+  routeOverride?: RouteLocationNormalizedLoaded | null
+}>(), { routeOverride: null })
+
 const route = useRoute()
+const currentRoute = computed(() => props.routeOverride ?? route)
 const router = useRouter()
 const authStore = useAuthStore()
 
-const username = computed(() => String(route.params.username || '').trim())
+const username = computed(() => String(currentRoute.value.params.username || '').trim())
 const defaultTab = computed<ProfileArticleTab>(() => (
   authStore.user?.username === username.value ? 'all' : 'approved'
 ))
 const activeTab = computed<ProfileArticleTab>(() => {
-  const rawTab = String(route.query.tab || defaultTab.value).toLowerCase()
+  const rawTab = String(currentRoute.value.query.tab || defaultTab.value).toLowerCase()
   if (['all', 'approved', 'pending', 'returned', 'rejected', 'draft'].includes(rawTab)) {
     return rawTab as ProfileArticleTab
   }
@@ -65,9 +71,9 @@ const articles = computed(() => {
 })
 
 watch(
-  () => profile.value?.displayName || username.value,
-  (title) => {
-    setDocumentTitle(title || '个人主页')
+  () => [route.fullPath, profile.value?.displayName || username.value] as const,
+  ([_path, title]) => {
+    if (route.name === ROUTE_NAME.PROFILE) setDocumentTitle(title || '个人主页')
   },
   { immediate: true },
 )
@@ -161,7 +167,7 @@ const reviewQueueError = computed(() =>
 
 async function onTabChange(tab: ProfileArticleTab) {
   const nextQuery = {
-    ...route.query,
+    ...currentRoute.value.query,
     tab: tab === defaultTab.value ? undefined : tab,
   }
 

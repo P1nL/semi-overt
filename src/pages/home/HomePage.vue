@@ -11,12 +11,22 @@ import { useHomeQuery } from '@/entities/queries'
 import { SectionHeader } from '@/shared/components/layout'
 import { HeroSection } from '@/widgets/hero-section'
 import HomeShowcaseRail from '@/widgets/home-showcase/HomeShowcaseRail.vue'
+import { useHomeIntro, type HomeIntroContentState } from '@/features/home-intro'
 
 const homeQuery = useHomeQuery()
+const homeIntro = useHomeIntro()
 
 const hiddenHomeSectionKeys = new Set(['QUICK', 'SHORT', 'DEEP'])
 const contentReady = computed(() => homeQuery.isSuccess.value)
 const animateHomeIntro = ref(!hasPlayedHomeIntro)
+
+// Report after the response has rendered, so preparation can capture real cards.
+watch(
+  (): HomeIntroContentState => homeQuery.isSuccess.value && homeQuery.data.value
+    ? 'ready' : homeQuery.isError.value ? 'error' : 'pending',
+  state => homeIntro?.setContentState(state),
+  { immediate: true, flush: 'post' },
+)
 
 watch(
   contentReady,
@@ -75,10 +85,10 @@ const home = computed(() => {
         :primary="home.heroPrimary"
         :secondary="home.heroSecondary"
         :revealed="contentReady"
-        :animate-reveal="animateHomeIntro"
+        :animate-reveal="animateHomeIntro && !homeIntro?.participated.value"
       />
 
-      <div v-if="contentReady" class="home-sections space-y-8 pt-8 md:space-y-10 md:pt-10 lg:pt-0">
+      <div v-if="contentReady && !homeIntro?.active.value" class="home-sections space-y-8 pt-8 md:space-y-10 md:pt-10 lg:pt-0">
         <section
           v-for="(section, sectionIndex) in home.sections"
           :key="section.key"
@@ -110,13 +120,9 @@ const home = computed(() => {
   overflow: hidden;
 }
 
-:global(html.home-scroll-locked) {
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-}
-
 :global(body.home-scroll-locked) {
-  block-size: 100vh;
+  block-size: 100svh;
+  min-block-size: 0;
 }
 
 .home-sections {

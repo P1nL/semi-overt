@@ -30,6 +30,7 @@ import { preloadImages } from '@/shared/utils/preloadImage'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { AuthDialog } from '@/widgets/auth-dialog'
+import { createHeaderPreviewUser, createHeaderPreviewDrafts, resolveHeaderIdentity } from './model/headerAuthPreview'
 
 const AsyncDraftBoxDrawer = defineAsyncComponent(
   () => import('@/features/draft-box/ui/DraftBoxDrawer.vue'),
@@ -38,12 +39,26 @@ const AsyncDraftBoxDrawer = defineAsyncComponent(
 const emit = defineEmits<{ 'dock-blocked': [blocked: boolean] }>()
 
 const authStore = useAuthStore()
+// 临时开关：仅开发环境展示导航栏登录态，不修改真实会话。
+const HEADER_AUTH_PREVIEW_ENABLED = import.meta.env.DEV
+const previewUser = ref(createHeaderPreviewUser(HEADER_AUTH_PREVIEW_ENABLED))
+const headerIdentity = computed(() => resolveHeaderIdentity(authStore.isAuthenticated, authStore.user, previewUser.value))
+const isHeaderPreview = computed(() => headerIdentity.value.isPreview)
+const previewDrafts = createHeaderPreviewDrafts(HEADER_AUTH_PREVIEW_ENABLED)
 const uiStore = useUiStore()
 const router = useRouter()
 const route = useRoute()
 const queryClient = useQueryClient()
 
 const authDialogOpen = ref(false)
+const profileAfterLogin = ref(false)
+watch(authDialogOpen, (open) => {
+  if (open) {
+    closeDraftMenu()
+    closeUserMenu()
+  }
+  if (!open) profileAfterLogin.value = false
+})
 const draftMenuOpen = ref(false)
 const draftDrawerLoaded = ref(false)
 const userMenuOpen = ref(false)
@@ -132,8 +147,8 @@ function closeUserMenu(options: { restoreFocus?: boolean } = {}) {
   }
 }
 
-const showAuthenticatedActions = computed(() => authStore.isAuthenticated && !authDialogOpen.value)
-const userLabel = computed(() => authStore.displayName || (authStore.isAdmin ? '管理员' : '个人中心'))
+const showAuthenticatedActions = computed(() => headerIdentity.value.isAuthenticated && !authDialogOpen.value)
+const userLabel = computed(() => headerIdentity.value.user?.nickname || headerIdentity.value.user?.username || (authStore.isAdmin ? '管理员' : '个人中心'))
 const avatarFallback = computed(() => userLabel.value.slice(0, 1) || '我')
 const themeMenuLabel = computed(() => (uiStore.darkMode ? '切换到浅色模式' : '切换到深色模式'))
 const appreciationEnabled = computed(() => route.name === ROUTE_NAME.HOME)
@@ -321,6 +336,7 @@ function scheduleWarmUserSurfaces() {
 }
 
 async function openDraftEditor(item: { id: number }) {
+  if (isHeaderPreview.value) return
   await router.push({
     name: ROUTE_NAME.ARTICLE_EDITOR,
     params: { id: String(item.id) },
@@ -330,6 +346,18 @@ async function openDraftEditor(item: { id: number }) {
 async function gotoProfile() {
   if (suppressProfileClick.value || logoutHolding.value || logoutFlipping.value || loggingOut.value) return
   closeUserMenu()
+  if (!authStore.isAuthenticated) {
+    profileAfterLogin.value = true
+    authDialogOpen.value = true
+    return
+  }
+  await router.push(profileRoute.value)
+}
+
+async function onAuthSuccess() {
+  if (!profileAfterLogin.value || !authStore.isAuthenticated) return
+  profileAfterLogin.value = false
+  await refreshCurrentUserProfile()
   await router.push(profileRoute.value)
 }
 
@@ -354,10 +382,15 @@ function cancelLogoutHold() {
     window.clearTimeout(logoutHoldTimer)
     logoutHoldTimer = null
   }
-  if (!logoutProgressAnimation) return
+  if (!logoutProgressAnimation) {
+    if (logoutHolding.value) resetLogoutProgress()
+    return
+  }
   const animation = logoutProgressAnimation
   const run = ++logoutProgressRun
-  animation.reverse()
+  // Several cancellation events can follow one hold; never toggle direction.
+  animation.updatePlaybackRate(-1)
+  animation.play()
   void animation.finished.then(() => {
     if (run !== logoutProgressRun || logoutProgressAnimation !== animation) return
     resetLogoutProgress()
@@ -366,9 +399,11 @@ function cancelLogoutHold() {
 
 async function activateLogoutProgress() {
   logoutHoldTimer = null
+  const run = ++logoutProgressRun
   logoutHolding.value = true
   suppressProfileClick.value = true
   await nextTick()
+  if (run !== logoutProgressRun || !logoutHolding.value) return
   const stroke = logoutProgressStrokeRef.value
   if (!stroke) { resetLogoutProgress(); return }
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -377,7 +412,6 @@ async function activateLogoutProgress() {
     { duration: reducedMotion ? 1 : LOGOUT_PROGRESS_MS, easing: 'linear', fill: 'forwards' },
   )
   logoutProgressAnimation = animation
-  const run = ++logoutProgressRun
   void animation.finished.then(() => {
     if (run !== logoutProgressRun || logoutProgressAnimation !== animation || animation.playbackRate < 0) return
     animation.cancel()
@@ -587,7 +621,7 @@ onClickOutside(draftMenuRef, () => {
   if (draftMenuOpen.value) {
     closeDraftMenu()
   }
-})
+}, { ignore: ['[data-draft-interaction-shield]'] })
 
 onClickOutside(userMenuRef, () => {
   if (userMenuOpen.value) {
@@ -598,11 +632,15 @@ onClickOutside(userMenuRef, () => {
 watch(
   () => authStore.isAuthenticated,
   (isAuthenticated) => {
-    if (isAuthenticated) return
-
     draftMenuOpen.value = false
     userMenuOpen.value = false
+    if (isAuthenticated) {
+      // A real login permanently replaces this component's temporary preview.
+      previewUser.value = null
+      return
+    }
   },
+  { immediate: true },
 )
 
 watch(userMenuOpen, async (open) => {
@@ -638,6 +676,12 @@ onBeforeUnmount(() => {
 })
 
 async function handleLogout() {
+  if (isHeaderPreview.value) {
+    previewUser.value = null
+    closeDraftMenu()
+    closeUserMenu()
+    return
+  }
   if (loggingOut.value) return
 
   loggingOut.value = true
@@ -671,7 +715,7 @@ async function handleLogout() {
       />
     </div>
 
-    <Transition name="header-draft-state" :appear="authStore.isAuthenticated">
+    <Transition name="header-draft-state" :appear="headerIdentity.isAuthenticated">
       <div
         v-if="showAuthenticatedActions"
         ref="draftEntryRef"
@@ -700,6 +744,8 @@ async function handleLogout() {
             v-if="draftDrawerLoaded"
             :id="draftMenuId"
             v-model="draftMenuOpen"
+            :preview-items="isHeaderPreview ? previewDrafts : undefined"
+            :placement="uiStore.appreciationMode ? 'left' : 'bottom'"
             @open-editor="openDraftEditor"
             @keydown="onDraftPanelKeydown"
           />
@@ -740,7 +786,7 @@ async function handleLogout() {
           <span ref="logoutCoinRef" class="logout-coin">
             <span class="logout-coin__face logout-coin__front">
               <Avatar
-                :src="authStore.user?.avatar || undefined"
+                :src="headerIdentity.user?.avatar || undefined"
                 :name="userLabel"
                 :fallback="avatarFallback"
                 size="md"
@@ -781,7 +827,7 @@ async function handleLogout() {
       </div>
     </div>
 
-    <AuthDialog v-model="authDialogOpen" initial-mode="login" />
+    <AuthDialog v-model="authDialogOpen" initial-mode="login" @success="onAuthSuccess" />
   </div>
 </template>
 
@@ -1123,17 +1169,9 @@ async function handleLogout() {
   stroke-dashoffset: 135.1;
 }
 
-.user-profile-trigger--holding .logout-progress__stroke {
-  animation: logout-progress 1100ms linear forwards;
-}
-
 .user-profile-trigger--flipping .logout-progress {
   opacity: 0;
   transition: opacity 120ms ease-out;
-}
-
-@keyframes logout-progress {
-  to { stroke-dashoffset: 0; }
 }
 
 .menu-item {

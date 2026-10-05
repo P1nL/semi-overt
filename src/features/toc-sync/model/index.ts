@@ -1,4 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { getPageScrollPosition, scrollPageTo } from '@/shared/utils/pageScroll'
 import type {
     TocHeading,
     TocParseOptions,
@@ -141,8 +142,8 @@ export function useTocSync(options: TocSyncOptions = {}) {
 
             container.scrollTo({ top, behavior })
         } else {
-            const top = element.getBoundingClientRect().top + window.scrollY - offset
-            window.scrollTo({ top, behavior })
+            const top = element.getBoundingClientRect().top + getPageScrollPosition().top - offset
+            scrollPageTo({ top, behavior })
         }
 
         activeId.value = id

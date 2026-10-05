@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import type { ArticleCardVm } from '@/entities/article'
 
 const props = withDefaults(
   defineProps<{
-    article: ArticleCardVm
+    article?: ArticleCardVm
     categoryLabel: string
     emphasis?: 'hero' | 'regular'
     toneIndex?: number
@@ -43,7 +44,7 @@ const cardTone = computed(() => {
 })
 
 const titleTypography = computed(() => {
-  const titleLength = Array.from(props.article.titleText.trim()).length
+  const titleLength = Array.from(props.article?.titleText.trim() ?? '').length
 
   if (titleLength <= 14) {
     return {
@@ -84,17 +85,22 @@ const cardStyle = computed(() => ({
 </script>
 
 <template>
-  <RouterLink
-    :to="article.articlePath"
+  <component
+    :is="article ? RouterLink : 'div'"
+    :to="article?.articlePath"
     class="home-showcase-card"
+    data-title-effect-occluder
     :class="{
       'home-showcase-card--cropped': cropped,
+      'home-showcase-card--decorative': !article,
       'home-showcase-card--revealed': revealed && animateReveal,
       'home-showcase-card--settled': revealed && !animateReveal,
     }"
     :style="cardStyle"
-    :aria-label="`${categoryLabel}：${article.titleText}`"
+    :aria-label="article ? `${categoryLabel}：${article.titleText}` : undefined"
+    :aria-hidden="!article ? 'true' : undefined"
   >
+    <template v-if="article">
     <div class="home-showcase-card__header">
 
     </div>
@@ -108,7 +114,8 @@ const cardStyle = computed(() => ({
         </div>
       </div>
     </div>
-  </RouterLink>
+    </template>
+  </component>
 </template>
 
 <style scoped>
@@ -147,6 +154,8 @@ const cardStyle = computed(() => ({
   opacity: 1;
   transform: translateY(0) scale(1);
 }
+
+.home-showcase-card--decorative { cursor: default; }
 
 .home-showcase-card__header {
   display: flex;
@@ -223,11 +232,11 @@ const cardStyle = computed(() => ({
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .home-showcase-card:hover {
+  .home-showcase-card:not(.home-showcase-card--decorative):hover {
     box-shadow: 0 28px 72px rgb(15 23 42 / 0.2);
   }
 
-  .home-showcase-card:hover .home-showcase-card__title {
+  .home-showcase-card:not(.home-showcase-card--decorative):hover .home-showcase-card__title {
     transform: translateY(-2px);
   }
 }
@@ -277,5 +286,10 @@ const cardStyle = computed(() => ({
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-showcase-card--revealed { animation: none; opacity: 1; transform: none; }
+  .home-showcase-card { transition: none; }
 }
 </style>

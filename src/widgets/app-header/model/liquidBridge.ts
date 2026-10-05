@@ -1,9 +1,10 @@
 import { deformLiquidPoint, type LiquidButtonMotion } from '@/shared/utils/magneticSpring'
 
 type Point = { x: number; y: number }
+type BridgeMotion = LiquidButtonMotion & { scaleX?: number; scaleY?: number }
 
 /** Liquid-contour shoulders; a longer separation draws a thinner, stretched neck. */
-export function createLiquidBridgePath(width: number, height: number, offset: LiquidButtonMotion): string {
+export function createLiquidBridgePath(width: number, height: number, offset: BridgeMotion): string {
   if (width <= 0 || height <= 0) return ''
   const radius = height / 2
   const a = { x: radius, y: radius }
@@ -21,7 +22,10 @@ export function createLiquidBridgePath(width: number, height: number, offset: Li
     const x = u.x * along + n.x * normal
     const y = u.y * along + n.y * normal
     const contour = liquid ? deformLiquidPoint({ x, y }, offset) : { x, y }
-    return { x: center.x + contour.x, y: center.y + contour.y }
+    return {
+      x: center.x + contour.x * (liquid ? offset.scaleX ?? 1 : 1),
+      y: center.y + contour.y * (liquid ? offset.scaleY ?? 1 : 1),
+    }
   }
   const lt = point(a, radius * shoulder, -radius * side)
   const rt = point(b, -radius * shoulder, -radius * side, true)

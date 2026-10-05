@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // Adapted from the Vue Bits VariableProximity registry component.
 import { computed, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+import { stepGlyphCompression } from '@/shared/utils/glyphCompression'
 
 export type FalloffType = 'linear' | 'exponential' | 'gaussian'
 const props = withDefaults(defineProps<{
   label: string
+  accessibleLabel?: string
   fromFontVariationSettings: string
   toFontVariationSettings: string
   containerRef?: HTMLElement | null
@@ -14,12 +16,14 @@ const props = withDefaults(defineProps<{
   style?: CSSProperties
   onClick?: () => void
   staticFontEffect?: boolean
+  profile?: 'flat' | 'peak'
 }>(), {
   radius: 100,
   falloff: 'linear',
   className: '',
   style: () => ({}),
   staticFontEffect: false,
+  profile: 'flat',
 })
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -36,10 +40,15 @@ const settings = computed(() => {
 })
 let pointer: { x: number; y: number } | null = null
 let filteredPointer: { x: number; y: number } | null = null
-const POINTER_DEAD_ZONE_PX = 1.5
+const POINTER_DEAD_ZONE_PX = 3
+const STRENGTH_SMOOTHING_MS = 160
+const POINTER_SMOOTHING_MS = 90
+const STRENGTH_SETTLE_EPSILON = 0.0005
+const GLYPH_COMPRESSION = 0.18
 let frame = 0
 let strengths: number[] = []
-type LetterGeometry = { letter: HTMLElement; index: number; width: number; center: number; left: number; y: number }
+let compressions: number[] = []
+type LetterGeometry = { letter: HTMLElement; index: number; width: number; height: number; center: number; left: number; y: number }
 let geometry: LetterGeometry[] = []
 let geometryDirty = true
 let measuredWidth = -1
@@ -49,14 +58,15 @@ let reducedMotion: MediaQueryList | undefined
 
 function reset() {
   pointer = null
-  filteredPointer = null
+  // Keep the filtered position during release so a quick re-entry does not snap.
   schedule()
 }
 function onPointerMove(event: PointerEvent) {
   if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return
   const bounds = props.containerRef?.getBoundingClientRect()
+  const profileTop = props.profile === 'peak' ? Math.min(0, ...geometry.map(item => item.y - item.height / 2)) : 0
   const inside = bounds && event.clientX >= bounds.left && event.clientX <= bounds.right
-    && event.clientY >= bounds.top && event.clientY <= bounds.bottom
+    && event.clientY >= bounds.top + profileTop && event.clientY <= bounds.bottom
   if (!inside) {
     if (pointer) reset()
     return
@@ -82,7 +92,7 @@ function update(timestamp: number) {
   const bounds = (props.containerRef ?? rootRef.value)?.getBoundingClientRect()
   if (!bounds) return
   const elapsed = lastFrameTime ? Math.min(32, timestamp - lastFrameTime) : 1000 / 60
-  const smoothing = 1 - Math.exp(-elapsed / 110)
+  const smoothing = 1 - Math.exp(-elapsed / STRENGTH_SMOOTHING_MS)
   lastFrameTime = timestamp
   if (geometryDirty || Math.abs(bounds.width - measuredWidth) > 0.01) {
     // Read true layout once, with transforms removed, before writing the next pose.
@@ -95,16 +105,34 @@ function update(timestamp: number) {
     geometry = letterRefs.value.flatMap((letter, index) => {
       if (!letter) return []
       const rect = letter.getBoundingClientRect()
-      return [{ letter, index, width: rect.width, center: rect.left + rect.width / 2 - bounds.left,
+      return [{ letter, index, width: rect.width, height: rect.height, center: rect.left + rect.width / 2 - bounds.left,
         left: rect.left - bounds.left, y: rect.top + rect.height / 2 - bounds.top }]
     })
+    if (geometry.length) {
+      const left = Math.min(...geometry.map(item => item.left))
+      const right = Math.max(...geometry.map(item => item.left + item.width))
+      geometry.forEach(item => {
+        // Use actual glyph positions, not letter indexes: the peak stays centered
+        // even when narrow separators sit between wide display letters.
+        const progress = right > left ? (item.center - left) / (right - left) : 0.5
+        const peak = props.profile === 'peak' ? Math.max(0, 1 - Math.abs(progress * 2 - 1)) : 0
+        item.letter.style.setProperty('--letter-peak', peak.toFixed(5))
+      })
+      geometry.forEach(item => {
+        const rect = item.letter.firstElementChild?.getBoundingClientRect()
+        if (rect) {
+          item.y = rect.top + rect.height / 2 - bounds.top
+          item.height = rect.height
+        }
+      })
+    }
     measuredWidth = bounds.width
     geometryDirty = false
   }
   if (pointer && filteredPointer && !reducedMotion?.matches) {
-    const pointerSmoothing = 1 - Math.exp(-elapsed / 65)
+    const pointerSmoothing = 1 - Math.exp(-elapsed / POINTER_SMOOTHING_MS)
     const distance = Math.hypot(pointer.x - filteredPointer.x, pointer.y - filteredPointer.y)
-    if (distance < 0.05) filteredPointer = { ...pointer }
+    if (distance < 0.25) filteredPointer = { ...pointer }
     else {
       filteredPointer.x += (pointer.x - filteredPointer.x) * pointerSmoothing
       filteredPointer.y += (pointer.y - filteredPointer.y) * pointerSmoothing
@@ -114,7 +142,7 @@ function update(timestamp: number) {
   const measurements = geometry
   measurements.forEach(({ index, center, y }) => {
     let target = 0
-    if (filteredPointer && !reducedMotion?.matches) {
+    if (pointer && filteredPointer && !reducedMotion?.matches) {
       const distance = Math.hypot(filteredPointer.x - bounds.left - center, filteredPointer.y - bounds.top - y)
       if (distance < radius) {
         const linear = 1 - distance / radius
@@ -126,9 +154,10 @@ function update(timestamp: number) {
       }
     }
     const previous = strengths[index] ?? 0
-    const strength = reducedMotion?.matches || Math.abs(target - previous) < 0.00005
-      ? target : previous + (target - previous) * smoothing
-    moving ||= Math.abs(target - strength) >= 0.00005
+    const interpolated = previous + (target - previous) * smoothing
+    const strength = reducedMotion?.matches || Math.abs(target - interpolated) < STRENGTH_SETTLE_EPSILON
+      ? target : interpolated
+    moving ||= strength !== target
     strengths[index] = strength
   })
 
@@ -141,39 +170,36 @@ function update(timestamp: number) {
     groups.set(parent, group)
   })
   groups.forEach(group => {
-    const totalWidth = group.reduce((sum, item) => sum + item.width, 0)
-    const expandedWidth = group.reduce((sum, item) => sum + item.width * (1 + (strengths[item.index] ?? 0) * 0.8), 0)
-    // Reallocate a fixed width budget: the active glyph expands, neighbors squeeze
-    // and shift, but the whole word remains centered within the original bounds.
-    const normalization = expandedWidth > 0 ? totalWidth / expandedWidth : 1
-    let cursor = group[0]!.left
-    group.forEach((item, position) => {
-      const { letter, index, width, center } = item
-      const strength = strengths[index] ?? 0
-      const scale = props.staticFontEffect ? (1 + strength * 0.8) * normalization : 1
-      const nextWidth = width * scale
-      const shift = props.staticFontEffect ? cursor + nextWidth / 2 - center : 0
-      // Avoid continuously rewriting unsupported variation axes on the static font.
+    const wave = reducedMotion?.matches ? { values: group.map(() => 0), settled: true } : stepGlyphCompression(
+      group.map(item => strengths[item.index] ?? 0),
+      group.map(item => compressions[item.index] ?? 0),
+      elapsed,
+    )
+    moving ||= !wave.settled
+    group.forEach(({ letter, index }, position) => {
+      const compression = wave.values[position] ?? 0
+      compressions[index] = compression
+      // Keep every glyph anchored in its original slot. Pressure thins it in place;
+      // no cursor reallocation, translation or global width normalization is applied.
+      const scale = props.staticFontEffect ? 1 - compression * GLYPH_COMPRESSION : 1
       const variation = props.staticFontEffect ? props.fromFontVariationSettings
-        : settings.value.map(({ axis, from, to }) => `'${axis}' ${from + (to - from) * strength}`).join(', ')
-      const transform = props.staticFontEffect ? `translate3d(${shift.toFixed(4)}px, 0, 0) scaleX(${scale.toFixed(6)})` : ''
-      const stroke = props.staticFontEffect ? `${(strength * 0.055).toFixed(6)}em` : ''
-      const strokeColor = props.staticFontEffect ? 'currentColor' : ''
+        : settings.value.map(({ axis, from, to }) => `'${axis}' ${from + (to - from) * compression}`).join(', ')
+      const transform = props.staticFontEffect ? `scaleX(${scale.toFixed(6)})` : ''
       if (letter.style.fontVariationSettings !== variation) letter.style.fontVariationSettings = variation
       if (letter.style.transform !== transform) letter.style.transform = transform
-      if (letter.style.webkitTextStrokeWidth !== stroke) letter.style.webkitTextStrokeWidth = stroke
-      if (letter.style.webkitTextStrokeColor !== strokeColor) letter.style.webkitTextStrokeColor = strokeColor
-      const next = group[position + 1]
-      const gap = next ? next.left - (item.left + width) : 0
-      cursor += nextWidth + gap
     })
   })
+
   if (moving) schedule()
-  else lastFrameTime = 0
+  else {
+    lastFrameTime = 0
+    if (!pointer) filteredPointer = null
+  }
 }
 
-watch(() => [props.label, props.fromFontVariationSettings, props.toFontVariationSettings, props.radius, props.staticFontEffect], () => {
+watch(() => [props.label, props.fromFontVariationSettings, props.toFontVariationSettings, props.radius, props.staticFontEffect, props.profile], () => {
   strengths = []
+  compressions = []
   invalidateGeometry()
 }, { flush: 'post' })
 watch(() => props.containerRef, element => {
@@ -208,7 +234,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span ref="rootRef" :class="['variable-proximity', className]" :style="style" @click="onClick">
+  <span ref="rootRef" :class="['variable-proximity', className, { 'variable-proximity--peak': profile === 'peak', 'variable-proximity--static': staticFontEffect }]" :style="style" @click="onClick">
     <span v-for="(word, wordIndex) in words" :key="wordIndex" class="variable-proximity-word" aria-hidden="true">
       <span
         v-for="(letter, index) in Array.from(word)"
@@ -216,14 +242,23 @@ onBeforeUnmount(() => {
         :ref="element => { letterRefs[lettersBefore(wordIndex) + index] = element as HTMLElement | null }"
         class="variable-proximity-letter"
         :style="{ fontVariationSettings: fromFontVariationSettings }"
-      >{{ letter }}</span><span v-if="wordIndex < words.length - 1">&nbsp;</span>
+      ><span class="variable-proximity-glyph"><slot name="glyph" :letter="letter" :index="lettersBefore(wordIndex) + index">{{ letter }}</slot></span></span><span v-if="wordIndex < words.length - 1">&nbsp;</span>
     </span>
-    <span class="sr-only">{{ label }}</span>
+    <span class="sr-only">{{ accessibleLabel ?? label }}</span>
   </span>
 </template>
 
 <style scoped>
 .variable-proximity { font-family: inherit; }
 .variable-proximity-word { display: inline-block; white-space: nowrap; }
+.variable-proximity-glyph { display: inline-block; }
+.variable-proximity--peak .variable-proximity-glyph {
+  transform: translateY(calc(-1 * var(--letter-peak, 0) * var(--variable-proximity-peak-lift, 0.6em)));
+}
+/* Static display fonts keep a stable glyph raster; only transforms animate. */
+.variable-proximity--static .variable-proximity-letter {
+  -webkit-text-stroke-width: 0;
+  will-change: transform;
+}
 .variable-proximity-letter { display: inline-block; transform-origin: center 60%; backface-visibility: hidden; }
 </style>

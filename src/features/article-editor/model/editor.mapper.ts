@@ -18,8 +18,8 @@ import type {
     EditorValidationResult,
 } from './editor.types'
 
-export function buildEditorStats(content: string, title = ''): EditorStats {
-    const wordCount = calcWordCount(`${title}\n${content}`)
+export function buildEditorStats(content: string, _title = ''): EditorStats {
+    const wordCount = calcWordCount(content)
     const readMinutes = calcReadMinutes(wordCount)
     const durationCategory = resolveDurationCategory(wordCount)
 

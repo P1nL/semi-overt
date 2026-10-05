@@ -5,15 +5,38 @@
     <meta name="darkreader-lock">
     <link rel="icon" type="image/svg+xml" sizes="any" href="%BASE_URL%favicon.svg?v=20260906-adaptive">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/src/app/styles/theme.css">
+    <style>html[data-intro-boot], html[data-intro-boot] body { background: var(--color-splash-cover); }</style>
     <title>Semi-Overt</title>
     <script>
       (function () {
         try {
-          var raw = window.localStorage.getItem('now.darkMode')
-          var isDark = raw ? JSON.parse(raw) === true : false
+          var raw = null
+          try { raw = window.localStorage.getItem('now.darkMode') } catch (_) {}
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var isDark = raw === 'true' ? true : raw === 'false' ? false : systemDark
           document.documentElement.classList.toggle('dark', isDark)
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+          // Keep this synchronous boot guard aligned with home-intro/model/frequency.ts.
+          var allowed = false
+          try {
+            var record = null
+            var frequencyRaw = window.localStorage.getItem('now.homeIntro.v2')
+            try { record = JSON.parse(frequencyRaw || 'null') } catch (_) {}
+            var now = Date.now()
+            var plays = Array.isArray(record && record.plays) ? record.plays.filter(function (time) {
+              return typeof time === 'number' && Number.isFinite(time) && time >= 0 && now - time < 86400000
+            }).sort(function (a, b) { return a - b }).slice(-2) : []
+            var snoozedUntil = record && typeof record.snoozedUntil === 'number' && Number.isFinite(record.snoozedUntil) ? Math.max(0, record.snoozedUntil) : 0
+            allowed = now >= snoozedUntil && plays.length < 2 && (!plays.length || now - plays[plays.length - 1] >= 7200000)
+          } catch (_) {}
+          var historyRestore = performance.getEntriesByType('navigation').some(function (entry) { return entry.type === 'back_forward' })
+          if (location.pathname === '%BASE_URL%' && allowed && !document.hidden && !historyRestore && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            document.documentElement.setAttribute('data-intro-boot', '')
+            window.setTimeout(function () { document.documentElement.removeAttribute('data-intro-boot') }, 8500)
+          }
         } catch (error) {
-          document.documentElement.classList.remove('dark')
+          document.documentElement.removeAttribute('data-intro-boot')
         }
       })()
     </script>

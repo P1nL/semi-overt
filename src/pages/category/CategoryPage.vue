@@ -8,13 +8,17 @@ import { mapCategoryValueToVm } from '@/entities/category'
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
 import { EmptyState } from '@/shared/components/base'
+import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import {
   ArticleResultStream,
+  ResultListHeading,
+  ResultViewToggle,
   RESULT_VIEW_MODE,
   isResultViewMode,
   normalizeResultViewMode,
+  type ResultViewMode,
 } from '@/widgets/article-result-stream'
 
 const props = withDefaults(
@@ -27,6 +31,7 @@ const props = withDefaults(
 )
 
 const route = useRoute()
+const emit = defineEmits<{ 'result-layout': [view: ResultViewMode] }>()
 const router = useRouter()
 const loadMoreRef = ref<HTMLElement | null>(null)
 const currentRoute = computed(() => props.routeOverride ?? route)
@@ -72,11 +77,16 @@ const contentState = computed(() => {
   if (list.value.length) return 'content'
   return 'empty'
 })
+const layoutView = ref(resultView.value)
+watch(layoutView, view => emit('result-layout', view), { immediate: true })
+watch(() => [resultView.value, contentState.value] as const, ([view, state]) => {
+  if (state !== 'content') layoutView.value = view
+})
 
 watch(
-  () => [currentRoute.value.fullPath, sectionMeta.value.label] as const,
+  () => [route.fullPath, currentRoute.value.fullPath, sectionMeta.value.label] as const,
   () => {
-    setDocumentTitle(sectionMeta.value.label)
+    if (route.name === ROUTE_NAME.CATEGORY) setDocumentTitle(sectionMeta.value.label)
   },
   { immediate: true },
 )
@@ -108,7 +118,11 @@ useIntersectionObserver(
 
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
-    <main class="page-container space-y-5 pb-0 pt-0">
+    <main class="page-container category-page-main" :class="layoutView === RESULT_VIEW_MODE.INFINITE ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'">
+      <div v-if="contentState === 'content'" class="category-page-view-toggle">
+        <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
+      </div>
+      <ResultListHeading v-if="layoutView !== RESULT_VIEW_MODE.INFINITE" :title="sectionMeta.label" :description="`共 ${Math.max(total, list.length)} 篇文章`" />
       <Transition name="content-fade" mode="out-in">
         <div
           v-if="contentState === 'loading'"
@@ -126,14 +140,16 @@ useIntersectionObserver(
             :view="resultView"
             :center-label="centerLabel"
             :result-count="total"
+            :show-view-toggle="false"
             fullscreen
+            @layout:view="layoutView = $event"
             @update:view="onViewChange"
           />
 
           <div ref="loadMoreRef" class="category-page-load-sentinel" aria-hidden="true" />
 
           <section
-            v-if="resultView !== RESULT_VIEW_MODE.INFINITE"
+            v-if="layoutView !== RESULT_VIEW_MODE.INFINITE"
             class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
           >
             <p v-if="categoryQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
@@ -161,6 +177,9 @@ useIntersectionObserver(
 </template>
 
 <style scoped>
+.category-page-main { position: relative; }
+.category-page-view-toggle { position: absolute; top: 1.25rem; right: 0; z-index: 20; display: flex; justify-content: flex-end; }
+@media (max-width: 640px) { .category-page-view-toggle { top: 0.85rem; right: 0.25rem; } }
 .category-page-load-sentinel {
   width: 100%;
   height: 1px;

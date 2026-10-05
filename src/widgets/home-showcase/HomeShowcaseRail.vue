@@ -7,6 +7,8 @@ import { useRouter } from 'vue-router'
 import type { ArticleCardVm } from '@/entities/article'
 
 import HomeShowcaseCard from './HomeShowcaseCard.vue'
+import { useCardEntrance } from './model/useCardEntrance'
+import { createShowcaseSlots, isShowcaseLayoutReversed } from './model/showcaseSlots'
 
 const props = withDefaults(
     defineProps<{
@@ -17,6 +19,7 @@ const props = withDefaults(
       animateReveal?: boolean
       delayBase?: number
       maxVisible?: number
+      fillDecorative?: boolean
     }>(),
     {
       featured: false,
@@ -24,16 +27,33 @@ const props = withDefaults(
       animateReveal: true,
       delayBase: 0,
       maxVisible: 6,
+      fillDecorative: false,
     },
 )
 
 const router = useRouter()
+const isDesktopRail = useMediaQuery('(min-width: 1024px)')
+const reversedLayout = ref(false)
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
-const visibleItemSignature = computed(() => visibleItems.value.map((item) => item.id).join('|'))
+const visibleSlots = computed(() => createShowcaseSlots(visibleItems.value, props.maxVisible, props.featured && props.fillDecorative && isDesktopRail.value, reversedLayout.value))
+// Changing slot contents after a size measurement must not remount/move slots.
+const visibleItemSignature = computed(() => `${visibleItems.value.map(item => item.id).join('|')}:${visibleSlots.value.length}`)
 const layoutVersion = ref(0)
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
-const isDesktopRail = useMediaQuery('(min-width: 1024px)')
+const railRef = ref<HTMLElement | null>(null)
+let layoutObserver: ResizeObserver | undefined
+function syncSlotOrder() {
+  const slots = Array.from(railRef.value?.querySelectorAll<HTMLElement>('.home-showcase-rail__item') ?? [])
+  // offsetLeft ignores hover/entrance transforms. Read only on layout changes.
+  const reversed = props.featured && props.fillDecorative && isDesktopRail.value
+    && isShowcaseLayoutReversed(slots.map(slot => slot.offsetLeft))
+  if (reversed !== reversedLayout.value) {
+    reversedLayout.value = reversed
+    hoveredIndex.value = null
+  }
+}
+const entrance = useCardEntrance(railRef, motionIdPrefix, () => props.featured, () => visibleSlots.value.length)
 const HOVER_SETTLE_BEFORE_NAVIGATE_MS = 280
 const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem'] as const
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
@@ -53,7 +73,7 @@ const getMotionKey = (index: number) => `${motionIdPrefix}-${layoutVersion.value
 
 const getMotionState = (index: number): Variant => {
   // 1. 无悬停时：保持端正，仅由纵向错层区分卡片高度
-  if (hoveredIndex.value === null) {
+  if (hoveredIndex.value === null || visibleSlots.value[index]?.kind !== 'article') {
     return {
       y: 0,
       x: 0,
@@ -135,7 +155,7 @@ const getMotionState = (index: number): Variant => {
 async function syncMotionState() {
   await nextTick()
 
-  visibleItems.value.forEach((_, index) => {
+  visibleSlots.value.forEach((_, index) => {
     motions[getMotionKey(index)]?.apply(getMotionState(index))
   })
 }
@@ -152,6 +172,7 @@ function clearHoveredItem() {
 }
 
 function handleRailPointerMove(event: PointerEvent) {
+  if (entrance.active.value) return
   if (event.pointerType !== 'mouse' || !isDesktopRail.value) return
 
   const item = event.target instanceof Element
@@ -159,7 +180,7 @@ function handleRailPointerMove(event: PointerEvent) {
     : null
   const index = item ? Number(item.dataset.showcaseItemIndex) : Number.NaN
 
-  hoveredIndex.value = Number.isInteger(index) ? index : null
+  hoveredIndex.value = Number.isInteger(index) && visibleSlots.value[index]?.kind === 'article' ? index : null
 }
 
 function handleDocumentPointerOut(event: PointerEvent) {
@@ -184,12 +205,8 @@ function shouldUseNativeNavigation(event: MouseEvent) {
   )
 }
 
-async function onItemClick(event: MouseEvent, item: ArticleCardVm) {
-  // 临时预览卡片保留悬停效果，不请求不存在的文章详情。
-  if (import.meta.env.DEV && item.id < 0) {
-    event.preventDefault()
-    return
-  }
+async function onItemClick(event: MouseEvent, item: ArticleCardVm | undefined) {
+  if (!item) return
   if (shouldUseNativeNavigation(event)) return
   if (!isDesktopRail.value || hoveredIndex.value === null) return
 
@@ -205,7 +222,7 @@ async function onItemClick(event: MouseEvent, item: ArticleCardVm) {
   }, HOVER_SETTLE_BEFORE_NAVIGATE_MS)
 }
 
-watch([hoveredIndex, visibleItems, isDesktopRail], () => {
+watch([hoveredIndex, visibleSlots, isDesktopRail], () => {
   void syncMotionState()
 }, { immediate: true, flush: 'post' })
 
@@ -213,14 +230,19 @@ watch(visibleItemSignature, () => {
   hoveredIndex.value = null
   layoutVersion.value += 1
   void syncMotionState()
+  void nextTick(syncSlotOrder)
 }, { flush: 'post' })
 
 onMounted(() => {
+  layoutObserver = new ResizeObserver(syncSlotOrder)
+  if (railRef.value) layoutObserver.observe(railRef.value)
+  syncSlotOrder()
   document.addEventListener('pointerout', handleDocumentPointerOut)
   window.addEventListener('blur', clearHoveredItem)
 })
 
 onBeforeUnmount(() => {
+  layoutObserver?.disconnect()
   clearNavigationSettleTimer()
   document.removeEventListener('pointerout', handleDocumentPointerOut)
   window.removeEventListener('blur', clearHoveredItem)
@@ -230,6 +252,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+      ref="railRef"
+      :inert="entrance.active.value"
       class="home-showcase-rail"
       :class="{ 'home-showcase-rail--featured': featured }"
       @pointermove="handleRailPointerMove"
@@ -238,25 +262,29 @@ onBeforeUnmount(() => {
     <div class="home-showcase-rail__viewport">
       <div class="home-showcase-rail__track">
         <div
-            v-for="(item, index) in visibleItems"
-            :key="`${item.id}-${index}-${layoutVersion}`"
+            v-for="(slot, index) in visibleSlots"
+            :key="`${motionIdPrefix}-slot-${index}-${layoutVersion}`"
             class="home-showcase-rail__item"
+            :class="{ 'home-showcase-rail__item--decoration': slot.kind === 'decoration' }"
             :style="getItemStyle(index)"
-            :data-showcase-item-index="index"
-            @click.capture="onItemClick($event, item)"
+            :data-showcase-item-index="slot.kind === 'article' ? index : undefined"
+            :data-showcase-kind="slot.kind"
+            @click.capture="onItemClick($event, slot.kind === 'article' ? slot.article : undefined)"
             v-motion="getMotionKey(index)"
             :initial="getMotionState(index)"
         >
+          <div data-card-entry :style="entrance.style(index, visibleSlots.length)">
           <HomeShowcaseCard
-              :article="item"
+              :article="slot.kind === 'article' ? slot.article : undefined"
               :category-label="categoryLabel"
-              :emphasis="featured && index === 0 ? 'hero' : 'regular'"
-              :tone-index="index"
+              :emphasis="featured && slot.kind === 'article' && slot.articleIndex === 0 ? 'hero' : 'regular'"
+              :tone-index="slot.kind === 'article' ? slot.articleIndex : index"
               :cropped="featured"
-              :revealed="revealed"
-              :animate-reveal="animateReveal"
+              :revealed="entrance.owned.value || revealed"
+              :animate-reveal="!entrance.owned.value && animateReveal"
               :delay="delayBase + index * 80"
           />
+          </div>
         </div>
       </div>
     </div>

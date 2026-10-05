@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "generate:api": "node ./scripts/generate-api-types.mjs",
     "font:subset": "python ./scripts/subset-zhaohua-font.py",
-    "test:auth-session": "node --test scripts/auth-session/*.test.mjs"
+    "test:auth-session": "node --test scripts/auth-session/*.test.mjs",
+    "test:page-scroll": "node --test scripts/page-scroll.test.mjs"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",

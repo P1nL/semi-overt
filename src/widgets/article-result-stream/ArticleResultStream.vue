@@ -29,6 +29,7 @@ withDefaults(
 
 const emit = defineEmits<{
   'update:view': [value: ResultViewMode]
+  'layout:view': [value: ResultViewMode]
 }>()
 </script>
 
@@ -41,7 +42,7 @@ const emit = defineEmits<{
       <ResultViewToggle :model-value="view" @update:model-value="emit('update:view', $event)" />
     </div>
 
-    <Transition name="result-view-switch" mode="out-in" :duration="RESULT_VIEW_SWITCH_DURATION">
+    <Transition name="result-view-switch" mode="out-in" :duration="RESULT_VIEW_SWITCH_DURATION" @after-leave="emit('layout:view', view)">
       <div :key="view" class="article-result-stream__panel" :class="`article-result-stream__panel--${view}`">
         <ArticleInfiniteMenu
           v-if="view === RESULT_VIEW_MODE.INFINITE"
@@ -69,7 +70,7 @@ const emit = defineEmits<{
   position: absolute;
   top: 1.25rem;
   right: 0;
-  z-index: 60;
+  z-index: 20;
   display: flex;
   justify-content: flex-end;
 }

@@ -33,6 +33,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 
 import {
   buildEditorStats,
+  createEditorSidePanelPreview,
   createEmptyEditorFormValues,
   mapArticleDetailVmToEditorFormValues,
   mapEditorFormToDraftPayload,
@@ -96,6 +97,7 @@ const saveError = ref('')
 const ready = ref(false)
 const workingArticleId = ref<number | string | undefined>(props.articleId)
 const sidePanelOpen = ref(true)
+const sidePanelPreview = createEditorSidePanelPreview(() => { sidePanelOpen.value = false })
 const titleTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const bodyImageInputRef = ref<HTMLInputElement | null>(null)
 const formatToolbarRef = ref<HTMLElement | null>(null)
@@ -132,7 +134,7 @@ const MIN_SAVE_FEEDBACK_MS = 560
 const disabledState = computed(() => props.disabled || loading.value || editorStore.submitting)
 const titleCountText = computed(() => `${form.title.length}/${ARTICLE_TITLE_MAX_LENGTH}`)
 const summaryCountText = computed(() => `${form.summary.length}/${ARTICLE_SUMMARY_MAX_LENGTH}`)
-const readMinutesText = computed(() => `约 ${Math.max(1, Math.round(form.readMinutes || 0))} 分钟阅读`)
+const readMinutesText = computed(() => ``)
 const bodyImageAccept = computed(() => ARTICLE_IMAGE_ACCEPTED_EXTENSIONS.join(','))
 const PARAGRAPH_TAB_INDENT = '\u00A0\u00A0\u00A0\u00A0'
 const headingOptions = [
@@ -226,7 +228,7 @@ const contentEditor = useEditor({
     TableHeader,
     TableCell,
     Placeholder.configure({
-      placeholder: '开始写作，支持标题、列表、引用、代码块、分割线和图片。',
+      placeholder: '',
     }),
   ],
   content: renderMarkdownToEditorHtml(form.content),
@@ -325,7 +327,7 @@ function normalizeMarkdown(value: string): string {
 function handleFormMutation() {
   if (!ready.value || disabledState.value) return
 
-  editorStore.dirty = true
+  editorStore.markChanged()
   emitFormChange()
   scheduleAutoSave()
 }
@@ -519,6 +521,8 @@ async function persistDraft(
     } else {
       savedArticle = await editorStore.loadArticleDetail(articleId, true)
     }
+
+    editorStore.recordDraftSave(articleId, manualFeedback ? 'manual' : 'auto', response.savedAt)
 
     const payload: EditorDraftSavedPayload = {
       savedAt: response.savedAt,
@@ -966,6 +970,7 @@ function isTextAlignmentActive(alignment: 'left' | 'center' | 'right') {
 }
 
 function toggleSidePanel() {
+  sidePanelPreview.takeControl()
   sidePanelOpen.value = !sidePanelOpen.value
 }
 
@@ -1064,6 +1069,7 @@ watch(
 
     patchFormValues(value)
     syncEditorFromMarkdown(value.content)
+    handleFormMutation()
   },
   { deep: true },
 )
@@ -1110,6 +1116,8 @@ watch(
 )
 
 onMounted(async () => {
+  sidePanelPreview.start()
+  editorStore.beginEditorSession()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeydown)
 
@@ -1143,6 +1151,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  sidePanelPreview.dispose()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   document.removeEventListener('keydown', handleDocumentKeydown)
   clearSaveTimer()
@@ -1857,6 +1866,7 @@ defineExpose({
           type="button"
           class="editor-side-toggle"
           :aria-label="sidePanelOpen ? '收起侧栏' : '展开侧栏'"
+          :aria-expanded="sidePanelOpen"
           @click="toggleSidePanel"
         >
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1931,7 +1941,7 @@ defineExpose({
 
 <style scoped>
 .editor-workbench {
-  --editor-canvas-width: 44rem;
+  --editor-canvas-width: 48rem;
   --editor-side-width: 17.5rem;
   --editor-side-gap: 1rem;
   --editor-side-toggle-width: 2.25rem;
@@ -3116,7 +3126,17 @@ defineExpose({
   }
 
   .editor-side-toggle-anchor {
-    display: none;
+    position: static;
+    display: flex;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .editor-side-toggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-pill);
+    border-right: 1px solid var(--color-border);
   }
 
   .editor-side-region,
@@ -3126,6 +3146,7 @@ defineExpose({
     max-height: none;
     opacity: 1;
     pointer-events: auto;
+    transform: none;
   }
 
   .editor-side-panel {
