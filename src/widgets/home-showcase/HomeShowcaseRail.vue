@@ -72,8 +72,9 @@ const hoveredIndex = ref<number | null>(null)
 const getMotionKey = (index: number) => `${motionIdPrefix}-${layoutVersion.value}-${index}`
 
 const getMotionState = (index: number): Variant => {
+  // 所有卡片共用悬停动效；装饰片是否可导航由 onItemClick 单独判断。
   // 1. 无悬停时：保持端正，仅由纵向错层区分卡片高度
-  if (hoveredIndex.value === null || visibleSlots.value[index]?.kind !== 'article') {
+  if (hoveredIndex.value === null) {
     return {
       y: 0,
       x: 0,
@@ -180,7 +181,7 @@ function handleRailPointerMove(event: PointerEvent) {
     : null
   const index = item ? Number(item.dataset.showcaseItemIndex) : Number.NaN
 
-  hoveredIndex.value = Number.isInteger(index) && visibleSlots.value[index]?.kind === 'article' ? index : null
+  hoveredIndex.value = Number.isInteger(index) && index >= 0 && index < visibleSlots.value.length ? index : null
 }
 
 function handleDocumentPointerOut(event: PointerEvent) {
@@ -267,7 +268,7 @@ onBeforeUnmount(() => {
             class="home-showcase-rail__item"
             :class="{ 'home-showcase-rail__item--decoration': slot.kind === 'decoration' }"
             :style="getItemStyle(index)"
-            :data-showcase-item-index="slot.kind === 'article' ? index : undefined"
+            :data-showcase-item-index="index"
             :data-showcase-kind="slot.kind"
             @click.capture="onItemClick($event, slot.kind === 'article' ? slot.article : undefined)"
             v-motion="getMotionKey(index)"

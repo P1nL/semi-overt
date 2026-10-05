@@ -232,7 +232,7 @@ const cardStyle = computed(() => ({
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .home-showcase-card:not(.home-showcase-card--decorative):hover {
+  .home-showcase-card:hover {
     box-shadow: 0 28px 72px rgb(15 23 42 / 0.2);
   }
 

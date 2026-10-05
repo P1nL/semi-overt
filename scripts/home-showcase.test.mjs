@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
+import vm from 'node:vm'
+import ts from 'typescript'
+import { parse } from '@vue/compiler-sfc'
 import { createShowcaseSlots, isShowcaseLayoutReversed } from '../src/widgets/home-showcase/model/showcaseSlots.ts'
 
 const articles = count => Array.from({length:count},(_,i)=>({id:i+1,titleText:`真实文章 ${i+1}`,articlePath:`/articles/${i+1}`}))
@@ -60,11 +63,12 @@ test('decoration roots are non-link hidden surfaces; only real cards render a ti
   assert.doesNotMatch(card,/\.home-showcase-card__title \{[^}]*animation:/)
   assert.doesNotMatch(card,/IntroGlyph|ScrambleText|TextPressure/)
 })
-test('decorations do not respond to hover or navigation, and share the whole-card entrance',()=>{
+test('all card slots expose hover geometry while only real articles expose navigation',()=>{
   const rail=readFileSync(new URL('../src/widgets/home-showcase/HomeShowcaseRail.vue',import.meta.url),'utf8')
   assert.match(rail,/props.featured && props.fillDecorative && isDesktopRail.value/)
-  assert.match(rail,/hoveredIndex.value === null \|\| visibleSlots.value\[index\]\?\.kind !== 'article'/)
-  assert.match(rail,/:data-showcase-item-index="slot.kind === 'article' \? index : undefined"/)
+  assert.match(rail,/if \(hoveredIndex.value === null\)/)
+  assert.doesNotMatch(rail,/hoveredIndex.value === null \|\| visibleSlots.value\[index\]\?\.kind !== 'article'/)
+  assert.match(rail,/:data-showcase-item-index="index"/)
   assert.match(rail,/if \(!item\) return/)
   assert.match(rail,/data-card-entry :style="entrance.style\(index, visibleSlots.length\)"/)
   assert.match(rail,/\(\) => visibleSlots.value.length/)
@@ -72,6 +76,95 @@ test('decorations do not respond to hover or navigation, and share the whole-car
   assert.doesNotMatch(rail,/home-showcase-rail--filled|clamp\(1rem, 2vw, 2rem\)/)
   assert.match(rail,/slots.map\(slot => slot.offsetLeft\)/)
   assert.match(rail,/:key="`\$\{motionIdPrefix\}-slot-\$\{index\}-\$\{layoutVersion\}`"/)
+  const card=readFileSync(new URL('../src/widgets/home-showcase/HomeShowcaseCard.vue',import.meta.url),'utf8')
+  assert.match(card,/\.home-showcase-card:hover \{\s*box-shadow:/)
+})
+
+// Exercise the component's actual motion and pointer logic, not a copied formula.
+const railSetup=parse(readFileSync(new URL('../src/widgets/home-showcase/HomeShowcaseRail.vue',import.meta.url),'utf8')).descriptor.scriptSetup.content
+const railAst=ts.createSourceFile('HomeShowcaseRail.ts',railSetup,ts.ScriptTarget.Latest,true)
+const railMotionSource=railAst.statements.filter(node=>{
+  if(ts.isVariableStatement(node)) return node.declarationList.declarations.some(item=>item.name.getText(railAst)==='getMotionState')
+  return ts.isFunctionDeclaration(node) && ['handleRailPointerMove','clearHoveredItem','onItemClick','shouldUseNativeNavigation'].includes(node.name?.text)
+}).map(node=>node.getText(railAst)).join('\n')
+const railMotionCode=ts.transpileModule(railMotionSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
+function motionHarness(slots) {
+  const hoveredIndex={value:null},desktop={value:true},active={value:false},pushes=[]
+  class Target {
+    constructor(index){this.index=index}
+    closest(){return this.index===null?null:{dataset:{showcaseItemIndex:String(this.index)}}}
+  }
+  const exports={}
+  vm.runInNewContext(railMotionCode+'\nObject.assign(exports,{getMotionState,handleRailPointerMove,clearHoveredItem,onItemClick})',{
+    exports,hoveredIndex,visibleSlots:{value:slots},isDesktopRail:desktop,entrance:{active},Element:Target,
+    clearNavigationSettleTimer(){},syncMotionState:async()=>{},navigationSettleTimer:null,HOVER_SETTLE_BEFORE_NAVIGATE_MS:280,
+    window:{setTimeout(fn){fn();return 1}},router:{push:path=>pushes.push(path)},
+  })
+  return {...exports,hoveredIndex,desktop,active,pushes,
+    move(index,pointerType='mouse'){exports.handleRailPointerMove({pointerType,target:new Target(index)})},
+    pose(index){return JSON.parse(JSON.stringify(exports.getMotionState(index)))},
+  }
+}
+test('decorative neighbours use exactly the same lift, side push, tilt and spring as real cards',()=>{
+  for(const reversed of [false,true]) for(const count of [1,3,7,10]) {
+    const slots=createShowcaseSlots(articles(count),11,true,reversed), h=motionHarness(slots)
+    const reference=motionHarness(createShowcaseSlots(articles(11),11))
+    slots.forEach((_,index)=>{
+      h.move(index);reference.move(index)
+      slots.forEach((_,neighbour)=>assert.deepEqual(h.pose(neighbour),reference.pose(neighbour),`count=${count}, reversed=${reversed}, hover=${index}, neighbour=${neighbour}`))
+    })
+  }
+})
+test('decorations follow both nearest neighbours then settle back when the hover clears',()=>{
+  const h=motionHarness(createShowcaseSlots(articles(3),11,true))
+  h.move(8)
+  assert.equal(h.pose(8).y,-400)
+  assert.deepEqual([h.pose(7).x,h.pose(7).y,h.pose(7).rotate],[-40,-100,-4])
+  assert.deepEqual([h.pose(6).x,h.pose(6).y,h.pose(6).rotate],[-10,-40,-1])
+  assert.equal(h.pose(5).y,0)
+  h.clearHoveredItem()
+  for(let index=0;index<11;index++) assert.deepEqual([h.pose(index).x,h.pose(index).y,h.pose(index).rotate],[0,0,0])
+})
+test('a decorative hover is fully animated after Splash without enabling navigation',async()=>{
+  const h=motionHarness(createShowcaseSlots(articles(3),11,true))
+  h.active.value=true
+  h.move(7)
+  assert.equal(h.hoveredIndex.value,null)
+  h.active.value=false
+  h.move(7)
+  assert.equal(h.hoveredIndex.value,7)
+  assert.equal(h.pose(7).y,-400)
+  assert.equal(h.pose(6).y,-100)
+  assert.equal(h.pose(8).y,-100)
+  let prevented=false
+  await h.onItemClick({preventDefault(){prevented=true}},undefined)
+  assert.equal(prevented,false)
+  assert.deepEqual(h.pushes,[])
+  assert.equal(h.hoveredIndex.value,7)
+  h.clearHoveredItem()
+  assert.equal(h.pose(7).y,0)
+})
+test('touch, narrow layouts and invalid targets cannot start a decorative hover',()=>{
+  const h=motionHarness(createShowcaseSlots(articles(3),11,true))
+  h.move(7,'touch')
+  assert.equal(h.hoveredIndex.value,null)
+  h.desktop.value=false;h.move(7)
+  assert.equal(h.hoveredIndex.value,null)
+  h.desktop.value=true
+  for(const index of [-1,11,1.5,NaN,Infinity,null]) {
+    h.move(7)
+    h.move(index)
+    assert.equal(h.hoveredIndex.value,null,String(index))
+  }
+})
+test('real article navigation still settles the deck before opening the article',async()=>{
+  const items=articles(3),h=motionHarness(createShowcaseSlots(items,11,true))
+  h.move(8)
+  let prevented=false
+  await h.onItemClick({button:0,preventDefault(){prevented=true}},items[0])
+  assert.equal(prevented,true)
+  assert.equal(h.hoveredIndex.value,null)
+  assert.deepEqual(h.pushes,[items[0].articlePath])
 })
 test('development and production share real data and the intro freezes it until completion',()=>{
   const hero=readFileSync(new URL('../src/widgets/hero-section/HeroSection.vue',import.meta.url),'utf8')
