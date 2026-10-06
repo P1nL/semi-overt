@@ -854,7 +854,7 @@ onBeforeUnmount(() => {
   min-height: 100%;
   height: 100%;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
-  background: #fff;
+  background: var(--color-surface);
   box-shadow:
     0 14px 32px rgb(15 23 42 / 0.07),
     inset 0 1px 0 rgb(255 255 255 / 0.96);
@@ -944,7 +944,7 @@ onBeforeUnmount(() => {
 
 html.dark .ptm__card :deep(.content-card-shell) {
   border-color: rgb(255 255 255 / 0.08);
-  background: rgb(20 24 33);
+  background: var(--color-surface);
   box-shadow:
     0 16px 36px rgb(0 0 0 / 0.2),
     0 4px 12px rgb(0 0 0 / 0.1);
@@ -1005,7 +1005,7 @@ html.dark .ptm__card :deep(.content-card-shell::before) {
 .ptm__mobile-item :deep(.content-card-shell) {
   min-height: 100%;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
-  background: #fff;
+  background: var(--color-surface);
   box-shadow:
     0 14px 32px rgb(15 23 42 / 0.07),
     inset 0 1px 0 rgb(255 255 255 / 0.96);
@@ -1033,7 +1033,7 @@ html.dark .ptm__card :deep(.content-card-shell::before) {
 
 html.dark .ptm__mobile-item :deep(.content-card-shell) {
   border-color: rgb(255 255 255 / 0.08);
-  background: rgb(20 24 33);
+  background: var(--color-surface);
   box-shadow:
     0 16px 36px rgb(0 0 0 / 0.2),
     0 4px 12px rgb(0 0 0 / 0.1);
@@ -1121,7 +1121,7 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
   min-height: 0;
   height: 100%;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 82%, white 18%);
-  background: #fff;
+  background: var(--color-surface);
   box-shadow:
     0 6px 18px rgb(15 23 42 / 0.07),
     inset 0 1px 0 rgb(255 255 255 / 0.96);
@@ -1176,7 +1176,7 @@ html.dark .ptm__mobile-item :deep(.content-card-shell::before) {
 
 html.dark .ptm__grid-item :deep(.content-card-shell) {
   border-color: rgb(255 255 255 / 0.08);
-  background: rgb(20 24 33);
+  background: var(--color-surface);
   box-shadow:
     0 6px 18px rgb(0 0 0 / 0.18),
     0 2px 6px rgb(0 0 0 / 0.1);

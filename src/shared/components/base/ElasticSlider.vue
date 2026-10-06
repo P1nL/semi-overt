@@ -7,6 +7,7 @@
     ]"
   >
     <div
+      ref="motionGroupRef"
       class="flex w-full touch-none select-none items-center justify-center gap-3"
       :style="{
         scale: scale,
@@ -80,13 +81,25 @@
           <span v-else>+</span>
         </slot>
       </div>
+      <div
+        v-if="$slots.trailing"
+        data-slider-trailing
+        @mouseenter="handleMouseLeave"
+        @mouseleave="handleTrailingLeave"
+        @touchstart.stop="handleMouseLeave"
+        @touchend.stop
+        class="flex shrink-0 items-center transition-transform duration-200 ease-out"
+        :style="{ transform: `translateX(${rightIconTranslateX}px) scale(${rightIconScale})` }"
+      >
+        <slot name="trailing" />
+      </div>
     </div>
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, type Component, useTemplateRef } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, type Component, useTemplateRef } from 'vue';
 
 const MAX_OVERFLOW = 50;
 
@@ -118,7 +131,12 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [number]
+  'right-offset': [number]
 }>();
+
+const motionGroupRef = useTemplateRef<HTMLDivElement>('motionGroupRef');
+const motionWidth = ref(0);
+let motionResizeObserver: ResizeObserver | undefined;
 
 const sliderRef = useTemplateRef<HTMLDivElement>('sliderRef');
 const leftIconRef = useTemplateRef<HTMLDivElement>('leftIconRef');
@@ -214,6 +232,10 @@ const leftIconTranslateX = computed(() => {
 const rightIconTranslateX = computed(() => {
   return region.value === 'right' ? overflow.value / scale.value : 0;
 });
+
+// Report screen-space translation only, so external actions stay unscaled.
+const rightOffset = computed(() => motionWidth.value * (scale.value - 1) / 2 + rightIconTranslateX.value * scale.value);
+watch(rightOffset, offset => emit('right-offset', offset), { immediate: true });
 
 const decay = (inputValue: number, max: number): number => {
   if (max === 0) return 0;
@@ -353,7 +375,15 @@ const handlePointerUp = () => {
   overflowAnimation = animate(overflow, 0, { type: 'spring', bounce: 0.4, duration: 500 });
 };
 
-const handleMouseEnter = () => {
+const handleTrailingLeave = (event: MouseEvent) => {
+  const host = (event.currentTarget as HTMLElement).parentElement;
+  if (event.relatedTarget instanceof Node && host?.contains(event.relatedTarget)) {
+    handleMouseEnter();
+  }
+};
+
+const handleMouseEnter = (event?: MouseEvent) => {
+  if (event?.target instanceof Element && event.target.closest('[data-slider-trailing]')) return;
   if (scaleAnimation) {
     cancelAnimationFrame(scaleAnimation);
   }
@@ -402,6 +432,16 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 onMounted(() => {
+  if (motionGroupRef.value) {
+    motionWidth.value = motionGroupRef.value.offsetWidth;
+    motionResizeObserver = new ResizeObserver(() => {
+      motionWidth.value = motionGroupRef.value?.offsetWidth ?? 0;
+    });
+    motionResizeObserver.observe(motionGroupRef.value);
+  }
   value.value = props.defaultValue;
+});
+onBeforeUnmount(() => {
+  motionResizeObserver?.disconnect();
 });
 </script>

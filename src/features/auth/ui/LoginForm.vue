@@ -193,8 +193,10 @@ async function handleSubmit() {
       :message="submitError"
     />
 
-    <div class="flex justify-center">
+    <!-- Reserve particle travel inside the auth containers' clipping boundaries. -->
+    <div class="flex justify-center pb-18">
       <GooeyActionButton
+        loading-transition="cycle"
         type="submit"
         width="18rem"
         height="3.5rem"
@@ -203,19 +205,9 @@ async function handleSubmit() {
         aria-label="登录"
         @effect-complete="handleLoadingEffectComplete"
       >
-        <AnimatedPersonCyclingIcon size="1.65rem" title="登录" :decorative="false" />
+        <AnimatedPersonCyclingIcon size="5rem" title="登录" :decorative="false" />
       </GooeyActionButton>
     </div>
 
-    <div class="text-center text-sm text-[var(--color-text-muted)]">
-      还没有账号？
-      <button
-        type="button"
-        class="font-medium text-[var(--color-primary)] transition-colors duration-200 hover:text-[var(--color-primary-strong)]"
-        @click="emit('switchMode', 'register')"
-      >
-        立即注册
-      </button>
-    </div>
   </form>
 </template>

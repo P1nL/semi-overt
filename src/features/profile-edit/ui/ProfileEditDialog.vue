@@ -39,6 +39,7 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const toast = useToast()
 
+const profileFormRef = ref<InstanceType<typeof ProfileEditForm> | null>(null)
 const submitting = ref(false)
 const errorMessage = ref('')
 const form = ref<ProfileEditFormValues>(createProfileEditFormValues(props.profile))
@@ -52,10 +53,12 @@ function resetFormState() {
 }
 
 function closeDialog() {
+  if (submitting.value) return
   emit('update:modelValue', false)
 }
 
 async function handleSubmit() {
+  if (submitting.value) return
   errorMessage.value = ''
 
   const validation = validateProfileEditForm(form.value)
@@ -68,6 +71,10 @@ async function handleSubmit() {
   const finishLoadingAnimation = createMinimumDuration()
 
   try {
+    const uploadedAvatar = await profileFormRef.value?.prepareAvatar()
+    if (uploadedAvatar) form.value = { ...form.value, avatarUrl: uploadedAvatar.url }
+    const uploadedCover = await profileFormRef.value?.prepareCover()
+    if (uploadedCover) form.value = { ...form.value, coverUrl: uploadedCover.url }
     const response = await userApi.updateMyProfile(mapProfileEditFormToPayload(form.value))
     const profile = mapUserProfileDtoToVm(response)
 
@@ -77,7 +84,7 @@ async function handleSubmit() {
     })
     await finishLoadingAnimation()
     emit('updated', profile)
-    closeDialog()
+    emit('update:modelValue', false)
   } catch (error) {
     const message = getErrorMessage(error, '资料更新失败，请稍后重试')
     errorMessage.value = message
@@ -136,7 +143,7 @@ watch(
     >
       <section
         v-if="modelValue"
-        class="surface-1 fixed bottom-0 left-1/2 z-[61] flex h-[min(88vh,52rem)] w-[min(42rem,calc(100vw-1rem))] -translate-x-1/2 flex-col overflow-hidden rounded-t-[var(--radius-xl)] shadow-[var(--shadow-lg)]"
+        class="profile-edit-dialog surface-1 fixed bottom-0 left-1/2 z-[61] flex h-[min(88vh,52rem)] w-[min(42rem,calc(100vw-1rem))] -translate-x-1/2 flex-col overflow-hidden rounded-t-[var(--radius-xl)] shadow-[var(--shadow-lg)]"
         role="dialog"
         aria-modal="true"
         aria-label="编辑资料"
@@ -144,15 +151,11 @@ watch(
       >
         <div class="flex items-start justify-between gap-4 border-b border-[var(--color-border)] px-5 pb-4 pt-5 md:px-6">
           <div class="min-w-0 flex-1">
-            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-primary)]">
-              PROFILE
-            </div>
+            
             <h2 class="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-text)]">
               编辑资料
             </h2>
-            <p class="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">
-              更新个人头像、封面和基础信息。
-            </p>
+            
           </div>
 
           <IconButton
@@ -171,6 +174,7 @@ watch(
             <InlineMessage v-if="errorMessage" tone="error" :message="errorMessage" />
 
             <ProfileEditForm
+              ref="profileFormRef"
               v-model="form"
               :errors="errors"
               :disabled="submitting"
@@ -184,6 +188,7 @@ watch(
             取消
           </Button>
           <GooeyActionButton
+            class="profile-edit-confirm"
             type="button"
             variant="primary"
             width="5rem"
@@ -202,3 +207,11 @@ watch(
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+/* Keep hover feedback stationary inside this dialog; retain pressed states. */
+.profile-edit-dialog :deep(button:hover:not(:active)) {
+  transform: none;
+  translate: none;
+}
+</style>

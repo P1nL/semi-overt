@@ -183,7 +183,7 @@ function loadMoreArticles() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
+  <div class="profile-page min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main class="page-container py-8 md:py-10">
       <Transition name="content-fade" mode="out-in">
         <div

@@ -222,3 +222,49 @@ html.dark {
             0 16px 36px rgb(0 0 0 / 0.28),
             0 5px 12px rgb(0 0 0 / 0.16);
 }
+
+/* Neutral profile palette; navigation and other routes retain their colors. */
+.profile-page,
+.profile-edit-dialog {
+    --color-primary: #505050;
+    --color-primary-strong: #333333;
+    --color-primary-soft: rgb(80 80 80 / 0.12);
+    --color-profile-activity: #606060;
+    --color-profile-selected-text: #ffffff;
+    --color-surface: #f4f4f4;
+    --color-surface-elevated: #ededed;
+    --color-surface-glass: rgb(244 244 244 / 0.66);
+    --color-surface-glass-strong: rgb(244 244 244 / 0.94);
+    --color-text: #242424;
+    --color-text-muted: #666666;
+    --color-text-faint: #737373;
+    --color-border: rgb(36 36 36 / 0.1);
+    --color-border-strong: rgb(36 36 36 / 0.18);
+    --color-profile-divider: var(--color-border-strong);
+    --color-selection-bg: rgb(80 80 80 / 0.2);
+    --color-selection-text: var(--color-text);
+}
+
+html.dark .profile-page,
+html.dark .profile-edit-dialog {
+    --color-primary: #d0d0d0;
+    --color-primary-strong: #eeeeee;
+    --color-primary-soft: rgb(208 208 208 / 0.14);
+    --color-profile-activity: #b8b8b8;
+    --color-profile-selected-text: #242424;
+    --color-surface: #202020;
+    --color-surface-elevated: #292929;
+    --color-surface-glass: rgb(32 32 32 / 0.72);
+    --color-surface-glass-strong: rgb(32 32 32 / 0.94);
+    --color-text: #f2f2f2;
+    --color-text-muted: #b0b0b0;
+    --color-text-faint: #999999;
+    --color-border: rgb(242 242 242 / 0.1);
+    --color-border-strong: rgb(242 242 242 / 0.18);
+    --color-selection-bg: rgb(208 208 208 / 0.24);
+}
+
+/* Keep the profile save action on the original global action palette. */
+:root { --color-profile-confirm: #0071e3; }
+html.dark { --color-profile-confirm: #2997ff; }
+.profile-edit-confirm { --color-primary: var(--color-profile-confirm); }

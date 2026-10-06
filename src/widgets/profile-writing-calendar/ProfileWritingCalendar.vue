@@ -361,25 +361,25 @@ onBeforeUnmount(() => {
 .profile-writing-calendar__cell--level-1 {
   --cell-transition-duration: 220ms;
   --cell-transition-delay: 20ms;
-  background: color-mix(in srgb, var(--color-success) 22%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 22%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__cell--level-2 {
   --cell-transition-duration: 280ms;
   --cell-transition-delay: 45ms;
-  background: color-mix(in srgb, var(--color-success) 42%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 42%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__cell--level-3 {
   --cell-transition-duration: 340ms;
   --cell-transition-delay: 70ms;
-  background: color-mix(in srgb, var(--color-success) 66%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 66%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__cell--level-4 {
   --cell-transition-duration: 420ms;
   --cell-transition-delay: 95ms;
-  background: color-mix(in srgb, var(--color-success) 92%, black 4%);
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 92%, black 4%);
 }
 
 .profile-writing-calendar__cell--future {
@@ -406,19 +406,19 @@ onBeforeUnmount(() => {
 }
 
 .profile-writing-calendar__legend-cell--level-1 {
-  background: color-mix(in srgb, var(--color-success) 22%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 22%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__legend-cell--level-2 {
-  background: color-mix(in srgb, var(--color-success) 42%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 42%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__legend-cell--level-3 {
-  background: color-mix(in srgb, var(--color-success) 66%, var(--color-surface-elevated));
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 66%, var(--color-surface-elevated));
 }
 
 .profile-writing-calendar__legend-cell--level-4 {
-  background: color-mix(in srgb, var(--color-success) 92%, black 4%);
+  background: color-mix(in srgb, var(--color-profile-activity, var(--color-success)) 92%, black 4%);
 }
 
 .profile-writing-calendar__years {
@@ -469,12 +469,12 @@ onBeforeUnmount(() => {
 }
 
 .profile-writing-calendar__year--active {
-  color: white;
+  color: var(--color-profile-selected-text, white);
   transform: translateX(0.18rem);
 }
 
 .profile-writing-calendar__year--active:hover {
-  color: white;
+  color: var(--color-profile-selected-text, white);
   transform: translateX(0.18rem);
 }
 

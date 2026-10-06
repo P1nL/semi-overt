@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 
-import { AnimatedActionButtonIcon, GooeyActionButton, Input } from '@/shared/components/base'
+import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
 import { useToast } from '@/shared/composables/useToast'
@@ -125,10 +125,11 @@ function validateResetStep(): boolean {
 }
 
 const resendButtonLabel = computed(() =>
-  resendSeconds.value > 0 ? `重新发送（${resendSeconds.value}s）` : '重新发送',
+  resendSeconds.value > 0 ? `重新发送（${resendSeconds.value}s）` : codeSent.value ? '重新发送' : '发送验证码',
 )
 
 function resetEmailStep() {
+  if (sendingCode.value || submitting.value) return
   stopResendCountdown()
   codeSent.value = false
   sendingCode.value = false
@@ -151,6 +152,7 @@ function resetEmailStep() {
 }
 
 async function sendCode() {
+  if (sendingCode.value || submitting.value || resendSeconds.value > 0) return
   submitError.value = ''
   successMessage.value = ''
 
@@ -174,10 +176,11 @@ async function sendCode() {
 }
 
 async function handleSubmit() {
+  if (submitting.value || sendingCode.value) return
   submitError.value = ''
 
   if (!codeSent.value) {
-    await sendCode()
+    submitError.value = '请先获取邮箱验证码'
     return
   }
 
@@ -208,125 +211,102 @@ onBeforeUnmount(() => {
   <form class="space-y-5" @submit.prevent="handleSubmit">
     <FormField>
       <FormLabel for="forgot-email">注册邮箱</FormLabel>
-      <Input
-        id="forgot-email"
-        v-model="form.email"
-        type="email"
-        placeholder="请输入注册邮箱"
-        :error="touched.email ? errors.email : ''"
-        autocomplete="email"
-        :disabled="codeSent || sendingCode || submitting"
-        @blur="onBlur('email')"
-      />
+      <div class="flex gap-2">
+        <Input
+          id="forgot-email"
+          v-model="form.email"
+          type="email"
+          placeholder="请输入注册邮箱"
+          :error="touched.email ? errors.email : ''"
+          autocomplete="email"
+          :disabled="codeSent || sendingCode || submitting"
+          @blur="onBlur('email')"
+        />
+        <button
+          type="button"
+          class="shrink-0 rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--color-primary)_34%,transparent)] px-4 text-sm font-medium text-[var(--color-primary)] transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--color-primary)_9%,transparent)] disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:text-[var(--color-text-muted)]"
+          :disabled="submitting || sendingCode || resendSeconds > 0"
+          @click="sendCode"
+        >
+          {{ sendingCode ? '发送中' : resendButtonLabel }}
+        </button>
+      </div>
       <FieldError :message="touched.email ? errors.email : ''" />
+      <button
+        v-if="codeSent"
+        type="button"
+        class="text-xs text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="submitting || sendingCode"
+        @click="resetEmailStep"
+      >修改邮箱</button>
     </FormField>
 
-    <div v-if="codeSent" class="space-y-5">
-      <FormField>
-        <FormLabel for="forgot-code">邮箱验证码</FormLabel>
-        <Input
-          id="forgot-code"
-          v-model="form.code"
-          type="text"
-          inputmode="numeric"
-          placeholder="请输入 6 位数字验证码"
-          :error="touched.code ? errors.code : ''"
-          autocomplete="one-time-code"
-          @blur="onBlur('code')"
-        />
-        <FieldError :message="touched.code ? errors.code : ''" />
-      </FormField>
+    <FormField>
+      <FormLabel for="forgot-code">邮箱验证码</FormLabel>
+      <Input
+        id="forgot-code"
+        v-model="form.code"
+        type="text"
+        inputmode="numeric"
+        placeholder="请输入 6 位数字验证码"
+        :maxlength="6"
+        :error="touched.code ? errors.code : ''"
+        autocomplete="one-time-code"
+        :disabled="submitting"
+        @blur="onBlur('code')"
+      />
+      <FieldError :message="touched.code ? errors.code : ''" />
+    </FormField>
 
-      <FormField>
-        <FormLabel for="forgot-new-password">新密码</FormLabel>
-        <Input
-          id="forgot-new-password"
-          v-model="form.newPassword"
-          type="password"
-          placeholder="至少 8 位，包含字母和数字"
-          :error="touched.newPassword ? errors.newPassword : ''"
-          autocomplete="new-password"
-          @blur="onBlur('newPassword')"
-        />
-        <FieldError :message="touched.newPassword ? errors.newPassword : ''" />
-      </FormField>
+    <FormField>
+      <FormLabel for="forgot-new-password">新密码</FormLabel>
+      <Input
+        id="forgot-new-password"
+        v-model="form.newPassword"
+        type="password"
+        placeholder="至少 8 位，包含字母和数字"
+        :error="touched.newPassword ? errors.newPassword : ''"
+        autocomplete="new-password"
+        :disabled="submitting"
+        @blur="onBlur('newPassword')"
+      />
+      <FieldError :message="touched.newPassword ? errors.newPassword : ''" />
+    </FormField>
 
-      <FormField>
-        <FormLabel for="forgot-confirm-password">确认新密码</FormLabel>
-        <Input
-          id="forgot-confirm-password"
-          v-model="form.confirmPassword"
-          type="password"
-          placeholder="请再次输入新密码"
-          :error="touched.confirmPassword ? errors.confirmPassword : ''"
-          autocomplete="new-password"
-          @blur="onBlur('confirmPassword')"
-        />
-        <FieldError :message="touched.confirmPassword ? errors.confirmPassword : ''" />
-      </FormField>
-    </div>
+    <FormField>
+      <FormLabel for="forgot-confirm-password">确认新密码</FormLabel>
+      <Input
+        id="forgot-confirm-password"
+        v-model="form.confirmPassword"
+        type="password"
+        placeholder="请再次输入新密码"
+        :error="touched.confirmPassword ? errors.confirmPassword : ''"
+        autocomplete="new-password"
+        :disabled="submitting"
+        @blur="onBlur('confirmPassword')"
+      />
+      <FieldError :message="touched.confirmPassword ? errors.confirmPassword : ''" />
+    </FormField>
 
-    <InlineMessage
-      v-if="successMessage"
-      tone="success"
-      :message="successMessage"
-    />
+    <InlineMessage v-if="successMessage" tone="success" :message="successMessage" />
+    <InlineMessage v-if="submitError" tone="error" :message="submitError" />
 
-    <InlineMessage
-      v-if="submitError"
-      tone="error"
-      :message="submitError"
-    />
-
-    <div class="flex justify-center">
+    <div class="flex justify-center pb-18">
       <GooeyActionButton
+        loading-transition="cycle"
         type="submit"
         width="14rem"
         height="3.5rem"
-        :aria-label="codeSent ? '重置密码' : '发送验证码'"
-        :title="codeSent ? '重置密码' : '发送验证码'"
-        :loading="submitting || sendingCode"
+        aria-label="重置密码"
+        title="重置密码"
+        loading-label="正在重置密码"
+        :loading="submitting"
         :disabled="submitting || sendingCode"
       >
-        <template v-if="codeSent">重置密码</template>
-        <AnimatedActionButtonIcon
-          v-else
-          size="1.5rem"
-          color="currentColor"
-          :decorative="true"
-        />
+        <AnimatedPersonCyclingIcon size="5rem" title="重置密码" :decorative="false" />
       </GooeyActionButton>
     </div>
 
-    <div v-if="codeSent" class="flex justify-center">
-      <button
-        type="button"
-        class="text-sm font-medium text-[var(--color-primary)] transition-colors duration-200 hover:text-[var(--color-primary-strong)] disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]"
-        :disabled="sendingCode || submitting || resendSeconds > 0"
-        @click="sendCode"
-      >
-        {{ resendButtonLabel }}
-      </button>
-    </div>
-
-    <div v-if="codeSent" class="flex justify-center">
-      <button
-        type="button"
-        class="text-sm font-medium text-[var(--color-text-muted)] transition-colors duration-200 hover:text-[var(--color-primary)]"
-        @click="resetEmailStep"
-      >
-        修改邮箱 / 重新开始
-      </button>
-    </div>
-
-    <div class="flex justify-center">
-      <button
-        type="button"
-        class="text-sm font-medium text-[var(--color-primary)] transition-colors duration-200 hover:text-[var(--color-primary-strong)]"
-        @click="emit('switchMode', 'login')"
-      >
-        返回登录
-      </button>
-    </div>
+    
   </form>
 </template>

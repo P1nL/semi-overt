@@ -30,7 +30,7 @@ export function mapProfileEditFormToPayload(values: ProfileEditFormValues): Prof
         nickname: values.nickname.trim(),
         signature: values.signature.trim(),
         avatarUrl: values.avatarUrl.trim() || undefined,
-        coverUrl: values.coverUrl.trim() || undefined,
+        coverUrl: values.coverUrl.trim(),
     }
 }
 

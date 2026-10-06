@@ -16,6 +16,7 @@ const props = withDefaults(
     height?: string
     ariaLabel?: string
     loadingLabel?: string
+    loadingTransition?: 'none' | 'cycle'
   }>(),
   {
     type: 'button',
@@ -26,6 +27,7 @@ const props = withDefaults(
     height: '3rem',
     ariaLabel: '',
     loadingLabel: '正在处理',
+    loadingTransition: 'none',
   },
 )
 
@@ -389,13 +391,17 @@ onBeforeUnmount(() => {
       aria-hidden="true"
     />
 
-    <span v-if="loading" class="gooey-action-button__loading-indicator">
-      <Spinner size="md" :label="loadingLabel" />
-    </span>
+    <Transition name="gooey-spinner" :css="loadingTransition === 'cycle'">
+      <span v-if="loading" class="gooey-action-button__loading-indicator">
+        <Spinner size="md" :label="loadingLabel" />
+      </span>
+    </Transition>
 
-    <span v-else class="gooey-action-button__content">
-      <slot />
-    </span>
+    <Transition name="gooey-cycle" :css="loadingTransition === 'cycle'">
+      <span v-if="!loading" class="gooey-action-button__content" :aria-hidden="loading || undefined">
+        <slot />
+      </span>
+    </Transition>
 
     <span v-if="loading" class="sr-only">{{ loadingLabel }}</span>
   </button>
@@ -492,6 +498,25 @@ onBeforeUnmount(() => {
   justify-content: center;
   color: currentColor;
 }
+
+.gooey-action-button__loading-indicator {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Opt-in cycling handoff: only the outgoing icon travels; recovery fades in place. */
+.gooey-cycle-leave-active {
+  transition: opacity 200ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.gooey-cycle-leave-to { opacity: 0; transform: translateX(8px); }
+.gooey-cycle-enter-active { transition: opacity 160ms ease; }
+.gooey-cycle-enter-from { opacity: 0; }
+.gooey-spinner-enter-active { transition: opacity 120ms ease 140ms; }
+.gooey-spinner-leave-active { transition: opacity 100ms ease; }
+.gooey-spinner-enter-from,
+.gooey-spinner-leave-to { opacity: 0; }
 
 .gooey-action-button__effect {
   position: absolute;
@@ -626,6 +651,10 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gooey-cycle-leave-active { transition: opacity 120ms ease; }
+  .gooey-cycle-leave-to { transform: none; }
+  .gooey-spinner-enter-active { transition-delay: 0ms; }
+
   .gooey-action-button {
     transition: none;
   }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 
-import { Avatar, Button, ElasticSlider, Tooltip } from '@/shared/components/base'
+import { Avatar, ElasticSlider, Tooltip } from '@/shared/components/base'
+import { ImageUploadTrigger } from '@/shared/image-upload'
 import { useToast } from '@/shared/composables/useToast'
 import {
   uploadImageFile,
@@ -39,6 +40,15 @@ const toast = useToast()
 const inputRef = ref<HTMLInputElement | null>(null)
 const cropImageRef = ref<HTMLImageElement | null>(null)
 const draftUrl = ref('')
+const imageReady = ref(false)
+const resetTurns = ref(0)
+const resetOffset = ref(0)
+
+function handleResetClick() {
+  if (buttonDisabled.value) return
+  resetCropPosition()
+  resetTurns.value += 1
+}
 const draftFileName = ref('')
 const uploading = ref(false)
 const dragging = ref(false)
@@ -114,7 +124,7 @@ async function handleInputChange(event: Event) {
   revokeDraftUrl()
   draftUrl.value = URL.createObjectURL(file)
   draftFileName.value = file.name
-  resetCropPosition()
+  imageReady.value = false
 
   await nextTick()
   cropImageRef.value?.decode?.().catch(() => undefined)
@@ -129,10 +139,11 @@ function handleImageLoad(event: Event) {
     PREVIEW_SIZE / crop.naturalHeight,
   )
   resetCropPosition()
+  imageReady.value = true
 }
 
 function handlePointerDown(event: PointerEvent) {
-  if (!hasDraft.value || buttonDisabled.value) return
+  if (!hasDraft.value || !imageReady.value || buttonDisabled.value) return
 
   dragging.value = true
   dragStart.pointerId = event.pointerId
@@ -200,8 +211,10 @@ function createCroppedFile(): Promise<File> {
   })
 }
 
-async function uploadCroppedAvatar() {
-  if (!hasDraft.value || buttonDisabled.value) return
+async function uploadCroppedAvatar(): Promise<ImageUploadResult | null> {
+  if (!hasDraft.value) return null
+  if (uploading.value) throw new Error('头像正在上传，请稍候')
+  if (!imageReady.value) throw new Error('头像尚未加载完成，请稍后保存')
 
   uploading.value = true
 
@@ -215,10 +228,9 @@ async function uploadCroppedAvatar() {
 
     emit('uploaded', uploaded)
     cancelDraft()
+    return uploaded
   } catch (error) {
-    const message = error instanceof Error ? error.message : '头像上传失败'
-    emit('error', message)
-    toast.error(message)
+    throw error instanceof Error ? error : new Error('头像上传失败')
   } finally {
     uploading.value = false
   }
@@ -228,8 +240,9 @@ function cancelDraft() {
   revokeDraftUrl()
   draftUrl.value = ''
   draftFileName.value = ''
-  resetCropPosition()
 }
+
+defineExpose({ uploadCroppedAvatar })
 
 onBeforeUnmount(() => {
   revokeDraftUrl()
@@ -257,18 +270,22 @@ onBeforeUnmount(() => {
         @pointercancel="handlePointerEnd"
         @wheel="handleWheel"
       >
+        <Transition name="avatar-preview" mode="out-in">
         <img
           v-if="draftUrl"
+          :key="draftUrl"
           ref="cropImageRef"
           :src="draftUrl"
           alt="头像裁剪预览"
           draggable="false"
           class="avatar-cropper__image"
+          :class="{ 'avatar-cropper__image--ready': imageReady }"
           :style="imageStyle"
           @load="handleImageLoad"
         >
         <Avatar
           v-else
+          :key="avatarUrl || 'avatar-fallback'"
           :src="avatarUrl || undefined"
           :alt="nickname || 'avatar preview'"
           :name="nickname"
@@ -277,12 +294,17 @@ onBeforeUnmount(() => {
           rounded
           class="size-44 bg-[color-mix(in_srgb,var(--color-surface-elevated)_88%,transparent)] text-4xl text-[var(--color-text)]"
         />
+        </Transition>
         <span class="avatar-cropper__ring" aria-hidden="true" />
       </div>
 
-      <Tooltip
+      <button v-if="hasDraft" type="button" class="avatar-cropper__close" :disabled="buttonDisabled" aria-label="取消裁剪" title="取消裁剪" @click.stop="cancelDraft">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+      </button>
+
+      <!-- <Tooltip
         class="avatar-cropper__help"
-        text="上传后拖拽图片调整位置，滚轮或滑杆缩放；点击“使用此头像”后再保存资料。"
+        text="上传后拖拽图片调整位置，滚轮或滑杆缩放；调整完成后，点击底部保存按钮统一保存。"
         placement="top"
         content-class="w-72 max-w-[min(18rem,calc(100vw-2rem))] whitespace-normal text-left leading-5"
         :open-delay="100"
@@ -294,10 +316,11 @@ onBeforeUnmount(() => {
         >
           ?
         </button>
-      </Tooltip>
+      </Tooltip> -->
     </div>
 
-    <div v-if="hasDraft" class="flex w-full max-w-sm flex-col items-center gap-3">
+    <Transition name="avatar-editor" mode="out-in">
+    <div v-if="hasDraft" key="editor" class="avatar-cropper__controls">
       <ElasticSlider
         :default-value="crop.zoom"
         :starting-value="MIN_ZOOM"
@@ -306,36 +329,101 @@ onBeforeUnmount(() => {
         :is-stepped="true"
         :disabled="buttonDisabled"
         aria-label="头像缩放"
-        class-name="mx-auto"
+        class-name="avatar-cropper__slider"
         @update:model-value="setZoom"
+        @right-offset="resetOffset = $event"
       />
-
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <Button type="button" size="sm" variant="primary" :loading="uploading" :disabled="buttonDisabled" @click="uploadCroppedAvatar">
-          使用此头像
-        </Button>
-        <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="resetCropPosition">
-          复位
-        </Button>
-        <Button type="button" size="sm" variant="ghost" :disabled="buttonDisabled" @click="cancelDraft">
-          取消
-        </Button>
-      </div>
+          <span class="avatar-cropper__reset-position" :style="{ transform: `translateX(${resetOffset}px)` }">
+      <button type="button" class="avatar-cropper__reset" :disabled="buttonDisabled" aria-label="复位头像位置和缩放" title="复位" @click="handleResetClick">
+        <svg class="avatar-cropper__reset-icon" :style="{ transform: `rotate(${resetTurns * 360}deg)` }" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 7a8 8 0 0 0-14-2L3 8m0-5v5h5M4 17a8 8 0 0 0 14 2l3-3m0 5v-5h-5" />
+        </svg>
+      </button>
+      </span>
     </div>
 
-    <Button
+    <ImageUploadTrigger
       v-else
-      type="button"
-      variant="secondary"
+      key="upload"
+      label="上传头像"
       :disabled="buttonDisabled"
       @click="triggerPick"
-    >
-      上传头像
-    </Button>
+    />
+    </Transition>
   </div>
 </template>
 
 <style scoped>
+.avatar-cropper__controls {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  column-gap: 1rem;
+  width: 100%;
+  max-width: 24rem;
+}
+.avatar-cropper__slider { grid-column: 2; min-width: 0; }
+.avatar-cropper__reset-position { grid-column: 3; display: block; }
+.avatar-cropper__reset-icon { transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .avatar-cropper__reset-icon { transition: none; }
+}
+
+.avatar-cropper__close,
+.avatar-cropper__reset {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.avatar-cropper__close {
+  position: absolute;
+  top: 155px;
+  right: 0;
+  z-index: 6;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+.avatar-cropper__close::before { content: ''; position: absolute; inset: -5px; border-radius: inherit; }
+.avatar-cropper__reset {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.avatar-cropper__reset:hover { color: var(--color-text); }
+.avatar-cropper__close:focus-visible,
+.avatar-cropper__reset:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.avatar-cropper__close:disabled,
+.avatar-cropper__reset:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.avatar-preview-enter-active,
+.avatar-preview-leave-active { transition: opacity 200ms ease; }
+.avatar-preview-enter-from,
+.avatar-preview-leave-to { opacity: 0 !important; }
+.avatar-editor-enter-active,
+.avatar-editor-leave-active {
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.avatar-editor-enter-from,
+.avatar-editor-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-cropper .avatar-cropper__image { transition: none; }
+  .avatar-preview-enter-active,
+  .avatar-preview-leave-active { transition: none; }
+  .avatar-editor-enter-active,
+  .avatar-editor-leave-active { transition: none; }
+}
+
 .avatar-cropper-shell {
   position: relative;
   width: 11rem;
@@ -400,7 +488,11 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
+.avatar-cropper__image.avatar-cropper__image--ready { opacity: 1; }
+
 .avatar-cropper__image {
+  opacity: 0;
+  transition: opacity 200ms ease;
   position: absolute;
   left: 50%;
   top: 50%;

@@ -341,7 +341,7 @@ onBeforeUnmount(() => {
       :message="successMessage"
     />
 
-    <div class="flex justify-center">
+    <div class="flex justify-center pb-20">
       <GooeyActionButton
         type="submit"
         width="18rem"
@@ -350,19 +350,9 @@ onBeforeUnmount(() => {
         :disabled="submitting || sendingCode || hasErrors"
         aria-label="注册"
       >
-        <AnimatedPersonCyclingIcon size="1.65rem" title="注册" :decorative="false" />
+        <AnimatedPersonCyclingIcon size="5rem" title="注册" :decorative="false" />
       </GooeyActionButton>
     </div>
 
-    <div class="text-center text-sm text-[var(--color-text-muted)]">
-      已有账号？
-      <button
-        type="button"
-        class="font-medium text-[var(--color-primary)] transition-colors duration-200 hover:text-[var(--color-primary-strong)]"
-        @click="emit('switchMode', 'login')"
-      >
-        去登录
-      </button>
-    </div>
   </form>
 </template>
