@@ -40,9 +40,9 @@ const PARTICLE_EFFECT_DURATION_MS = 1500
 const PARTICLE_STAGGER_WINDOW_MS = 420
 const PARTICLE_MIN_TRAVEL_MS = 560
 const PARTICLE_FINISH_BUFFER_MS = 80
-const PARTICLE_COUNT = 30
+const PARTICLE_COUNT = 10
 const PARTICLE_VERTICAL_DISTANCE = 90
-const PARTICLE_HORIZONTAL_OUTSET = 20
+const PARTICLE_HORIZONTAL_OUTSET = 10
 const PARTICLE_ENTRY_DEPTH = 10
 const COLORS = [1, 2, 3, 1, 2, 3, 1, 4] as const
 const filterId = `gooey-action-${useId().replace(/:/g, '')}`
@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
 
 .gooey-action-button--primary {
   --gooey-action-color: #ffffff;
-  --gooey-action-background: var(--color-primary);
+  --gooey-action-background: var(--color-action-primary);
 
   background: var(--gooey-action-background);
   box-shadow: var(--shadow-button);

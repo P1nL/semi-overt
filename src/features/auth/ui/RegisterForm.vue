@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
+import PasswordToggleButton from './PasswordToggleButton.vue'
 import { useToast } from '@/shared/composables/useToast'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { createMinimumDuration } from '@/shared/utils/minimumDuration'
@@ -25,6 +26,8 @@ const emit = defineEmits<{
 const router = useRouter()
 const authStore = useAuthStore()
 const toast = useToast()
+const passwordVisible = ref(false)
+const confirmPasswordVisible = ref(false)
 
 const form = reactive<RegisterFormValues>({
   email: '',
@@ -292,12 +295,20 @@ onBeforeUnmount(() => {
       <Input
         id="register-password"
         v-model="form.password"
-        type="password"
+        :type="passwordVisible ? 'text' : 'password'"
         placeholder="至少 8 位，包含字母和数字"
         :error="touched.password ? errors.password : ''"
         autocomplete="new-password"
         @blur="onBlur('password')"
-      />
+      >
+        <template #trailing>
+          <PasswordToggleButton
+            :visible="passwordVisible"
+            :disabled="submitting"
+            @toggle="passwordVisible = !passwordVisible"
+          />
+        </template>
+      </Input>
       <FieldError :message="touched.password ? errors.password : ''" />
     </FormField>
 
@@ -306,12 +317,20 @@ onBeforeUnmount(() => {
       <Input
         id="register-confirm-password"
         v-model="form.confirmPassword"
-        type="password"
+        :type="confirmPasswordVisible ? 'text' : 'password'"
         placeholder="请再次输入密码"
         :error="touched.confirmPassword ? errors.confirmPassword : ''"
         autocomplete="new-password"
         @blur="onBlur('confirmPassword')"
-      />
+      >
+        <template #trailing>
+          <PasswordToggleButton
+            :visible="confirmPasswordVisible"
+            :disabled="submitting"
+            @toggle="confirmPasswordVisible = !confirmPasswordVisible"
+          />
+        </template>
+      </Input>
       <FieldError :message="touched.confirmPassword ? errors.confirmPassword : ''" />
     </FormField>
 

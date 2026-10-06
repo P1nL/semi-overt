@@ -34,7 +34,7 @@ const authPageMeta = computed(() => {
         displayTitle: true,
         description: '创建新账户后，系统会自动帮你登录。',
         glowClass:
-          'pointer-events-none absolute left-[-4rem] top-24 h-52 w-52 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
+          'pointer-events-none absolute left-[-4rem] top-24 h-52 w-52 rounded-full bg-[var(--color-auth-glow)] blur-3xl',
       }
     case ROUTE_NAME.FORGOT_PASSWORD:
       return {
@@ -43,7 +43,7 @@ const authPageMeta = computed(() => {
         displayTitle: true,
         description: '输入注册邮箱，如果账号存在，我们会向你发送 6 位验证码。',
         glowClass:
-          'pointer-events-none absolute right-[-5rem] top-28 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
+          'pointer-events-none absolute right-[-5rem] top-28 h-56 w-56 rounded-full bg-[var(--color-auth-glow)] blur-3xl',
       }
     case ROUTE_NAME.RESET_PASSWORD:
       return {
@@ -52,7 +52,7 @@ const authPageMeta = computed(() => {
         displayTitle: false,
         description: '为你的账户设置一个新密码，然后返回登录。',
         glowClass:
-          'pointer-events-none absolute left-[-4rem] top-28 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
+          'pointer-events-none absolute left-[-4rem] top-28 h-56 w-56 rounded-full bg-[var(--color-auth-glow)] blur-3xl',
       }
     case ROUTE_NAME.LOGIN:
     default:
@@ -62,7 +62,7 @@ const authPageMeta = computed(() => {
         displayTitle: true,
         description: '登录后即可继续写作、编辑和管理你的文章。',
         glowClass:
-          'pointer-events-none absolute right-[-5rem] top-24 h-56 w-56 rounded-full bg-[rgba(255,255,255,0.42)] blur-3xl dark:bg-[rgba(41,151,255,0.14)]',
+          'pointer-events-none absolute right-[-5rem] top-24 h-56 w-56 rounded-full bg-[var(--color-auth-glow)] blur-3xl',
       }
   }
 })
@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
   <div class="relative min-h-screen overflow-hidden px-4 py-10 md:py-14">
     <div
       aria-hidden="true"
-      class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,rgba(0,113,227,0.18),transparent_65%)]"
+      class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,var(--color-auth-glow),transparent_65%)]"
     />
     <div aria-hidden="true" :class="authPageMeta.glowClass" />
 

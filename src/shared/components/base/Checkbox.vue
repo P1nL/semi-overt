@@ -75,7 +75,7 @@ function onChange(event: Event) {
           cn(
             'inline-flex size-5 items-center justify-center rounded-[calc(var(--radius-sm)-2px)] border transition-colors',
             checked || indeterminate
-              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-on-primary)]'
               : 'border-[var(--color-border)] bg-[var(--color-surface)] text-transparent',
           )
         "

@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { AnimatedPersonCyclingIcon, GooeyActionButton, Input } from '@/shared/components/base'
 import { InlineMessage } from '@/shared/components/feedback'
 import { FieldError, FormField, FormLabel } from '@/shared/components/form'
+import PasswordToggleButton from './PasswordToggleButton.vue'
 import { useToast } from '@/shared/composables/useToast'
 import { createMinimumDuration } from '@/shared/utils/minimumDuration'
 
@@ -17,6 +18,8 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const passwordVisible = ref(false)
+const confirmPasswordVisible = ref(false)
 
 const form = reactive<ForgotPasswordFormValues>({
   email: '',
@@ -138,6 +141,8 @@ function resetEmailStep() {
   submitError.value = ''
   successMessage.value = ''
 
+  passwordVisible.value = false
+  confirmPasswordVisible.value = false
   form.code = ''
   form.newPassword = ''
   form.confirmPassword = ''
@@ -263,13 +268,21 @@ onBeforeUnmount(() => {
       <Input
         id="forgot-new-password"
         v-model="form.newPassword"
-        type="password"
+        :type="passwordVisible ? 'text' : 'password'"
         placeholder="至少 8 位，包含字母和数字"
         :error="touched.newPassword ? errors.newPassword : ''"
         autocomplete="new-password"
         :disabled="submitting"
         @blur="onBlur('newPassword')"
-      />
+      >
+        <template #trailing>
+          <PasswordToggleButton
+            :visible="passwordVisible"
+            :disabled="submitting"
+            @toggle="passwordVisible = !passwordVisible"
+          />
+        </template>
+      </Input>
       <FieldError :message="touched.newPassword ? errors.newPassword : ''" />
     </FormField>
 
@@ -278,13 +291,21 @@ onBeforeUnmount(() => {
       <Input
         id="forgot-confirm-password"
         v-model="form.confirmPassword"
-        type="password"
+        :type="confirmPasswordVisible ? 'text' : 'password'"
         placeholder="请再次输入新密码"
         :error="touched.confirmPassword ? errors.confirmPassword : ''"
         autocomplete="new-password"
         :disabled="submitting"
         @blur="onBlur('confirmPassword')"
-      />
+      >
+        <template #trailing>
+          <PasswordToggleButton
+            :visible="confirmPasswordVisible"
+            :disabled="submitting"
+            @toggle="confirmPasswordVisible = !confirmPasswordVisible"
+          />
+        </template>
+      </Input>
       <FieldError :message="touched.confirmPassword ? errors.confirmPassword : ''" />
     </FormField>
 

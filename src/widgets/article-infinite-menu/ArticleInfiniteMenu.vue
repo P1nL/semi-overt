@@ -434,21 +434,21 @@ onBeforeUnmount(() => {
   border: 5px solid color-mix(in srgb, var(--color-bg) 84%, transparent);
   border-radius: 50%;
   color: #fff;
-  background: var(--color-primary);
-  box-shadow: var(--shadow-button);
+  background: var(--color-action-primary);
+  box-shadow: var(--shadow-action-button);
   pointer-events: auto;
   transform: translateX(-50%) scale(1);
 }
 
 .article-infinite-menu__action:hover {
-  background: var(--color-primary-strong);
+  background: var(--color-action-primary-strong);
   transform: translateX(-50%) scale(1.06);
 }
 
 .article-infinite-menu__action:focus-visible {
   outline: none;
   box-shadow:
-    var(--shadow-button),
+    var(--shadow-action-button),
     0 0 0 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 

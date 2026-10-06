@@ -46,56 +46,67 @@
             system-ui,
             sans-serif;
 
-    --color-primary: #0071e3;
-    --color-primary-strong: #005ecb;
-    --color-primary-soft: rgb(0 113 227 / 0.12);
+    /* Neutral UI, with a separate palette for primary actions. */
+    --color-on-primary: #ffffff;
+    --color-action-primary: #0071e3;
+    --color-action-primary-strong: #005ecb;
+    --color-action-on-primary: #ffffff;
+    --shadow-action-button: 0 10px 24px rgb(0 113 227 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.16);
+    --color-profile-activity: #606060;
+    --color-profile-selected-text: var(--color-on-primary);
+    --color-profile-confirm: var(--color-action-primary);
+    --color-auth-glow: rgb(80 80 80 / 0.1);
+    --color-sheet-overlay: rgb(8 8 8 / 0.26);
+    --color-primary: #505050;
+    --color-primary-strong: #333333;
+    --color-primary-soft: rgb(80 80 80 / 0.12);
 
-    --color-bg: #f5f5f7;
-    --color-bg-elevated: #fbfbfd;
-    --color-surface: #ffffff;
-    --color-surface-elevated: #fbfbfd;
-    --color-surface-glass: rgb(255 255 255 / 0.66);
-    --color-surface-glass-strong: rgb(255 255 255 / 0.94);
+    --color-bg: #f0f0f0;
+    --color-bg-elevated: #fafafa;
+    --color-surface: #f4f4f4;
+    --color-surface-elevated: #ededed;
+    --color-surface-glass: rgb(244 244 244 / 0.66);
+    --color-surface-glass-strong: rgb(244 244 244 / 0.94);
     --color-surface-panel: color-mix(in srgb, var(--color-surface) 94%, transparent);
 
-    --color-text: #1d1d1f;
-    --color-text-muted: #6e6e73;
-    --color-text-faint: #86868b;
+    --color-text: #242424;
+    --color-text-muted: #666666;
+    --color-text-faint: #737373;
 
-    --color-border: rgb(29 29 31 / 0.08);
-    --color-border-strong: rgb(29 29 31 / 0.12);
+    --color-border: rgb(36 36 36 / 0.1);
+    --color-border-strong: rgb(36 36 36 / 0.18);
     --color-border-panel: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
     --color-danger: #d92c20;
     --color-success: #14863c;
     --color-warning: #b96b00;
     --color-hero-tesseract: #ff9500;
-    --color-profile-divider: #d97706;
-    --color-overlay: rgb(9 12 20 / 0.28);
+    --color-profile-divider: var(--color-border-strong);
+    --color-overlay: rgb(9 9 9 / 0.28);
     --color-scrollbar-thumb: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
     --color-scrollbar-thumb-hover: color-mix(in srgb, var(--color-text-faint) 62%, transparent);
     --color-scrollbar-track: transparent;
-    --color-selection-bg: rgb(0 113 227 / 0.18);
-    --color-selection-text: #1d1d1f;
+    --color-selection-bg: rgb(80 80 80 / 0.2);
+    --color-selection-text: var(--color-text);
 
-    --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.04);
-    --shadow-sm: 0 10px 30px rgb(15 23 42 / 0.07);
-    --shadow-md: 0 10px 30px rgb(15 23 42 / 0.08);
-    --shadow-lg: 0 32px 90px rgb(15 23 42 / 0.16);
+    --shadow-xs: 0 1px 2px rgb(24 24 24 / 0.04);
+    --shadow-sm: 0 10px 30px rgb(24 24 24 / 0.07);
+    --shadow-md: 0 10px 30px rgb(24 24 24 / 0.08);
+    --shadow-lg: 0 32px 90px rgb(24 24 24 / 0.16);
     --shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.72);
     --shadow-button:
-            0 10px 24px rgb(0 113 227 / 0.22),
+            0 10px 24px rgb(36 36 36 / 0.12),
             inset 0 1px 0 rgb(255 255 255 / 0.16);
-    --shadow-surface-sm: 0 6px 18px rgb(15 23 42 / 0.022);
-    --shadow-surface-md: 0 10px 28px rgb(15 23 42 / 0.028);
+    --shadow-surface-sm: 0 6px 18px rgb(24 24 24 / 0.022);
+    --shadow-surface-md: 0 10px 28px rgb(24 24 24 / 0.028);
     --shadow-glass-card:
-            0 16px 36px rgb(164 181 201 / 0.14),
-            0 4px 12px rgb(164 181 201 / 0.08);
+            0 16px 36px rgb(80 80 80 / 0.14),
+            0 4px 12px rgb(80 80 80 / 0.08);
     --shadow-glass-card-hover:
-            0 22px 48px rgb(164 181 201 / 0.18),
-            0 6px 16px rgb(164 181 201 / 0.1);
+            0 22px 48px rgb(80 80 80 / 0.18),
+            0 6px 16px rgb(80 80 80 / 0.1);
     --shadow-glass-card-compact-hover:
-            0 16px 36px rgb(164 181 201 / 0.16),
-            0 5px 12px rgb(164 181 201 / 0.1);
+            0 16px 36px rgb(80 80 80 / 0.16),
+            0 5px 12px rgb(80 80 80 / 0.1);
 
     --scrollbar-size: 0.35rem;
     --radius-base: 1rem;
@@ -120,6 +131,8 @@
     --hover-copy-font-size: 0.6875rem;
     --hover-copy-line-height: 1.4;
 
+    /* All bottom drawers share the article editor inset. */
+    --drawer-top: max(3.5rem, env(safe-area-inset-top, 0px));
     --header-height: 5.5rem;
     --header-height-md: 5.75rem;
 
@@ -129,10 +142,10 @@
     --nav-glass-blur: 2px;
     --nav-glass-border: rgb(255 255 255 / 0.38);
     --nav-glass-reflection: linear-gradient(175deg, rgb(255 255 255 / 0.20), transparent 30%, transparent 68%, rgb(255 255 255 / 0.055));
-    --nav-glass-edge: linear-gradient(155deg, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.55) 18%, rgb(255 255 255 / 0.08) 42%, rgb(15 23 42 / 0.14) 60%, rgb(255 255 255 / 0.62) 83%, rgb(255 255 255 / 0.85) 100%);
-    --nav-glass-shadow: 0 8px 24px rgb(15 23 42 / 0.075), 0 2px 5px rgb(15 23 42 / 0.05);
-    --nav-glass-rim-shadow: inset 0 2px 3px rgb(255 255 255 / 0.48), inset 0 -2px 3px rgb(15 23 42 / 0.08), inset 1px 0 2px rgb(255 255 255 / 0.28);
-    --nav-search-frost-shadow: 0 10px 28px rgb(15 23 42 / 0.028), inset 0 1px 0 rgb(255 255 255 / 0.34);
+    --nav-glass-edge: linear-gradient(155deg, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.55) 18%, rgb(255 255 255 / 0.08) 42%, rgb(24 24 24 / 0.14) 60%, rgb(255 255 255 / 0.62) 83%, rgb(255 255 255 / 0.85) 100%);
+    --nav-glass-shadow: 0 8px 24px rgb(24 24 24 / 0.075), 0 2px 5px rgb(24 24 24 / 0.05);
+    --nav-glass-rim-shadow: inset 0 2px 3px rgb(255 255 255 / 0.48), inset 0 -2px 3px rgb(24 24 24 / 0.08), inset 1px 0 2px rgb(255 255 255 / 0.28);
+    --nav-search-frost-shadow: 0 10px 28px rgb(24 24 24 / 0.028), inset 0 1px 0 rgb(255 255 255 / 0.34);
 }
 
 html.dark {
@@ -156,36 +169,42 @@ html.dark {
     --nav-glass-rim-shadow: inset 0 2px 3px rgb(255 255 255 / 0.18), inset 0 -2px 3px rgb(0 0 0 / 0.22), inset 1px 0 2px rgb(255 255 255 / 0.12);
     --nav-search-frost-shadow: 0 10px 28px rgb(0 0 0 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.12);
 
-    --color-primary: #2997ff;
-    --color-primary-strong: #54adff;
-    --color-primary-soft: rgb(41 151 255 / 0.18);
+    --color-on-primary: #242424;
+    --color-action-primary: #2997ff;
+    --color-action-primary-strong: #54adff;
+    --shadow-action-button: 0 10px 26px rgb(41 151 255 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.1);
+    --color-profile-activity: #b8b8b8;
+    --color-auth-glow: rgb(208 208 208 / 0.08);
+    --color-primary: #d0d0d0;
+    --color-primary-strong: #eeeeee;
+    --color-primary-soft: rgb(208 208 208 / 0.14);
 
-    /* 背景色调来自参考文件 --color-bg1/bg2：深蓝海军蓝 */
-    --color-bg: rgb(8 10 15);
-    --color-bg-elevated: rgb(0 17 32);
-    --color-surface: rgb(10 18 30);
-    --color-surface-elevated: rgb(14 24 40);
-    --color-surface-glass: rgb(0 17 32 / 0.72);
-    --color-surface-glass-strong: rgb(8 10 15 / 0.88);
+    /* Neutral charcoal surfaces match the profile and edit dialog. */
+    --color-bg: #101010;
+    --color-bg-elevated: #181818;
+    --color-surface: #202020;
+    --color-surface-elevated: #292929;
+    --color-surface-glass: rgb(32 32 32 / 0.72);
+    --color-surface-glass-strong: rgb(32 32 32 / 0.94);
     --color-surface-panel: color-mix(in srgb, var(--color-surface) 94%, transparent);
 
-    --color-text: #f5f5f7;
-    --color-text-muted: #a1a1a6;
-    --color-text-faint: #8b8b91;
+    --color-text: #f2f2f2;
+    --color-text-muted: #b0b0b0;
+    --color-text-faint: #999999;
 
-    --color-border: rgb(255 255 255 / 0.08);
-    --color-border-strong: rgb(255 255 255 / 0.12);
+    --color-border: rgb(242 242 242 / 0.1);
+    --color-border-strong: rgb(242 242 242 / 0.18);
     --color-border-panel: color-mix(in srgb, var(--color-border-strong) 88%, white 10%);
     --color-danger: #ff695f;
     --color-success: #32d74b;
     --color-warning: #ff9f0a;
-    --color-profile-divider: color-mix(in srgb, var(--color-border) 88%, white 10%);
-    --color-overlay: rgb(4 6 11 / 0.5);
+    --color-profile-divider: var(--color-border-strong);
+    --color-overlay: rgb(4 4 4 / 0.5);
     --color-scrollbar-thumb: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
     --color-scrollbar-thumb-hover: color-mix(in srgb, var(--color-text-faint) 62%, transparent);
     --color-scrollbar-track: transparent;
-    --color-selection-bg: rgb(41 151 255 / 0.42);
-    --color-selection-text: #f5f5f7;
+    --color-selection-bg: rgb(208 208 208 / 0.24);
+    --color-selection-text: var(--color-text);
 
     /* 暗色背景前景玻璃遮罩保持层次，但减少模糊以保留布纹细节。 */
     --backdrop-blur: 14px;
@@ -208,7 +227,7 @@ html.dark {
     --shadow-lg: 0 36px 100px rgb(0 0 0 / 0.48);
     --shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.08);
     --shadow-button:
-            0 10px 26px rgb(41 151 255 / 0.2),
+            0 10px 26px rgb(0 0 0 / 0.2),
             inset 0 1px 0 rgb(255 255 255 / 0.1);
     --shadow-surface-sm: 0 6px 18px rgb(0 0 0 / 0.18);
     --shadow-surface-md: 0 10px 28px rgb(0 0 0 / 0.24);
@@ -223,48 +242,5 @@ html.dark {
             0 5px 12px rgb(0 0 0 / 0.16);
 }
 
-/* Neutral profile palette; navigation and other routes retain their colors. */
-.profile-page,
-.profile-edit-dialog {
-    --color-primary: #505050;
-    --color-primary-strong: #333333;
-    --color-primary-soft: rgb(80 80 80 / 0.12);
-    --color-profile-activity: #606060;
-    --color-profile-selected-text: #ffffff;
-    --color-surface: #f4f4f4;
-    --color-surface-elevated: #ededed;
-    --color-surface-glass: rgb(244 244 244 / 0.66);
-    --color-surface-glass-strong: rgb(244 244 244 / 0.94);
-    --color-text: #242424;
-    --color-text-muted: #666666;
-    --color-text-faint: #737373;
-    --color-border: rgb(36 36 36 / 0.1);
-    --color-border-strong: rgb(36 36 36 / 0.18);
-    --color-profile-divider: var(--color-border-strong);
-    --color-selection-bg: rgb(80 80 80 / 0.2);
-    --color-selection-text: var(--color-text);
-}
 
-html.dark .profile-page,
-html.dark .profile-edit-dialog {
-    --color-primary: #d0d0d0;
-    --color-primary-strong: #eeeeee;
-    --color-primary-soft: rgb(208 208 208 / 0.14);
-    --color-profile-activity: #b8b8b8;
-    --color-profile-selected-text: #242424;
-    --color-surface: #202020;
-    --color-surface-elevated: #292929;
-    --color-surface-glass: rgb(32 32 32 / 0.72);
-    --color-surface-glass-strong: rgb(32 32 32 / 0.94);
-    --color-text: #f2f2f2;
-    --color-text-muted: #b0b0b0;
-    --color-text-faint: #999999;
-    --color-border: rgb(242 242 242 / 0.1);
-    --color-border-strong: rgb(242 242 242 / 0.18);
-    --color-selection-bg: rgb(208 208 208 / 0.24);
-}
-
-/* Keep the profile save action on the original global action palette. */
-:root { --color-profile-confirm: #0071e3; }
-html.dark { --color-profile-confirm: #2997ff; }
-.profile-edit-confirm { --color-primary: var(--color-profile-confirm); }
+.profile-edit-confirm { --color-primary: var(--color-action-primary); }

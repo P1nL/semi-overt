@@ -129,10 +129,10 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div class="pointer-events-none fixed inset-0 z-[70]" :class="{ 'page-sheet--editor': props.inset === 'editor' }">
+    <div class="pointer-events-none fixed inset-0 z-[70]">
       <button
         type="button"
-        class="page-sheet-backdrop absolute inset-0 border-0 bg-[rgba(8,12,20,0.26)] backdrop-blur-[8px]"
+        class="page-sheet-backdrop absolute inset-0 border-0 bg-[var(--color-sheet-overlay)] backdrop-blur-[8px]"
         :class="visualOpen ? 'page-sheet-backdrop--open' : ''"
         aria-label="Close panel"
         :aria-hidden="!open"
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
 
       <div
         class="page-sheet-close pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end px-4 md:px-6"
-        :class="[visualOpen ? 'page-sheet-close--open' : '', props.inset === 'editor' ? 'page-sheet-close--editor' : 'h-20 md:h-24']"
+        :class="[visualOpen ? 'page-sheet-close--open' : '', 'page-sheet-close--drawer']"
         :aria-hidden="!open"
       >
         <div class="pointer-events-auto">
@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
               props.scrollMode === 'content' ? 'overflow-y-hidden' : 'overflow-y-auto',
             ]
             : [
-              props.inset === 'editor' ? 'page-sheet-panel--editor' : props.inset === 'article' ? 'top-20 md:top-24' : 'top-[calc(var(--header-height)-0.75rem)] md:top-[var(--header-height)]',
+              'page-sheet-panel--drawer',
               props.scrollMode === 'content' ? 'overflow-y-hidden' : 'overflow-y-auto',
               'rounded-t-[2rem] border-x border-t border-[color-mix(in_srgb,var(--color-border)_82%,white_14%)] shadow-[0_-18px_48px_rgb(15_23_42_/_0.12)]',
             ],
@@ -189,9 +189,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.page-sheet--editor { --page-sheet-editor-top: 3.5rem; }
-.page-sheet-close--editor { height: var(--page-sheet-editor-top); }
-.page-sheet-panel--editor { top: var(--page-sheet-editor-top); }
+.page-sheet-close--drawer { height: var(--drawer-top); }
+.page-sheet-panel--drawer { top: var(--drawer-top); }
 
 .page-sheet-backdrop {
   opacity: 0;

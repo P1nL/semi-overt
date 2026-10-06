@@ -112,8 +112,8 @@ const pages = computed<(number | '...')[]>(() => {
     color-mix(in srgb, var(--color-primary) 88%, white 12%),
     var(--color-primary-strong)
   );
-  color: #fff;
-  box-shadow: var(--shadow-button);
+  color: var(--color-on-primary);
+  box-shadow: var(--shadow-xs);
 }
 
 .pagination-page--idle {
@@ -151,7 +151,7 @@ const pages = computed<(number | '...')[]>(() => {
 
 html.dark .pagination-page--active {
   border-color: color-mix(in srgb, var(--color-primary) 72%, white 18%);
-  color: #08111d;
+  color: var(--color-on-primary);
 }
 
 html.dark .pagination-page--idle {

@@ -98,13 +98,13 @@ const hasRightIcon = computed(() => Boolean(slots.trailing))
 <style scoped>
 .button--primary {
   border: 1px solid transparent;
-  background: var(--color-primary);
+  background: var(--color-action-primary);
   color: white;
-  box-shadow: var(--shadow-button);
+  box-shadow: var(--shadow-action-button);
 }
 
 .button--primary:hover {
-  background: var(--color-primary-strong);
+  background: var(--color-action-primary-strong);
   transform: translateY(-1px);
   box-shadow:
     0 14px 30px rgb(0 113 227 / 0.26),

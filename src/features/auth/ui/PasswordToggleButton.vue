@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, useId } from 'vue'
 import gsap from 'gsap'
 
-import { Tooltip } from '@/shared/components/base'
 
 const props = defineProps<{
   visible: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle'): void
 }>()
+
+const maskId = `password-toggle-${useId().replace(/:/g, '')}`
+const openMaskId = `${maskId}-open`
+const closedMaskId = `${maskId}-closed`
 
 // --- refs ---
 const eyeEl = ref<SVGGElement | null>(null)
@@ -78,7 +82,7 @@ function onPointerMove(e: PointerEvent) {
 
 // ---- toggle animation ----
 function handleClick() {
-  if (busy) return
+  if (busy || props.disabled) return
   emit('toggle')
 }
 
@@ -128,17 +132,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Tooltip
-    :text="visible ? '隐藏密码' : '显示密码'"
-    placement="top"
-    :open-delay="600"
-    class="password-toggle-hint"
-  >
+  <span class="password-toggle-hint">
     <button
     ref="btnEl"
     type="button"
     :aria-label="visible ? '隐藏密码' : '显示密码'"
     :aria-pressed="visible"
+    :disabled="disabled"
     class="password-toggle-btn"
     @click="handleClick"
   >
@@ -149,7 +149,7 @@ onUnmounted(() => {
       aria-hidden="true"
     >
       <defs>
-        <mask id="ptb-eye-open">
+        <mask :id="openMaskId">
           <path
             d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12V20H12H1V12Z"
             fill="#D9D9D9"
@@ -158,7 +158,7 @@ onUnmounted(() => {
             stroke-linejoin="round"
           />
         </mask>
-        <mask id="ptb-eye-closed">
+        <mask :id="closedMaskId">
           <path
             d="M1 12C1 12 5 20 12 20C19 20 23 12 23 12V20H12H1V12Z"
             fill="#D9D9D9"
@@ -186,7 +186,7 @@ onUnmounted(() => {
       />
 
       <!-- eyeball — only visible when eye is open (not closed) -->
-      <g :mask="visible ? 'url(#ptb-eye-closed)' : 'url(#ptb-eye-open)'">
+      <g :mask="`url(#${visible ? closedMaskId : openMaskId})`">
         <g ref="eyeEl" class="ptb-eye">
           <circle cx="12" cy="12" r="4" fill="currentColor" />
           <circle cx="13" cy="11" r="1" fill="var(--color-bg, white)" />
@@ -196,7 +196,7 @@ onUnmounted(() => {
 
       <span class="sr-only">{{ visible ? '隐藏密码' : '显示密码' }}</span>
     </button>
-  </Tooltip>
+  </span>
 </template>
 
 <style scoped>
@@ -228,9 +228,11 @@ onUnmounted(() => {
   transition: color 0.2s, background 0.125s;
 }
 
-.password-toggle-btn:is(:hover, :focus-visible) {
+.password-toggle-btn:not(:disabled):is(:hover, :focus-visible) {
   color: var(--color-text);
 }
+
+.password-toggle-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .password-toggle-btn svg {
   width: 75%;
