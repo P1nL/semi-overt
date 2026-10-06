@@ -7,18 +7,21 @@ import { World, Body, Particle, DistanceConstraint, Vec3, GSSolver, SAPBroadphas
 // Inspired by Arno Di Nunzio's physics-based cloth:
 // https://tympanus.net/codrops/2020/02/11/how-to-create-a-physics-based-3d-cloth-with-cannon-js-and-three-js/
 // Uses a particle/constraint fabric with OGL rendering, without slideshow images.
-const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true })
+const props = withDefaults(defineProps<{ active?: boolean; nativeResolution?: boolean }>(), { active: true, nativeResolution: false })
 const host = useTemplateRef<HTMLDivElement>('host')
 const { visible, reducedMotion } = useAnimationVisibility(host, 'background')
 const active = computed(() => props.active && visible.value)
 // A decorative background does not need a full-resolution physics mesh.
 const COLS = 24
 const ROWS = 18
-const COUNT = (COLS + 1) * (ROWS + 1)
+const RENDER_SUBDIVISIONS = 3
+const RENDER_COLS = COLS * RENDER_SUBDIVISIONS
+const RENDER_ROWS = ROWS * RENDER_SUBDIVISIONS
+const RENDER_COUNT = (RENDER_COLS + 1) * (RENDER_ROWS + 1)
 const STEP = 1 / 60
 const FRAME_INTERVAL_MS = 1000 / 30
-const MAX_DEVICE_PIXEL_RATIO = 1.25
-const MAX_RENDER_PIXELS = 2560 * 1440
+const MAX_DEVICE_PIXEL_RATIO = 2
+const MAX_RENDER_PIXELS = 3840 * 2160
 const POINTER_SPEED_SCALE = 12
 // Preserve the drag strength of a 60 Hz input stream when sampling at 30 fps.
 const POINTER_REFERENCE_INTERVAL_MS = 1000 / 60
@@ -38,10 +41,10 @@ let elapsed = 0
 let viewWidth = 10
 let viewHeight = 10
 let lost = false
-const positions = new Float32Array(COUNT * 3)
-const normals = new Float32Array(COUNT * 3)
-const uv = new Float32Array(COUNT * 2)
-const indices = new Uint16Array(COLS * ROWS * 6)
+const positions = new Float32Array(RENDER_COUNT * 3)
+const normals = new Float32Array(RENDER_COUNT * 3)
+const uv = new Float32Array(RENDER_COUNT * 2)
+const indices = new Uint16Array(RENDER_COLS * RENDER_ROWS * 6)
 const force = new Vec3()
 const pointer = { x: 0, y: 0, dx: 0, dy: 0, energy: 0, active: false, time: 0 }
 let pendingPointer: PointerEvent | null = null
@@ -67,7 +70,6 @@ precision highp float;
 varying vec3 vNormal;
 varying vec2 vUv;
 varying float vDepth;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 void main() {
   vec3 n = normalize(vNormal);
   if (!gl_FrontFacing) n = -n;
@@ -78,11 +80,9 @@ void main() {
                 + max(dot(n, fillLight), 0.0) * 0.12;
   vec3 halfLight = normalize(light + vec3(0.0,0.0,1.0));
   float sheen = pow(max(dot(n, halfLight), 0.0), 8.0);
-  float fibre = hash(gl_FragCoord.xy);
-  float weave = sin(vUv.x * 2800.0) * sin(vUv.y * 2400.0);
   vec3 cloth = vec3(0.145,0.137,0.158) * (0.26 + diffuse * 1.45)
                + vec3(0.030,0.028,0.032) * sheen;
-  cloth *= 0.96 + fibre * 0.065 + weave * 0.012;
+  cloth *= 0.9925;
   cloth *= 1.0 - clamp(-vDepth * 0.05, 0.0, 0.12);
   gl_FragColor = vec4(cloth,1.0);
 }`
@@ -105,8 +105,17 @@ function createFabric() {
       // Overscan and anchored borders keep a continuous background while the
       // interior has slack, giving it folds rather than a rubber-sheet stretch.
       const pinned = row === 0 || row === ROWS || col === 0 || col === COLS
-      const z = 0.30 * Math.sin(u * Math.PI * 10 + v * 2.0)
-              + 0.10 * Math.sin(v * Math.PI * 4 + u * 7)
+      // Predominantly vertical folds: vary spacing across the fabric, while
+      // bending gently with height rather than adding diagonal travelling waves.
+      const bend = 0.018 * Math.sin(v * Math.PI * 2 + 0.4)
+                 + 0.009 * Math.sin(v * Math.PI * 3.4 + 1.2)
+      const foldU = u + bend
+      const foldPhase = foldU * Math.PI * 5
+                      + 0.48 * Math.sin(foldU * Math.PI * 3 + 0.7)
+      const foldDepth = 0.20 + 0.035 * Math.sin(u * Math.PI * 2.6 + 0.5)
+      const drape = 0.88 + 0.12 * Math.sin(v * Math.PI)
+      const z = drape * foldDepth * Math.sin(foldPhase)
+              + 0.035 * Math.sin(v * Math.PI * 1.6 + 0.3)
       const body = new Body({
         mass: pinned ? 0 : 0.025,
         shape,
@@ -117,9 +126,6 @@ function createFabric() {
       })
       world.addBody(body)
       bodies.push(body)
-      const index = row * (COLS + 1) + col
-      uv[index * 2] = u
-      uv[index * 2 + 1] = 1 - v
     }
   }
   const stitch = (a: number, b: number, slack = 1) => {
@@ -128,7 +134,6 @@ function createFabric() {
     const distance = first.position.distanceTo(second.position) * slack
     world!.addConstraint(new DistanceConstraint(first, second, distance, 18))
   }
-  let offset = 0
   for (let row = 0; row <= ROWS; row++) {
     for (let col = 0; col <= COLS; col++) {
       const index = row * (COLS + 1) + col
@@ -137,8 +142,38 @@ function createFabric() {
       if (col < COLS && row < ROWS) {
         stitch(index, index + COLS + 2)
         stitch(index + 1, index + COLS + 1)
-        indices.set([index, index + COLS + 1, index + 1,
-          index + 1, index + COLS + 1, index + COLS + 2], offset)
+      }
+    }
+  }
+}
+
+// Cache tensor-product cubic weights. Physics stays on the original grid;
+// only the visible surface is subdivided, avoiding extra constraint work.
+function renderSamples(segments: number) {
+  return Array.from({ length: segments * RENDER_SUBDIVISIONS + 1 }, (_, i) => {
+    const coordinate = i / RENDER_SUBDIVISIONS
+    const base = Math.min(segments - 1, Math.floor(coordinate))
+    const t = coordinate - base, t2 = t * t, t3 = t2 * t
+    return {
+      indices: [base - 1, base, base + 1, base + 2].map(n => Math.max(0, Math.min(segments, n))),
+      weights: [-0.5 * t + t2 - 0.5 * t3, 1 - 2.5 * t2 + 1.5 * t3,
+        0.5 * t + 2 * t2 - 1.5 * t3, -0.5 * t2 + 0.5 * t3],
+    }
+  })
+}
+const horizontalSamples = renderSamples(COLS)
+const verticalSamples = renderSamples(ROWS)
+
+function createRenderGrid() {
+  let offset = 0
+  for (let row = 0; row <= RENDER_ROWS; row++) {
+    for (let col = 0; col <= RENDER_COLS; col++) {
+      const index = row * (RENDER_COLS + 1) + col
+      uv[index * 2] = col / RENDER_COLS
+      uv[index * 2 + 1] = 1 - row / RENDER_ROWS
+      if (row < RENDER_ROWS && col < RENDER_COLS) {
+        indices.set([index, index + RENDER_COLS + 1, index + 1,
+          index + 1, index + RENDER_COLS + 1, index + RENDER_COLS + 2], offset)
         offset += 6
       }
     }
@@ -146,22 +181,49 @@ function createFabric() {
 }
 
 function updateMesh() {
-  for (let i = 0; i < COUNT; i++) {
-    const p = bodies[i]!.position
-    const offset = i * 3
-    positions[offset] = p.x
-    positions[offset + 1] = p.y
-    positions[offset + 2] = p.z
+  for (let row = 0; row <= RENDER_ROWS; row++) {
+    const ys = verticalSamples[row]!
+    for (let col = 0; col <= RENDER_COLS; col++) {
+      const xs = horizontalSamples[col]!
+      let x = 0, y = 0, z = 0
+      for (let j = 0; j < 4; j++) {
+        for (let i = 0; i < 4; i++) {
+          const weight = ys.weights[j]! * xs.weights[i]!
+          const point = bodies[ys.indices[j]! * (COLS + 1) + xs.indices[i]!]!.position
+          x += point.x * weight
+          y += point.y * weight
+          z += point.z * weight
+        }
+      }
+      const offset = (row * (RENDER_COLS + 1) + col) * 3
+      positions[offset] = x
+      positions[offset + 1] = y
+      positions[offset + 2] = z
+    }
   }
-  normals.fill(0)
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i]! * 3, b = indices[i + 1]! * 3, c = indices[i + 2]! * 3
-    const abx = positions[b]! - positions[a]!, aby = positions[b+1]! - positions[a+1]!, abz = positions[b+2]! - positions[a+2]!
-    const acx = positions[c]! - positions[a]!, acy = positions[c+1]! - positions[a+1]!, acz = positions[c+2]! - positions[a+2]!
-    const x = aby*acz-abz*acy, y = abz*acx-abx*acz, z = abx*acy-aby*acx
-    normals[a]! += x; normals[a+1]! += y; normals[a+2]! += z
-    normals[b]! += x; normals[b+1]! += y; normals[b+2]! += z
-    normals[c]! += x; normals[c+1]! += y; normals[c+2]! += z
+  // Derive smooth normals from the fabric's two grid directions, not from
+  // consistently diagonal triangles, which can imprint diagonal light bands.
+  for (let row = 0; row <= RENDER_ROWS; row++) {
+    for (let col = 0; col <= RENDER_COLS; col++) {
+      const left = (row * (RENDER_COLS + 1) + Math.max(0, col - 1)) * 3
+      const right = (row * (RENDER_COLS + 1) + Math.min(RENDER_COLS, col + 1)) * 3
+      const top = (Math.max(0, row - 1) * (RENDER_COLS + 1) + col) * 3
+      const bottom = (Math.min(RENDER_ROWS, row + 1) * (RENDER_COLS + 1) + col) * 3
+      const ux = positions[right]! - positions[left]!
+      const uy = positions[right + 1]! - positions[left + 1]!
+      const uz = positions[right + 2]! - positions[left + 2]!
+      const vx = positions[top]! - positions[bottom]!
+      const vy = positions[top + 1]! - positions[bottom + 1]!
+      const vz = positions[top + 2]! - positions[bottom + 2]!
+      const nx = uy * vz - uz * vy
+      const ny = uz * vx - ux * vz
+      const nz = ux * vy - uy * vx
+      const length = Math.hypot(nx, ny, nz) || 1
+      const offset = (row * (RENDER_COLS + 1) + col) * 3
+      normals[offset] = nx / length
+      normals[offset + 1] = ny / length
+      normals[offset + 2] = nz / length
+    }
   }
   if (geometry) {
     geometry.attributes.position!.needsUpdate = true
@@ -269,7 +331,7 @@ function resize() {
   const { width, height } = hostRect
   if (!width || !height) return
   viewHeight = viewWidth * height / width
-  renderer.dpr = Math.min(
+  renderer.dpr = props.nativeResolution ? (window.devicePixelRatio || 1) : Math.min(
     window.devicePixelRatio || 1,
     MAX_DEVICE_PIXEL_RATIO,
     Math.sqrt(MAX_RENDER_PIXELS / (width * height)),
@@ -297,6 +359,7 @@ onMounted(() => {
     camera = new Camera(gl)
     camera.position.z = 12
     createFabric()
+    createRenderGrid()
     updateMesh()
     geometry = new Geometry(gl, {
       position: { size: 3, data: positions, usage: gl.DYNAMIC_DRAW },

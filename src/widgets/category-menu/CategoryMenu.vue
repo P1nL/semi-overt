@@ -393,7 +393,6 @@ watch(open, async (isOpen) => {
   transition-delay: calc(170ms + var(--node-delay));
   pointer-events: auto;
 }
-.category-menu-item.is-active { box-shadow: inset 0 0 0 1.5px var(--color-brand-logo-fg); }
 .category-menu-item:hover { box-shadow: none; }
 .category-menu-trigger:focus-visible,
 .category-menu-item:focus-visible { outline: 2px solid var(--color-brand-logo-fg); outline-offset: 3px; }

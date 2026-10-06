@@ -6,8 +6,8 @@ import ResultViewToggle from './ResultViewToggle.vue'
 import { RESULT_VIEW_MODE, type ResultViewMode } from './result-view'
 
 const RESULT_VIEW_SWITCH_DURATION = {
-  enter: 360,
-  leave: 180,
+  enter: 260,
+  leave: 200,
 }
 
 withDefaults(
@@ -37,6 +37,7 @@ const emit = defineEmits<{
   <section
     class="article-result-stream"
     :class="[`article-result-stream--${view}`, fullscreen && 'article-result-stream--fullscreen']"
+    :style="{ '--result-view-slide-direction': view === RESULT_VIEW_MODE.LIST ? 1 : -1 }"
   >
     <div v-if="showViewToggle" class="article-result-stream__view-toggle">
       <ResultViewToggle :model-value="view" @update:model-value="emit('update:view', $event)" />
@@ -64,6 +65,7 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow-x: clip;
 }
 
 .article-result-stream__view-toggle {
@@ -79,7 +81,7 @@ const emit = defineEmits<{
   display: flex;
   min-width: 0;
   flex-direction: column;
-  will-change: opacity;
+
 }
 
 .article-result-stream__panel--list {
@@ -87,22 +89,31 @@ const emit = defineEmits<{
 }
 
 
+.result-view-switch-enter-active,
+.result-view-switch-leave-active {
+  will-change: transform;
+  pointer-events: none;
+}
+
 .result-view-switch-enter-active {
-  transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .result-view-switch-leave-active {
-  transition: opacity 180ms cubic-bezier(0.4, 0, 1, 1);
+  transition: transform 200ms cubic-bezier(0.4, 0, 1, 1);
 }
 
-.result-view-switch-enter-from,
+.result-view-switch-enter-from {
+  transform: translate3d(calc(var(--result-view-slide-direction) * 100%), 0, 0);
+}
+
 .result-view-switch-leave-to {
-  opacity: 0;
+  transform: translate3d(calc(var(--result-view-slide-direction) * -100%), 0, 0);
 }
 
 .result-view-switch-enter-to,
 .result-view-switch-leave-from {
-  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 @media (max-width: 640px) {
@@ -116,6 +127,7 @@ const emit = defineEmits<{
   .result-view-switch-enter-active,
   .result-view-switch-leave-active {
     transition-duration: 1ms;
+    transform: none;
   }
 }
 </style>

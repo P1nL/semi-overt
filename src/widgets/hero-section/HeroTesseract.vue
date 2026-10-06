@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
   height: auto;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
-  color: var(--color-text);
+  color: var(--color-hero-tesseract);
   pointer-events: none;
   z-index: 0;
 }

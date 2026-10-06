@@ -48,7 +48,6 @@ watch(() => route.fullPath, () => {
 const pageScrollRef = ref<HTMLElement | null>(null)
 watch(pageScrollRef, setPageScrollContainer, { flush: 'post' })
 onBeforeUnmount(() => setPageScrollContainer(null))
-const ClothBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Cloth.vue'))
 const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
 const PAGE_SHEET_LEAVE = 360
@@ -610,20 +609,10 @@ onBeforeUnmount(() => {
     <div
       aria-hidden="true"
       class="app-theme-background app-waves-background"
-      :class="uiStore.darkMode ? 'app-theme-background--hidden' : 'app-theme-background--visible'"
+      :class="{ 'app-waves-background--dark': uiStore.darkMode }"
     >
-      <WavesBackground :active="!uiStore.darkMode" :x-gap="20" :friction="0.85" />
+      <WavesBackground :x-gap="32" :friction="0.85" />
     </div>
-
-    <div
-      aria-hidden="true"
-      class="app-theme-background app-silk-background"
-      :class="uiStore.darkMode ? 'app-theme-background--visible' : 'app-theme-background--hidden'"
-    >
-      <ClothBackground :active="uiStore.darkMode" class="app-silk-background__canvas" />
-      <div class="app-silk-background__overlay" />
-    </div>
-
 
     <div
       class="app-interface relative z-10"
@@ -758,27 +747,11 @@ onBeforeUnmount(() => {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  transition: opacity 900ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity;
+  transition: filter 900ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.app-theme-background--visible { opacity: 1; }
-.app-theme-background--hidden { opacity: 0; }
-.app-waves-background { background: #fff; }
-.app-silk-background { background: #0b0b0f; }
-
-.app-silk-background__canvas,
-.app-silk-background__overlay {
-  position: absolute;
-  inset: 0;
-}
-
-.app-silk-background__overlay {
-  z-index: 2;
-  background:
-    radial-gradient(circle at 50% 42%, transparent 22%, rgb(5 6 10 / 0.18) 72%, rgb(3 4 8 / 0.46) 100%),
-    linear-gradient(180deg, rgb(8 10 15 / 0.08), rgb(8 10 15 / 0.24));
-}
+.app-waves-background { background: #fff; filter: invert(0); }
+.app-waves-background--dark { filter: invert(1); }
 
 @media (prefers-reduced-motion: reduce) {
   .app-theme-background { transition-duration: 0.01ms; }

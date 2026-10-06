@@ -68,6 +68,7 @@
     --color-danger: #d92c20;
     --color-success: #14863c;
     --color-warning: #b96b00;
+    --color-hero-tesseract: #ff9500;
     --color-profile-divider: #d97706;
     --color-overlay: rgb(9 12 20 / 0.28);
     --color-scrollbar-thumb: color-mix(in srgb, var(--color-text-faint) 42%, transparent);
