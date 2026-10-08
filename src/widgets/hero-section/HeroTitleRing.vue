@@ -9,6 +9,7 @@ import { useIntroTarget, HOME_INTRO, INTRO_MOTION, glyphStart, introEmoji, gazeA
 import HeroCubeGlyph from './HeroCubeGlyph.vue'
 import { useAnimationVisibility } from '@/shared/composables/useAnimationVisibility'
 import { createFrameLimiter } from '@/shared/utils/animationFrame'
+import { HOME_ORBIT_STOP_DURATION } from '@/features/page-transition'
 import { usePageMotion } from '@/shared/composables/usePageMotion'
 import { advanceTitleOrbit, createTitleOrbit, getTitleOrbitPose, getTitleOrbitHitDistance } from './model/titleOrbit'
 
@@ -45,7 +46,7 @@ let frame = 0
 let mounted = false
 let observer: ResizeObserver | undefined
 let stopStarted = -Infinity
-const slowing = () => pageMotion?.phase.value === 'leave' && performance.now() - stopStarted < 500
+const slowing = () => pageMotion?.phase.value === 'leave' && performance.now() - stopStarted < HOME_ORBIT_STOP_DURATION
 
 let hitCache: { x: number; y: number; effect: string | null } | null = null
 
@@ -92,7 +93,7 @@ function tick(time: number) {
   if (!mounted || reducedMotion.value || introActive.value || ((!visible.value || motionFrozen.value) && !stopping)) return
   const elapsed = limiter.consume(time)
   if (elapsed !== null) {
-    const speed = stopping ? Math.max(0, 1 - (time - stopStarted) / 500) : 1
+    const speed = stopping ? Math.max(0, 1 - (time - stopStarted) / HOME_ORBIT_STOP_DURATION) : 1
     phase = advanceTitleOrbit(phase, Math.min(64, elapsed) * speed)
     paint()
   }

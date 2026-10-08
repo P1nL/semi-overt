@@ -12,6 +12,8 @@ uniform vec4 uRotationAxisVelocity;
 uniform int uTransitionMain;
 uniform float uMainScale;
 uniform float uOthersOpacity;
+uniform bool uOpaqueMain;
+uniform int uActiveCard;
 
 in vec3 aModelPosition;
 in vec3 aModelNormal;
@@ -30,16 +32,13 @@ void main() {
     vec3 centerPos = (uWorldMatrix * aInstanceMatrix * vec4(0., 0., 0., 1.)).xyz;
     float radius = length(centerPos.xyz);
 
-    if (gl_VertexID > 0) {
-        vec3 rotationAxis = uRotationAxisVelocity.xyz;
-        float rotationVelocity = min(.15, uRotationAxisVelocity.w * 15.);
-        vec3 stretchDir = normalize(cross(centerPos, rotationAxis));
-        vec3 relativeVertexPos = normalize(worldPosition.xyz - centerPos);
-        float strength = dot(stretchDir, relativeVertexPos);
-        float invAbsStrength = min(0., abs(strength) - 1.);
-        strength = rotationVelocity * sign(strength) * abs(invAbsStrength * invAbsStrength * invAbsStrength + 1.);
-        worldPosition.xyz += stretchDir * strength;
-    }
+    // This mesh has four corners, not a centre vertex: deform all corners equally.
+    // Fade the tangent near the rotation pole instead of normalizing a near-zero vector.
+    vec3 tangent = cross(centerPos / max(radius, .0001), uRotationAxisVelocity.xyz);
+    vec3 stretchDir = tangent / max(length(tangent), .2);
+    float stretch = min(.08, uRotationAxisVelocity.w * 6.);
+    vec3 relativeVertexPos = worldPosition.xyz - centerPos;
+    worldPosition.xyz += stretchDir * dot(stretchDir, relativeVertexPos) * stretch;
 
     worldPosition.xyz = radius * normalize(worldPosition.xyz);
 
@@ -52,6 +51,7 @@ void main() {
     }
 
     vAlpha = smoothstep(0.5, 1., normalize(worldPosition.xyz).z) * .9 + .1;
+    if (uOpaqueMain && gl_InstanceID == uActiveCard) vAlpha = 1.;
     vAlpha *= gl_InstanceID == uTransitionMain ? step(0.00001, uMainScale) : uOthersOpacity;
     vUvs = aModelUvs;
     vInstanceId = gl_InstanceID;
@@ -64,6 +64,10 @@ precision highp float;
 uniform sampler2D uTex;
 uniform int uItemCount;
 uniform int uAtlasSize;
+uniform int uItemOffset;
+uniform int uSwapVertex;
+uniform int uNextAtlasSize;
+uniform sampler2D uNextTex;
 
 out vec4 outColor;
 
@@ -72,18 +76,21 @@ in float vAlpha;
 flat in int vInstanceId;
 
 void main() {
-    int itemIndex = vInstanceId % uItemCount;
+    int itemIndex = (vInstanceId + uItemOffset) % uItemCount;
     int cellX = itemIndex % uAtlasSize;
     int cellY = itemIndex / uAtlasSize;
     vec2 cellSize = vec2(1.0) / float(uAtlasSize);
     vec2 cellOffset = vec2(float(cellX), float(cellY)) * cellSize;
     vec2 st = vec2(vUvs.x, 1.0 - vUvs.y) * cellSize + cellOffset;
-    vec4 sampledColor = texture(uTex, st);
+    vec4 sampledColor = vInstanceId == uSwapVertex
+        ? texture(uNextTex, vec2(vUvs.x, 1.0 - vUvs.y) / float(uNextAtlasSize))
+        : texture(uTex, st);
 
     if (sampledColor.a < 0.02) discard;
 
-    outColor = sampledColor;
-    outColor.a *= vAlpha;
+    // Atlas pixels and the browser's WebGL canvas use premultiplied alpha.
+    // Scale RGB together with alpha, otherwise a fading card leaves colour behind.
+    outColor = sampledColor * vAlpha;
 }
 `;
 
@@ -564,6 +571,24 @@ class ArcballControl {
   snapTargetDirection;
   EPSILON = 0.1;
   IDENTITY_QUAT = quat.create();
+  autoRotation = null;
+  pointerId = null;
+  angularVelocity = vec3.create();
+
+  stopAutoRotation() {
+    this.autoRotation = null;
+    this.snapTargetDirection = null;
+    quat.identity(this.pointerRotation);
+    quat.identity(this._combinedQuat);
+    this._rotationVelocity = 0;
+    this.rotationVelocity = 0;
+    vec3.zero(this.angularVelocity);
+  }
+
+  rotateTo(target, duration) {
+    this.stopAutoRotation();
+    this.autoRotation = { from: quat.clone(this.orientation), target, elapsed: 0, duration };
+  }
 
   constructor(canvas, updateCallback) {
     this.canvas = canvas;
@@ -575,19 +600,28 @@ class ArcballControl {
     this._combinedQuat = quat.create();
 
     canvas.addEventListener('pointerdown', e => {
-      vec2.set(this.pointerPos, e.clientX, e.clientY);
+      if (this.pointerId !== null) return;
+      this.stopAutoRotation();
+      this.pointerId = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      const bounds = canvas.getBoundingClientRect();
+      vec2.set(this.pointerPos, e.clientX - bounds.left, e.clientY - bounds.top);
       vec2.copy(this.previousPointerPos, this.pointerPos);
       this.isPointerDown = true;
     });
-    canvas.addEventListener('pointerup', () => {
+    const releasePointer = e => {
+      if (e.pointerId !== this.pointerId) return;
+      this.pointerId = null;
       this.isPointerDown = false;
-    });
-    canvas.addEventListener('pointerleave', () => {
-      this.isPointerDown = false;
-    });
+      if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    };
+    canvas.addEventListener('pointerup', releasePointer);
+    canvas.addEventListener('pointercancel', releasePointer);
+    canvas.addEventListener('lostpointercapture', releasePointer);
     canvas.addEventListener('pointermove', e => {
-      if (this.isPointerDown) {
-        vec2.set(this.pointerPos, e.clientX, e.clientY);
+      if (this.isPointerDown && e.pointerId === this.pointerId) {
+        const bounds = canvas.getBoundingClientRect();
+        vec2.set(this.pointerPos, e.clientX - bounds.left, e.clientY - bounds.top);
       }
     });
 
@@ -600,8 +634,17 @@ class ArcballControl {
     let snapRotation = quat.create();
 
     const held = heldOverride === null ? this.isPointerDown : heldOverride;
-    if (held) {
-      const INTENSITY = 0.3 * timeScale;
+    if (this.autoRotation) {
+      const flight = this.autoRotation;
+      flight.elapsed += deltaTime;
+      const progress = flight.duration > 0 ? Math.min(1, flight.elapsed / flight.duration) : 1;
+      // Ease out on the sphere itself, keeping every card in the same world.
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const next = quat.slerp(quat.create(), flight.from, flight.target, eased);
+      quat.multiply(snapRotation, next, quat.conjugate(quat.create(), this.orientation));
+      if (progress === 1) this.autoRotation = null;
+    } else if (held) {
+      const INTENSITY = 1 - Math.pow(0.7, timeScale);
       const ANGLE_AMPLIFICATION = 5 / timeScale;
 
       const midPointerPos = vec2.sub(vec2.create(), this.pointerPos, this.previousPointerPos);
@@ -624,7 +667,7 @@ class ArcballControl {
         quat.slerp(this.pointerRotation, this.pointerRotation, this.IDENTITY_QUAT, INTENSITY);
       }
     } else {
-      const INTENSITY = 0.1 * timeScale;
+      const INTENSITY = 1 - Math.pow(0.9, timeScale);
       quat.slerp(this.pointerRotation, this.pointerRotation, this.IDENTITY_QUAT, INTENSITY);
 
       if (this.snapTargetDirection) {
@@ -642,23 +685,17 @@ class ArcballControl {
     this.orientation = quat.multiply(quat.create(), combinedQuat, this.orientation);
     quat.normalize(this.orientation, this.orientation);
 
-    const RA_INTENSITY = 0.8 * timeScale;
-    quat.slerp(this._combinedQuat, this._combinedQuat, combinedQuat, RA_INTENSITY);
-    quat.normalize(this._combinedQuat, this._combinedQuat);
-
-    const rad = Math.acos(this._combinedQuat[3]) * 2.0;
-    const s = Math.sin(rad / 2.0);
-    let rv = 0;
-    if (s > 0.000001) {
-      rv = rad / (2 * Math.PI);
-      this.rotationAxis[0] = this._combinedQuat[0] / s;
-      this.rotationAxis[1] = this._combinedQuat[1] / s;
-      this.rotationAxis[2] = this._combinedQuat[2] / s;
+    // Normalize by frame duration BEFORE filtering. Smooth direction and speed together
+    // so small pointer reversals do not swing the deformation axis at full strength.
+    const sinHalf = Math.hypot(combinedQuat[0], combinedQuat[1], combinedQuat[2]);
+    const rad = 2 * Math.atan2(sinHalf, Math.abs(combinedQuat[3]));
+    const factor = sinHalf > 1e-8 ? rad * (combinedQuat[3] < 0 ? -1 : 1) / (sinHalf * 2 * Math.PI * timeScale) : 0;
+    const velocity = vec3.fromValues(combinedQuat[0] * factor, combinedQuat[1] * factor, combinedQuat[2] * factor);
+    vec3.lerp(this.angularVelocity, this.angularVelocity, velocity, 1 - Math.exp(-Math.max(0, deltaTime) / 100));
+    this.rotationVelocity = vec3.length(this.angularVelocity);
+    if (this.rotationVelocity > 1e-8) {
+      vec3.scale(this.rotationAxis, this.angularVelocity, 1 / this.rotationVelocity);
     }
-
-    const RV_INTENSITY = 0.5 * timeScale;
-    this._rotationVelocity += (rv - this._rotationVelocity) * RV_INTENSITY;
-    this.rotationVelocity = this._rotationVelocity / timeScale;
 
     this.updateCallback(deltaTime);
   }
@@ -718,14 +755,141 @@ class InfiniteGridMenu {
     }
   };
 
+  itemOffset = 0;
+  resultReplacement = null;
   nearestVertexIndex = null;
   smoothRotationVelocity = 0;
   scaleFactor = 1.0;
   movementActive = false;
   transitionMainIndex = null;
   presentationPress = null;
+  lastWheelTime = -Infinity;
+  wheelDistance = 0;
+  wheelConsumed = false;
+
+  handleWheel(event) {
+    // Keep browser zoom and horizontal trackpad gestures native.
+    if (event.ctrlKey || event.metaKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    if (this.destroyed || !this.animationFrame || this.presentationPress !== null || getResultCardMotion(this.canvas)) return;
+    event.preventDefault();
+    const now = performance.now();
+    if (now - this.lastWheelTime > 200) {
+      this.wheelDistance = 0;
+      this.wheelConsumed = false;
+    }
+    this.lastWheelTime = now;
+    // Consume the whole burst, including its inertial tail; never queue flights.
+    if (this.control.isPointerDown || this.control.autoRotation) {
+      this.wheelConsumed = true;
+      return;
+    }
+    if (this.wheelConsumed || this.items.length < 2) return;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.canvas.clientHeight : 1;
+    this.wheelDistance += event.deltaY * unit;
+    if (Math.abs(this.wheelDistance) < 12) return;
+    this.wheelConsumed = true;
+
+    const count = this.items.length;
+    const current = (this.#findNearestVertexIndex() + this.itemOffset) % count;
+    const targetItem = (current + Math.sign(this.wheelDistance) + count) % count;
+    let targetVertex = -1;
+    let bestAlignment = -Infinity;
+    // Repeated instances share an article: choose the shortest trip to that article.
+    for (let i = (targetItem - this.itemOffset + count) % count; i < this.instancePositions.length; i += count) {
+      const direction = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(i));
+      const alignment = vec3.dot(direction, this.control.snapDirection);
+      if (alignment > bestAlignment) { bestAlignment = alignment; targetVertex = i; }
+    }
+    if (targetVertex < 0) return;
+    const direction = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(targetVertex));
+    const correction = quat.rotationTo(quat.create(), direction, this.control.snapDirection);
+    const target = quat.multiply(quat.create(), correction, this.control.orientation);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.control.rotateTo(target, reducedMotion ? 0 : 500);
+  }
+
+  paintCurrentFrame() {
+    if (this.destroyed) return;
+    this.#animate(0);
+    this.#render();
+  }
+
+  captureResultState() {
+    this.finishResultReplacement();
+    return {
+      items: this.items.slice(), orientation: Array.from(this.control.orientation),
+      cameraZ: this.camera.position[2], itemOffset: this.itemOffset,
+      instanceCount: this.instancePositions.length
+    };
+  }
+
+  replaceResultsFrom(previous, direction = 1) {
+    this.finishResultReplacement();
+    const next = { items: this.items, tex: this.tex, atlasSize: this.atlasSize };
+    this.items = previous.items;
+    this.itemOffset = previous.itemOffset;
+    this.#initTexture();
+    quat.copy(this.control.orientation, previous.orientation);
+    this.control.stopAutoRotation();
+    this.smoothRotationVelocity = 0;
+    this.camera.position[2] = previous.cameraZ;
+    this.#updateCameraMatrix();
+    // Keep the old sphere topology for the actual card flight, even if result counts differ.
+    if (this.instancePositions.length !== previous.instanceCount) {
+      const geo = new IcosahedronGeometry();
+      while (geo.vertices.length < previous.instanceCount) geo.subdivide(1);
+      geo.spherize(this.SPHERE_RADIUS);
+      this.instancePositions = geo.vertices.map(v => v.position);
+      this.DISC_INSTANCE_COUNT = this.instancePositions.length;
+      this.gl.deleteBuffer(this.discInstances.buffer);
+      this.#initDiscInstances(this.DISC_INSTANCE_COUNT);
+    }
+    const current = this.#findNearestVertexIndex();
+    let targetVertex = -1, best = -Infinity;
+    for (let i = 0; i < this.instancePositions.length; i++) {
+      if (i === current) continue;
+      const position = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(i));
+      if (position[0] * direction <= .001) continue;
+      const alignment = vec3.dot(position, this.control.snapDirection);
+      if (alignment > best) { best = alignment; targetVertex = i; }
+    }
+    if (targetVertex < 0) targetVertex = (current + 1) % this.instancePositions.length;
+    const position = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(targetVertex));
+    const correction = quat.rotationTo(quat.create(), position, this.control.snapDirection);
+    const target = quat.multiply(quat.create(), correction, this.control.orientation);
+    this.resultReplacement = { ...next, targetVertex, target };
+    this.control.rotateTo(target, 500);
+    // Paint the inherited old pose before Vue reveals this replacement canvas.
+    this.#animate(0);
+    this.#render();
+  }
+
+  finishResultReplacement() {
+    const next = this.resultReplacement;
+    if (!next) return;
+    this.control.stopAutoRotation();
+    quat.copy(this.control.orientation, next.target);
+    this.gl.deleteTexture(this.tex);
+    this.items = next.items;
+    this.tex = next.tex;
+    this.atlasSize = next.atlasSize;
+    this.itemOffset = (this.items.length - next.targetVertex % this.items.length) % this.items.length;
+    this.resultReplacement = null;
+    this.onActiveItemChange(0);
+    // Admit all new results without changing the centred card's identity or pose.
+    if (this.instancePositions.length < this.items.length) {
+      const geo = new IcosahedronGeometry();
+      while (geo.vertices.length < this.items.length) geo.subdivide(1);
+      geo.spherize(this.SPHERE_RADIUS);
+      this.instancePositions = geo.vertices.map(v => v.position);
+      this.DISC_INSTANCE_COUNT = this.instancePositions.length;
+      this.gl.deleteBuffer(this.discInstances.buffer);
+      this.#initDiscInstances(this.DISC_INSTANCE_COUNT);
+    }
+  }
 
   setPresentationPress(value, initializeHidden = false) {
+    if (value !== null && this.control?.autoRotation) this.control.stopAutoRotation();
     if (value !== null && this.presentationPress === null && value >= .99) this.canvas.dataset.viewPressPending = '';
     this.presentationPress = value === null ? null : Math.max(0, Math.min(1, value));
     if (initializeHidden && this.presentationPress !== null) {
@@ -746,6 +910,7 @@ class InfiniteGridMenu {
     this.onMovementChange = onMovementChange || (() => {});
     this.scaleFactor = scale;
     this.centerLabel = normalizeCenterLabel(options.centerLabel);
+    this.opaqueMain = options.opaqueMain === true;
     this.camera.position[2] = 3 * scale;
     this.#init(onInit);
   }
@@ -789,13 +954,14 @@ class InfiniteGridMenu {
     if (this.centerLabelVAO) gl.deleteVertexArray(this.centerLabelVAO);
     if (this.centerLabelProgram) gl.deleteProgram(this.centerLabelProgram);
     if (this.tex) gl.deleteTexture(this.tex);
+    if (this.resultReplacement?.tex) gl.deleteTexture(this.resultReplacement.tex);
     if (this.discVAO) gl.deleteVertexArray(this.discVAO);
     if (this.discInstances?.buffer) gl.deleteBuffer(this.discInstances.buffer);
     if (this.discProgram) gl.deleteProgram(this.discProgram);
   }
 
   #init(onInit) {
-    this.gl = this.canvas.getContext('webgl2', { antialias: true, alpha: true });
+    this.gl = this.canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true });
     const gl = this.gl;
     if (!gl) {
       throw new Error('No WebGL 2 context!');
@@ -824,13 +990,20 @@ class InfiniteGridMenu {
       uTransitionMain: gl.getUniformLocation(this.discProgram, 'uTransitionMain'),
       uMainScale: gl.getUniformLocation(this.discProgram, 'uMainScale'),
       uOthersOpacity: gl.getUniformLocation(this.discProgram, 'uOthersOpacity'),
+      uOpaqueMain: gl.getUniformLocation(this.discProgram, 'uOpaqueMain'),
+      uActiveCard: gl.getUniformLocation(this.discProgram, 'uActiveCard'),
       uTex: gl.getUniformLocation(this.discProgram, 'uTex'),
       uFrames: gl.getUniformLocation(this.discProgram, 'uFrames'),
       uItemCount: gl.getUniformLocation(this.discProgram, 'uItemCount'),
-      uAtlasSize: gl.getUniformLocation(this.discProgram, 'uAtlasSize')
+      uAtlasSize: gl.getUniformLocation(this.discProgram, 'uAtlasSize'),
+      uItemOffset: gl.getUniformLocation(this.discProgram, 'uItemOffset'),
+      uSwapVertex: gl.getUniformLocation(this.discProgram, 'uSwapVertex'),
+      uNextAtlasSize: gl.getUniformLocation(this.discProgram, 'uNextAtlasSize'),
+      uNextTex: gl.getUniformLocation(this.discProgram, 'uNextTex')
     };
 
-    this.discGeo = new CardGeometry();
+    const cardTexture = this.items[0]?.texture;
+    this.discGeo = new CardGeometry(cardTexture ? cardTexture.width / cardTexture.height : 0.8);
     this.discBuffers = this.discGeo.data;
     this.discVAO = makeVertexArray(
       gl,
@@ -843,6 +1016,8 @@ class InfiniteGridMenu {
 
     this.icoGeo = new IcosahedronGeometry();
     this.icoGeo.subdivide(1).spherize(this.SPHERE_RADIUS);
+    // Every loaded article must have a real sphere position to navigate to.
+    while (this.icoGeo.vertices.length < this.items.length) this.icoGeo.subdivide(1).spherize(this.SPHERE_RADIUS);
     this.instancePositions = this.icoGeo.vertices.map(v => v.position);
     this.DISC_INSTANCE_COUNT = this.icoGeo.vertices.length;
     this.#initDiscInstances(this.DISC_INSTANCE_COUNT);
@@ -975,6 +1150,7 @@ class InfiniteGridMenu {
     const gl = this.gl;
     const motion = getResultCardMotion(this.canvas);
     if (motion) {
+      if (this.control.autoRotation) this.control.stopAutoRotation();
       if (this.transitionMainIndex === null) {
         this.transitionMainIndex = this.#findNearestVertexIndex();
         // A cold renderer enters at its normal snapped pose before any card is visible.
@@ -983,7 +1159,7 @@ class InfiniteGridMenu {
           const correction = quat.rotationTo(quat.create(), from, this.control.snapDirection);
           quat.multiply(this.control.orientation, correction, this.control.orientation);
         }
-        this.onActiveItemChange(this.transitionMainIndex % Math.max(1, this.items.length));
+        this.onActiveItemChange((this.transitionMainIndex + this.itemOffset) % Math.max(1, this.items.length));
         this.onMovementChange(false);
         this.movementActive = false;
       }
@@ -992,6 +1168,8 @@ class InfiniteGridMenu {
       this.control.update(deltaTime, this.TARGET_FRAME_DURATION,
         this.presentationPress === null ? null : this.presentationPress > 0);
     }
+
+    if (this.resultReplacement && !this.control.autoRotation) this.finishResultReplacement();
 
     let positions = this.instancePositions.map(p => vec3.transformQuat(vec3.create(), p, this.control.orientation));
     const scale = 0.25;
@@ -1065,10 +1243,18 @@ class InfiniteGridMenu {
 
     gl.uniform1i(this.discLocations.uItemCount, this.items.length);
     gl.uniform1i(this.discLocations.uAtlasSize, this.atlasSize);
+    gl.uniform1i(this.discLocations.uItemOffset, this.itemOffset);
+    gl.uniform1i(this.discLocations.uSwapVertex, this.resultReplacement?.targetVertex ?? -1);
+    gl.uniform1i(this.discLocations.uNextAtlasSize, this.resultReplacement?.atlasSize ?? this.atlasSize);
+    gl.uniform1i(this.discLocations.uNextTex, 1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.resultReplacement?.tex ?? this.tex);
     const motion = getResultCardMotion(this.canvas);
     gl.uniform1i(this.discLocations.uTransitionMain, this.transitionMainIndex ?? -1);
     gl.uniform1f(this.discLocations.uMainScale, motion?.mainScale ?? 1);
     gl.uniform1f(this.discLocations.uOthersOpacity, motion?.othersOpacity ?? 1);
+    gl.uniform1i(this.discLocations.uOpaqueMain, this.opaqueMain ? 1 : 0);
+    gl.uniform1i(this.discLocations.uActiveCard, this.opaqueMain ? (this.transitionMainIndex ?? this.#findNearestVertexIndex()) : -1);
 
     gl.uniform1f(this.discLocations.uFrames, this.#frames);
     gl.uniform1f(this.discLocations.uScaleFactor, this.scaleFactor);
@@ -1152,21 +1338,23 @@ class InfiniteGridMenu {
   #onControlUpdate(deltaTime) {
     const controlled = this.presentationPress !== null;
     const pressed = controlled ? this.presentationPress > 0 : this.control.isPointerDown;
-    const isMoving = pressed || (!controlled && Math.abs(this.smoothRotationVelocity) > 0.01);
+    const flight = this.control.autoRotation;
+    const isMoving = pressed || Boolean(flight) || (!controlled && Math.abs(this.smoothRotationVelocity) > 0.01);
 
     if (isMoving !== this.movementActive) {
       this.movementActive = isMoving;
       this.onMovementChange(isMoving);
     }
 
-    if (!pressed) {
+    if (!pressed && !flight) {
       const nearestVertexIndex = this.#findNearestVertexIndex();
-      const itemIndex = nearestVertexIndex % Math.max(1, this.items.length);
-      this.onActiveItemChange(itemIndex);
+      const itemIndex = (nearestVertexIndex + this.itemOffset) % Math.max(1, this.items.length);
+      if (!this.resultReplacement) this.onActiveItemChange(itemIndex);
       const snapDirection = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(nearestVertexIndex));
       this.control.snapTargetDirection = snapDirection;
     }
-    this.camera.position[2] = stepPressCamera(this.camera.position[2], 3 * this.scaleFactor, pressed,
+    const flightHeld = flight && flight.duration > 0 && flight.elapsed / flight.duration < 0.55;
+    this.camera.position[2] = stepPressCamera(this.camera.position[2], 3 * this.scaleFactor, pressed || Boolean(flightHeld),
       this.control.rotationVelocity, deltaTime, this.TARGET_FRAME_DURATION);
     this.#updateCameraMatrix();
   }

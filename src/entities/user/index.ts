@@ -11,6 +11,7 @@ export type { UserRole } from './model/user.constants'
 
 export {
     mapUserProfileDtoToVm,
+    mapUserSearchItemDtoToVm,
     mapUserProfilePageDtoToVm,
 } from './model/user.mapper'
 

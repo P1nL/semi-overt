@@ -93,7 +93,7 @@ onBeforeUnmount(() => { generation++; stop(); media?.removeEventListener('change
 </script>
 
 <template>
-  <section class="article-result-stream" :data-view-switch="switching ? view : undefined">
+  <section class="article-result-stream" :data-result-view="view" :data-view-switch="switching ? view : undefined">
     <div v-if="showViewToggle" class="article-result-stream__view-toggle">
       <ResultViewToggle :model-value="view" @update:model-value="emit('update:view', $event)" />
     </div>
@@ -106,10 +106,10 @@ onBeforeUnmount(() => { generation++; stop(); media?.removeEventListener('change
       <div v-show="showList" ref="listPanel" class="article-result-stream__panel article-result-stream__panel--list"
         :class="{ 'article-result-stream__panel--flow': !switching && settled === 'list', 'article-result-stream__panel--preparing': preparing && settled !== 'list' }"
         :inert="switching || !showList" :aria-hidden="!showList || undefined">
-        <div v-if="mountedList" class="article-result-stream__list-content">
+        <div v-if="mountedList" class="article-result-stream__list-content" data-page-motion="result-list">
           <slot name="list-header" />
           <AnimatedArticleList :items="items" />
-          <slot name="list-footer" />
+          <!-- <slot name="list-footer" /> -->
         </div>
       </div>
     </div>

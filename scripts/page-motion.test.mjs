@@ -10,6 +10,8 @@ function load(path, mocks = {}, globals = {}) {
   const code = ts.transpileModule(read(path).replaceAll('import.meta.env.DEV', 'true'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   vm.runInNewContext(code, { module, exports: module.exports, ...globals, require(name) {
     if (name in mocks) return mocks[name]
+    if (name === '@/shared/utils/resultMenuBridge') return { getResultMenu: () => undefined }
+    if (name === './resultLayoutMotion') return {}
     throw new Error('Unexpected dependency: ' + name)
   } })
   return module.exports
@@ -28,23 +30,26 @@ test('view-only query changes do not run page replacement choreography', () => {
 })
 
 test('infinite-to-list requests the native held target before receding, then admits the list', () => {
-  const view = load('src/widgets/article-result-stream/view-motion.ts')
+  const view = load('src/shared/utils/resultViewMotion.ts')
   const start = { press: 0, infiniteOpacity: 1, infiniteScale: 1, listX: 1 }
   assert.equal(view.viewSwitchPose('list', 0, start).press, 1, 'the native damping must receive the held target immediately')
   const held = view.viewSwitchPose('list', 180, start)
   assert.equal(held.press, 1)
   assert.equal(held.infiniteOpacity, 1)
   assert.equal(held.listX, 1)
-  for (let time = 180; time <= 820; time += 20) {
+  for (let time = 180; time <= 600; time += 20) {
     const hold = view.viewSwitchPose('list', time, start)
     assert.equal(hold.press, 1); assert.equal(hold.infiniteOpacity, 1)
     assert.equal(hold.infiniteScale, 1); assert.equal(hold.listX, 1)
   }
-  const middle = view.viewSwitchPose('list', 1000, start)
+  assert.ok(view.viewSwitchPose('list', 601, start).infiniteOpacity < 1, 'recede begins after native settling plus a 100ms hold')
+  assert.equal(view.VIEW_SWITCH_DURATION.list, 1500)
+  assert.equal(view.VIEW_SWITCH_DURATION.infinite, 1100)
+  const middle = view.viewSwitchPose('list', 750, start)
   assert.ok(middle.infiniteOpacity > 0 && middle.infiniteOpacity < 1)
   assert.ok(middle.infiniteScale < 1)
   assert.equal(middle.listX, 1, 'list waits outside the viewport until the sphere has disappeared')
-  const entering = view.viewSwitchPose('list', 1400, start)
+  const entering = view.viewSwitchPose('list', 1200, start)
   assert.equal(entering.infiniteOpacity, 0)
   assert.ok(entering.listX > 0 && entering.listX < 1)
   const end = view.viewSwitchPose('list', view.VIEW_SWITCH_DURATION.list, start)
@@ -73,7 +78,7 @@ test('scripted press and physical press share the unchanged native camera dampin
 })
 
 test('list-to-infinite leaves left, reveals a held sphere, then smoothly releases it', () => {
-  const view = load('src/widgets/article-result-stream/view-motion.ts')
+  const view = load('src/shared/utils/resultViewMotion.ts')
   const start = { press: 1, infiniteOpacity: 0, infiniteScale: .88, listX: 0 }
   const held = view.viewSwitchPose('infinite', 350, start)
   assert.equal(held.press, 1)
@@ -98,18 +103,18 @@ test('full-bleed view stage does not clip edges or collapse the stationary toggl
   assert.match(renderer, /resume\(\) \{ if \(!this\.animationFrame/)
 })
 
-test('faster scene budgets include the full 2.5 second home exit', () => {
+test('home entrance takes 1.8 seconds and exit gives the lift 0.7 seconds', () => {
   for (const from of ['home', 'results', 'profile']) for (const to of ['home', 'results', 'profile']) {
     if (from === 'home' && to === 'home') continue
     assert.ok(motion.routeDuration(from, to) <= 4500)
   }
-  assert.equal(motion.LEAVE_DURATION.home, 2500)
-  assert.equal(motion.SCENE_DURATION.home, 2000)
+  assert.equal(motion.LEAVE_DURATION.home, 2100)
+  assert.equal(motion.SCENE_DURATION.home, 1800)
   assert.equal(motion.RESULT_SCALE_DURATION.enter, 1100)
   assert.equal(motion.RESULT_SCALE_DURATION.leave, 850)
-  assert.equal(motion.routeDuration('home', 'results'), 4500)
-  assert.equal(motion.routeDuration('results', 'home'), 3500)
-  assert.equal(motion.routeDuration('home', 'profile'), 4500)
+  assert.equal(motion.routeDuration('home', 'results'), 4100)
+  assert.equal(motion.routeDuration('results', 'home'), 3300)
+  assert.equal(motion.routeDuration('home', 'profile'), 4100)
   assert.equal(motion.routeDuration('profile', 'results'), 4000)
   assert.equal(motion.routeDuration('profile', 'profile'), 2000)
   assert.equal(motion.routeDuration('results', 'results'), 2000)
@@ -155,8 +160,8 @@ test('fall starts fast, decelerates to zero landing speed and never rebounds', (
 
 test('upper and lower home elements share one accelerating exit curve', () => {
   assert.equal(motion.homeExitProgress(1000), 0)
-  assert.equal(motion.homeExitProgress(2500), 1)
-  const p = [1000, 1300, 1600, 1900, 2200, 2500].map(time => motion.homeExitProgress(time))
+  assert.equal(motion.homeExitProgress(2100), 1)
+  const p = [1400, 1540, 1680, 1820, 1960, 2100].map(time => motion.homeExitProgress(time))
   for (let i = 2; i < p.length; i++) assert.ok(p[i] - p[i - 1] > p[i - 1] - p[i - 2])
   const scene = read('src/features/page-transition/model/scene.ts')
   assert.equal((scene.match(/homeExitClock\.pull\(/g) ?? []).length, 2)
@@ -310,7 +315,7 @@ test('rope endpoint selects a real topmost silhouette point, not the box center'
 test('ropes remain invisible until their precise anchor is locked, then connect before lifting', () => {
   assert.equal(motion.ropeConnectProgress(0), 0)
   assert.equal(motion.ropeConnectProgress(motion.ROPE_CONNECT_START), 0)
-  assert.equal(motion.ropeConnectProgress(1150), 1)
+  assert.equal(motion.ropeConnectProgress(motion.ROPE_CONNECT_START + motion.ROPE_CONNECT_DURATION), 1)
   assert.equal(motion.homeExitProgress(900), 0)
   const scene = read('src/features/page-transition/model/scene.ts')
   assert.match(scene, /attachment \? homeExitClock\.connection\(elapsed\) : 0/)
@@ -332,7 +337,7 @@ test('slow anchor preparation cannot skip the rope descent or start pulling befo
     assert.equal(clock.pull(readyAt + 600), 0, 'do not pull an unconnected rope')
     clock.start(readyAt + 400)
     assert.equal(clock.connection(readyAt + 600), 1, 'later glyph callbacks cannot reset the shared clock')
-    assert.equal(clock.pull(2500), 1, 'upper and lower exits still finish at 2.5 seconds')
+    assert.equal(clock.pull(2100), 1, 'upper and lower exits finish at 2.1 seconds')
   }
   const scene = read('src/features/page-transition/model/scene.ts')
   assert.match(scene, /if \(!pendingHomeAnchors\.size\) homeExitClock\.start\(performance\.now\(\) - started\)/)
@@ -512,4 +517,301 @@ test('opening and route bursts share identical ray geometry', () => {
   assert.equal(burst.buttonBurstRay(0, 1).x1, 40)
   assert.equal(burst.buttonBurstRay(0, 1).x2, 40)
   assert.match(read('src/widgets/app-header/HeaderIntroEffects.vue'), /buttonBurstRay/)
+})
+
+ test('home orbit stops before rope descent and leaves 700ms for lifting', () => {
+  assert.equal(motion.HOME_ORBIT_STOP_DURATION, 700)
+  assert.ok(motion.ROPE_CONNECT_START > motion.HOME_ORBIT_STOP_DURATION)
+  assert.equal(motion.ropeConnectProgress(motion.HOME_ORBIT_STOP_DURATION), 0)
+  const pullStart = motion.ROPE_CONNECT_START + motion.ROPE_CONNECT_DURATION + 50
+  assert.equal(motion.homeExitProgress(pullStart), 0)
+  assert.equal(motion.LEAVE_DURATION.home - pullStart, 700)
+  assert.equal(motion.homeExitProgress(2100), 1)
+  assert.match(read('src/widgets/hero-section/HeroTitleRing.vue'), /\(time - stopStarted\) \/ HOME_ORBIT_STOP_DURATION/)
+})
+
+
+test('infinite route exit hands off at 850ms without changing list, entry or reduced budgets', () => {
+  for (const [infinite, phase, reduced, expected] of [
+    [true, 'leave', false, 850],
+    [false, 'leave', false, 1500],
+    [true, 'enter', false, 2000],
+    [true, 'swap', false, 2000],
+    [true, 'leave', true, 150],
+  ]) {
+    const timers = []
+    let completed = false
+    const root = { querySelector: selector => selector.includes('result-empty') || selector.includes('result-list') ? null : infinite ? {} : null, querySelectorAll: () => [], dataset: {} }
+    const scene = load('src/features/page-transition/model/scene.ts', {
+      '@/shared/utils/motionClock': { motionTimer(duration, paint, done) { paint(0); timers.push({ duration, done }); return () => {} } },
+      '@/shared/utils/resultCardMotion': {}, './choreography': motion, './ropeAnchor': {}, './profileLayout': {},
+      './effects': { styles() { return { set() {}, restore() {} } } },
+    }, { performance: { now: () => 0 }, MutationObserver: class { observe() {} disconnect() {} } })
+    const stop = scene.playScene(root, { kind: 'results', phase, reduced }, () => { completed = true })
+    assert.equal(timers.at(-1).duration, expected)
+    assert.equal(completed, false)
+    timers.at(-1).done()
+    assert.equal(completed, true, 'the next scene is released at the actual exit endpoint')
+    stop()
+  }
+})
+
+
+test('list exit moves the full list left once, ignores cached hidden infinite panels and hands off at 650ms', () => {
+  const timers = []
+  let translation = '', innerWrites = 0, done = false
+  const list = { dataset: { pageMotion: 'result-list' }, closest: () => null, getBoundingClientRect: () => ({ right: 1200 }) }
+  const card = { dataset: {}, closest: selector => selector.includes('result-list') ? list : null }
+  const hiddenCanvas = { dataset: {}, closest: selector => selector.includes('aria-hidden') ? {} : null }
+  const root = { dataset: {}, querySelector: selector => selector.includes('result-empty') ? null : selector.includes('result-list') ? list : hiddenCanvas, querySelectorAll: () => [list, card, hiddenCanvas] }
+  const scene = load('src/features/page-transition/model/scene.ts', {
+    '@/shared/utils/motionClock': { motionTimer(duration, paint, done) { paint(0); timers.push({ duration, paint, done }); return () => {} } },
+    '@/shared/utils/resultCardMotion': {}, './choreography': motion, './ropeAnchor': {}, './profileLayout': {},
+    './effects': { styles(el) { if (el !== list) innerWrites++; return { set(key, value) { if (key === 'translate') translation = value }, restore() {} } } },
+  }, { performance: { now: () => 0 }, MutationObserver: class { observe() {} disconnect() {} } })
+  const stop = scene.playScene(root, { kind: 'results', phase: 'leave' }, () => { done = true })
+  assert.equal(timers.at(-1).duration, 650)
+  assert.equal(innerWrites, 0, 'children and hidden canvas must not get their own exit')
+  timers.forEach(timer => { timer.paint(timer.duration); timer.done() })
+  assert.equal(translation, '-1232px 0px')
+  assert.equal(done, true)
+  stop()
+})
+
+test('author results reuse the infinite canvas, landscape profile textures and mapped public data without list mode', () => {
+  const search = read('src/pages/search/SearchPage.vue')
+  assert.match(search, /if \(isUserSearch\.value\) return RESULT_VIEW_MODE\.INFINITE/)
+  assert.match(search, /<AuthorInfiniteMenu/)
+  assert.match(search, /\.map\(mapUserSearchItemDtoToVm\)/)
+  assert.ok(!search.includes('v-for="user in userList"'))
+  const menu = read('src/widgets/article-infinite-menu/ArticleInfiniteMenu.vue')
+  assert.match(menu, /createAuthorMenuTextureItems\(props\.authors\)/)
+  assert.match(menu, /activeIndex\.value = index % itemCount\.value/)
+  const authorOverlay = menu.slice(menu.indexOf('<div v-if="activeAuthor && !errorMessage"'), menu.indexOf('<div v-if="loading"'))
+  assert.ok(!authorOverlay.includes('__title') && !authorOverlay.includes('__details') && !authorOverlay.includes('__left-meta'))
+  assert.match(read('src/widgets/article-infinite-menu/model/infinite-grid-menu.js'), /cardTexture\.width \/ cardTexture\.height/)
+  const texture = load('src/widgets/article-infinite-menu/model/author-card-texture.ts')
+  const ctx = { measureText: text => ({ width: Array.from(text).length * 10 }) }
+  assert.deepEqual(Array.from(texture.authorCardLines(ctx, '很长很长的作者昵称', 40, 1)), ['很长很…'])
+  assert.deepEqual(Array.from(texture.authorCardLines(ctx, '一个简短签名', 40, 2)), ['一个简短', '签名'])
+})
+
+
+test('author text is rasterized at 2x and the main card does not bleed the background through its text', () => {
+  const texture = read('src/widgets/article-infinite-menu/model/author-card-texture.ts')
+  assert.match(texture, /const TEXTURE_SCALE = 2/)
+  assert.match(texture, /canvas.width = WIDTH \* TEXTURE_SCALE; canvas.height = HEIGHT \* TEXTURE_SCALE/)
+  assert.match(texture, /ctx.scale\(TEXTURE_SCALE, TEXTURE_SCALE\)/)
+  assert.match(read('src/widgets/article-infinite-menu/ArticleInfiniteMenu.vue'), /opaqueMain: authorMode.value/)
+  const renderer = read('src/widgets/article-infinite-menu/model/infinite-grid-menu.js')
+  assert.match(renderer, /if \(uOpaqueMain && gl_InstanceID == uActiveCard\) vAlpha = 1\.;/)
+  assert.match(renderer, /this.opaqueMain = options.opaqueMain === true/)
+})
+
+
+test('result route classification distinguishes rotation, direct list replacement, view switches and card exits', () => {
+  const routing = load('src/features/page-transition/model/resultTransition.ts')
+  const article = { name: 'search', query: { keyword: 'a' } }
+  const otherArticles = { name: 'category', query: {} }
+  const author = { name: 'search', query: { keyword: 'b', type: 'users', view: 'list' } }
+  const list = { name: 'search', query: { keyword: 'c', view: 'list' } }
+  const otherList = { name: 'category', query: { view: ['list'] } }
+  assert.equal(routing.resultPresentation(author), 'author-infinite', 'authors ignore any stale list query')
+  assert.equal(routing.resultTransition(article, otherArticles), 'rotate')
+  assert.equal(routing.resultTransition(list, otherList), 'direct')
+  for (const [from, to] of [[article, author], [author, article]]) assert.equal(routing.resultTransition(from, to), 'replace')
+  for (const [from, to] of [[list, author], [author, list], [list, article], [article, list]]) assert.equal(routing.resultTransition(from, to), 'view')
+  const transition = read('src/features/page-transition/ui/PageTransition.vue')
+  assert.match(transition, /sibling = isSibling[^\n]*resultMode !== 'replace'/)
+  assert.match(transition, /effectiveMode === 'direct'/)
+  assert.match(transition, /scene.whenReady/)
+})
+
+test('live result menu bridge releases only its own registration', () => {
+  const bridge = load('src/shared/utils/resultMenuBridge.ts')
+  const canvas = {}, first = { name: 'first' }, second = { name: 'second' }
+  const release = bridge.registerResultMenu(canvas, first)
+  assert.equal(bridge.getResultMenu(canvas), first)
+  const releaseSecond = bridge.registerResultMenu(canvas, second)
+  release()
+  assert.equal(bridge.getResultMenu(canvas), second)
+  releaseSecond()
+  assert.equal(bridge.getResultMenu(canvas), undefined)
+})
+
+test('result route layout switches reuse the same view pose and the native pressed camera', () => {
+  const poses = load('src/shared/utils/resultViewMotion.ts')
+  for (const target of ['list', 'infinite']) {
+    const writes = new Map(), presses = [], timer = []
+    const canvas = {}, list = {}, menuRoot = { querySelector: () => canvas }
+    const root = { dataset: {}, querySelector: selector => selector.includes('result-list') ? list : menuRoot, querySelectorAll: () => [] }
+    const motion = load('src/features/page-transition/model/resultLayoutMotion.ts', {
+      '@/shared/utils/motionClock': { motionTimer(duration, paint, done) { paint(0); timer.push({ duration, paint, done }); return () => {} } },
+      '@/shared/utils/resultMenuBridge': { getResultMenu: () => ({ setPress(value, hidden) { presses.push([value, hidden]) } }) },
+      '@/shared/utils/resultViewMotion': poses,
+      './effects': { styles(el) { return { set(key, value) { writes.set(el === list ? 'list:' + key : el === menuRoot ? 'menu:' + key : 'root:' + key, value) }, restore() {} } } },
+    }, { performance: { now: () => 0 }, innerWidth: 1200 })
+    let done = false
+    const stop = motion.playResultLayoutChange(root, root, target, () => { done = true })
+    assert.equal(timer[0].duration, poses.VIEW_SWITCH_DURATION[target])
+    if (target === 'infinite') assert.deepEqual(presses[0], [1, true])
+    timer[0].paint(750)
+    const from = target === 'list' ? { press: 0, infiniteOpacity: 1, infiniteScale: 1, listX: 1 } : { press: 1, infiniteOpacity: 0, infiniteScale: .88, listX: 0 }
+    const pose = poses.viewSwitchPose(target, 750, from)
+    assert.equal(writes.get('list:transform'), `translateX(${pose.listX * 1200}px)`)
+    assert.equal(writes.get('menu:opacity'), String(pose.infiniteOpacity))
+    timer[0].done()
+    assert.equal(done, true)
+    assert.equal(presses.at(-1)[0], null)
+    stop()
+  }
+})
+
+test('group replacement rotates real WebGL geometry and promotes the new atlas without a screenshot fade', () => {
+  const renderer = read('src/widgets/article-infinite-menu/model/infinite-grid-menu.js')
+  assert.match(renderer, /replaceResultsFrom\(previous, direction = 1\)/)
+  assert.match(renderer, /quat.copy\(this.control.orientation, previous.orientation\)/)
+  assert.match(renderer, /this.control.rotateTo\(target, 500\)/)
+  assert.match(renderer, /vInstanceId == uSwapVertex/)
+  assert.match(renderer, /this.itemOffset = \(this.items.length - next.targetVertex % this.items.length\) % this.items.length/)
+  assert.match(renderer, /if \(!this.resultReplacement\) this.onActiveItemChange\(itemIndex\)/)
+  const scene = read('src/features/page-transition/model/scene.ts')
+  assert.match(scene, /menu.rotateFrom\(previous.resultMenu/)
+  assert.match(scene, /previous\?\.resultCopy/)
+})
+
+
+test('a visible author/article canvas stays visible when exit starts, but a cold entrance still waits for GPU paint', () => {
+  const bridge = load('src/shared/utils/resultCardMotion.ts')
+  const canvas = { dataset: {} }
+  bridge.setResultCardMotion(canvas, { mainScale: 1, othersOpacity: 1 })
+  assert.ok(!('resultMotionPending' in canvas.dataset), 'do not hide the valid old frame before exit RAF')
+  bridge.setResultCardMotion(canvas, { mainScale: .97, othersOpacity: .92 })
+  assert.ok(!('resultMotionPending' in canvas.dataset))
+  bridge.clearResultCardMotion(canvas)
+  bridge.setResultCardMotion(canvas, { mainScale: 0, othersOpacity: 0 })
+  assert.ok('resultMotionPending' in canvas.dataset, 'entrance still gates the stale full-sized GPU buffer')
+})
+
+
+test('non-main author/article cards fade their premultiplied RGB and alpha together in both directions', () => {
+  const renderer = read('src/widgets/article-infinite-menu/model/infinite-grid-menu.js')
+  const fragment = renderer.slice(renderer.indexOf('const discFragShaderSource'), renderer.indexOf('const centerLabelVertShaderSource'))
+  assert.match(fragment, /outColor = sampledColor \* vAlpha/)
+  assert.ok(!fragment.includes('outColor.a *= vAlpha'), 'alpha-only fading leaves visible colour in a premultiplied canvas')
+  assert.match(renderer, /premultipliedAlpha: true/)
+  assert.match(renderer, /gl_InstanceID == uTransitionMain \? step\(0\.00001, uMainScale\) : uOthersOpacity/)
+  const sample = [.2, .4, .6, 1]
+  const invisible = sample.map(channel => channel * 0)
+  const halfway = sample.map(channel => channel * .5)
+  assert.deepEqual(invisible, [0, 0, 0, 0])
+  assert.deepEqual(halfway, [.1, .2, .3, .5])
+})
+
+
+test('rendered empty states cannot enter native rotation or leave an incoming sphere paused', () => {
+  const routing = load('src/features/page-transition/model/resultTransition.ts')
+  const key = JSON.stringify(['🤔', '暂无搜索结果', ''])
+  assert.equal(routing.renderedResultTransition('rotate', key, undefined, false), 'replace')
+  assert.equal(routing.renderedResultTransition('rotate', undefined, key, false), 'replace')
+  assert.equal(routing.renderedResultTransition('rotate', key, key, false), 'direct')
+  assert.equal(routing.renderedResultTransition('rotate', key, JSON.stringify(['🥲', '这里还没有文章', '']), false), 'replace')
+  assert.equal(routing.renderedResultTransition('rotate', undefined, undefined, false), 'replace')
+  assert.equal(routing.renderedResultTransition('rotate', undefined, undefined, true), 'rotate')
+  let pauses = 0
+  const route = { name: 'category', query: {} }
+  const mode = routing.resultTransition(route, { name: 'search', query: { keyword: 'full' } })
+  if (routing.renderedResultTransition(mode, key, undefined, false) === 'rotate') pauses++
+  assert.equal(pauses, 0)
+  const transition = read('src/features/page-transition/ui/PageTransition.vue')
+  assert.ok(transition.indexOf("effectiveMode === 'replace'") < transition.indexOf('newMenu?.prepareRotation'))
+  assert.match(transition, /enter\(true\)/, 'empty-to-content must play enter rather than the sibling swap')
+})
+
+test('empty result groups scale around their centre on enter and leave without a background surface', () => {
+  for (const phase of ['enter', 'leave']) {
+    const timers = [], values = new Map()
+    const group = { dataset: { pageMotion: 'result-empty', resultEmptyKey: 'same' }, closest: () => null }
+    const root = { dataset: {}, querySelector: selector => selector.includes('result-empty') ? group : null, querySelectorAll: () => [group] }
+    const scene = load('src/features/page-transition/model/scene.ts', {
+      '@/shared/utils/motionClock': { motionTimer(duration, paint, done) { paint(0); timers.push({ duration, paint, done }); return () => {} } },
+      '@/shared/utils/resultCardMotion': {}, './choreography': motion, './ropeAnchor': {}, './profileLayout': {},
+      './effects': { styles() { return { set(key, value) { values.set(key, value) }, restore() {} } } },
+    }, { performance: { now: () => 0 }, MutationObserver: class { observe() {} disconnect() {} } })
+    const stop = scene.playScene(root, { kind: 'results', phase }, () => {})
+    assert.equal(timers.at(-1).duration, phase === 'enter' ? 350 : 250)
+    assert.equal(values.get('scale'), phase === 'enter' ? '0' : '1')
+    timers[0].paint(timers[0].duration)
+    assert.equal(values.get('scale'), phase === 'enter' ? '1' : '0')
+    assert.ok(!values.has('opacity'), 'the authored empty-state effect is centre scale, not another fade')
+    stop()
+  }
+  const empty = read('src/widgets/article-result-stream/ResultEmptyState.vue')
+  assert.match(empty, /place-items: center/)
+  assert.match(empty, /transform-origin: center/)
+  assert.ok(!empty.includes('surface-1') && !empty.includes('rounded-full'))
+  for (const page of ['category/CategoryPage.vue', 'search/SearchPage.vue']) assert.match(read('src/pages/' + page), /<ResultEmptyState v-else/)
+})
+
+
+test('a completed shrinking emoji stays at scale zero during delayed Vue removal; interrupted exits restore normally', () => {
+  for (const completed of [false, true]) {
+    const timers = [], values = new Map()
+    const group = { dataset: { pageMotion: 'result-empty' }, closest: () => null }
+    const root = { dataset: {}, querySelector: selector => selector.includes('result-empty') ? group : null, querySelectorAll: () => [group] }
+    const scene = load('src/features/page-transition/model/scene.ts', {
+      '@/shared/utils/motionClock': { motionTimer(duration, paint, done) { paint(0); timers.push({ duration, paint, done }); return () => {} } },
+      '@/shared/utils/resultCardMotion': {}, './choreography': motion, './ropeAnchor': {}, './profileLayout': {},
+      './effects': { styles() { return { set(key, value) { values.set(key, value) }, restore(except = []) { for (const key of [...values.keys()]) if (!except.includes(key)) values.delete(key) } } } },
+    }, { performance: { now: () => 0 }, MutationObserver: class { observe() {} disconnect() {} } })
+    const stop = scene.playScene(root, { kind: 'results', phase: 'leave' }, () => {})
+    if (completed) timers.forEach(timer => { timer.paint(timer.duration); timer.done() })
+    else timers[0].paint(100)
+    stop()
+    assert.equal(values.get('scale'), completed ? '0' : undefined)
+    assert.equal(values.get('will-change'), undefined)
+  }
+})
+
+
+test('nonzero first entrance clocks gate and paint the GPU buffer before the layer is revealed', () => {
+  const bridge = load('src/shared/utils/resultCardMotion.ts')
+  class Canvas {
+    dataset = {}
+    closest() { return null }
+    matches(selector) { return selector.includes('article-infinite-menu__canvas') }
+  }
+  for (const phase of ['enter', 'leave']) {
+    const canvas = new Canvas(), trace = []
+    const root = { dataset: {}, querySelector: selector => selector.includes('canvas') ? canvas : null, querySelectorAll: () => [canvas] }
+    let now = 0, renderedScale = 1
+    const scene = load('src/features/page-transition/model/scene.ts', {
+      '@/shared/utils/motionClock': { motionTimer(duration, paint) { paint(0); return () => {} } },
+      '@/shared/utils/resultCardMotion': bridge,
+      '@/shared/utils/resultMenuBridge': { getResultMenu: () => ({ renderFrame() {
+        const state = bridge.getResultCardMotion(canvas)
+        trace.push({ scale: state.mainScale, pending: 'resultMotionPending' in canvas.dataset })
+        renderedScale = state.mainScale
+        bridge.markResultCardMotionRendered(canvas, state)
+      } }) },
+      './choreography': motion, './ropeAnchor': {}, './profileLayout': {}, './effects': {},
+    }, { performance: { now: () => now += .4 }, HTMLCanvasElement: Canvas, MutationObserver: class { observe() {} disconnect() {} } })
+    const stop = scene.playScene(root, { kind: 'results', phase }, () => {})
+    assert.equal(trace.length, 1)
+    if (phase === 'enter') {
+      assert.ok(trace[0].scale > 0 && trace[0].scale < .01, 'the first local clock is not exactly zero')
+      assert.equal(trace[0].pending, true, 'even an epsilon entrance gates the stale static frame')
+      assert.ok(renderedScale < .01, 'GPU pose is already prepared before playScene returns')
+    } else {
+      assert.ok(trace[0].scale < 1 && trace[0].scale > .99)
+      assert.equal(trace[0].pending, false, 'an epsilon leave must not hide its valid previous frame')
+    }
+    assert.equal('resultMotionPending' in canvas.dataset, false)
+    stop()
+  }
+  const transition = read('src/features/page-transition/ui/PageTransition.vue')
+  const enter = transition.slice(transition.indexOf('const enter = async'), transition.indexOf('  if (resultMode)'))
+  assert.ok(!enter.includes("incoming.staged = false\n    const phase"))
+  assert.match(enter, /}, revealPrepared\)/)
+  assert.match(read('src/features/page-transition/ui/PageScene.vue'), /prepared.value = true\s+onPrepared\?\.\(\)/)
 })

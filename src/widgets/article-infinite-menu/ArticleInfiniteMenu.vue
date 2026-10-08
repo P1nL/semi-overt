@@ -2,19 +2,26 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowUpRight } from 'lucide-vue-next'
 
+import { registerResultMenu } from '@/shared/utils/resultMenuBridge'
+import { Avatar } from '@/shared/components/base'
+import type { UserProfileVm } from '@/entities/user'
+import { createAuthorMenuTextureItems } from './model/author-card-texture'
 import { ArticleCard, type ArticleCardVm } from '@/entities/article'
 import { createArticleMenuTextureItems } from './model/article-card-texture'
 import { InfiniteGridMenu } from './model/infinite-grid-menu.js'
 
 const props = withDefaults(
   defineProps<{
-    items: ArticleCardVm[]
+    items?: ArticleCardVm[]
+    authors?: UserProfileVm[]
     fullscreen?: boolean
     centerLabel?: string
     resultCount?: number
     active?: boolean
   }>(),
   {
+    items: () => [],
+    authors: () => [],
     fullscreen: false,
     centerLabel: '',
     resultCount: 0,
@@ -22,11 +29,18 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{ 'active-change': [index: number] }>()
+const authorMode = computed(() => props.authors.length > 0)
+const itemCount = computed(() => authorMode.value ? props.authors.length : props.items.length)
+const activeAuthor = computed(() => props.authors[activeIndex.value] ?? props.authors[0] ?? null)
+
 const rootRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const canvasKey = ref(0)
 const activeIndex = ref(0)
 const moving = ref(false)
+const routeRotating = ref(false)
+let unregisterRenderer: (() => void) | undefined
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -38,6 +52,9 @@ let mounted = false
 let darkMode = false
 let viewPress: number | null = null
 let initializeHeldView = false
+function onWheel(event: WheelEvent) {
+  renderer?.handleWheel(event)
+}
 function setViewPress(value: number | null, initializeHidden = false) {
   viewPress = value
   if (initializeHidden) initializeHeldView = true
@@ -59,6 +76,7 @@ watch(() => props.active, async active => {
 const rendererSignature = computed(() =>
   [
     props.centerLabel,
+    ...props.authors.map(item => [item.id, item.displayName, item.username, item.avatarUrl, item.coverUrl, item.signature, item.role?.label].join(':')),
     ...props.items.map((item) =>
       [item.id, item.titleText, item.summary.text, item.cover.src, item.cover.color].join(':'),
     ),
@@ -71,15 +89,17 @@ const activeResultNumber = computed(() =>
   resultTotal.value > 0 ? Math.min(activeIndex.value + 1, resultTotal.value) : 0,
 )
 const activeHasCover = computed(() => Boolean(activeArticle.value?.cover.hasImage && activeArticle.value.cover.src))
-const overlayStateClass = computed(() => (moving.value ? 'article-infinite-menu__overlay--moving' : 'article-infinite-menu__overlay--active'))
+const overlayStateClass = computed(() => (moving.value && !routeRotating.value ? 'article-infinite-menu__overlay--moving' : 'article-infinite-menu__overlay--active'))
 
 function disposeRenderer() {
+  unregisterRenderer?.(); unregisterRenderer = undefined
+  routeRotating.value = false
   renderer?.dispose()
   renderer = null
 }
 
 async function rebuildRenderer() {
-  if (!mounted || !canvasRef.value || !props.items.length) return
+  if (!mounted || !canvasRef.value || !itemCount.value) return
 
   const version = ++buildVersion
   loading.value = true
@@ -91,24 +111,44 @@ async function rebuildRenderer() {
   await nextTick()
 
   try {
-    const textureItems = await createArticleMenuTextureItems(props.items, props.centerLabel)
+    const textureItems = authorMode.value
+      ? await createAuthorMenuTextureItems(props.authors)
+      : await createArticleMenuTextureItems(props.items, props.centerLabel)
     if (version !== buildVersion || !canvasRef.value) return
 
     renderer = new InfiniteGridMenu(
       canvasRef.value,
       textureItems,
       (index) => {
-        if (!props.items.length) return
-        activeIndex.value = index % props.items.length
+        if (!itemCount.value || routeRotating.value) return
+        activeIndex.value = index % itemCount.value
+        emit('active-change', activeIndex.value)
       },
       (isMoving) => {
         moving.value = isMoving
       },
       (instance) => { instance.setPresentationPress(viewPress, initializeHeldView); initializeHeldView = false; if (props.active) instance.resume() },
       1,
-      { centerLabel: props.centerLabel },
+      { centerLabel: props.centerLabel, opaqueMain: authorMode.value },
     )
 
+    const instance = renderer
+    unregisterRenderer = registerResultMenu(canvasRef.value, {
+      snapshot: () => instance.captureResultState(),
+      renderFrame: () => instance.paintCurrentFrame(),
+      prepareRotation() {
+        routeRotating.value = true
+        activeIndex.value = 0
+        instance.pause()
+      },
+      setPress: setViewPress,
+      rotateFrom(previous, direction) {
+        routeRotating.value = true
+        instance.replaceResultsFrom(previous, direction)
+        instance.resume()
+        return () => { instance.finishResultReplacement(); routeRotating.value = false }
+      },
+    })
     renderer.resize()
     loading.value = false
   } catch (error) {
@@ -121,7 +161,7 @@ async function rebuildRenderer() {
 }
 
 watch(rendererSignature, () => {
-  activeIndex.value = Math.min(activeIndex.value, Math.max(0, props.items.length - 1))
+  activeIndex.value = Math.min(activeIndex.value, Math.max(0, itemCount.value - 1))
   void rebuildRenderer()
 })
 
@@ -164,13 +204,15 @@ onBeforeUnmount(() => {
       !loading && !errorMessage && 'article-infinite-menu--ready',
     ]"
     :aria-busy="loading"
-    aria-label="无限文章菜单"
+    :inert="routeRotating"
+    :aria-label="authorMode ? '无限作者菜单' : '无限文章菜单'"
+    @wheel="onWheel"
   >
     <canvas
       :key="canvasKey"
       ref="canvasRef"
       class="article-infinite-menu__canvas"
-      aria-label="拖拽球面文章卡片浏览文章"
+      :aria-label="authorMode ? '拖拽球面浏览作者，或滚动滚轮按编号切换作者' : '拖拽球面浏览文章，或滚动滚轮按编号切换文章'"
     />
 
     <h1 v-if="centerLabel" class="article-infinite-menu__sr-label">
@@ -244,12 +286,24 @@ onBeforeUnmount(() => {
       </RouterLink>
     </div>
 
+    <div v-if="activeAuthor && !errorMessage" class="article-infinite-menu__overlay" :class="overlayStateClass">
+      <p v-if="resultTotal > 0" class="article-infinite-menu__result-index" :aria-label="`第 ${activeResultNumber} 位作者，共 ${resultTotal} 位`">{{ activeResultNumber }}/{{ resultTotal }}</p>
+      <RouterLink :to="activeAuthor.profilePath" class="article-infinite-menu__action" :aria-label="`查看 ${activeAuthor.displayName} 的个人页`" @pointerdown.stop @click.stop>
+        <ArrowUpRight :size="24" :stroke-width="1.8" />
+      </RouterLink>
+    </div>
+
     <div v-if="loading" class="article-infinite-menu__loading" aria-live="polite">
-      正在生成文章菜单…
+      {{ authorMode ? '正在生成作者菜单…' : '正在生成文章菜单…' }}
     </div>
 
     <div v-else-if="errorMessage" class="article-infinite-menu__fallback">
       <p>{{ errorMessage }}</p>
+      <RouterLink v-if="activeAuthor" :to="activeAuthor.profilePath" class="author-menu-fallback-card" :class="activeAuthor.coverUrl && 'author-menu-fallback-card--cover'" :style="activeAuthor.coverUrl ? { backgroundImage: `url(${JSON.stringify(activeAuthor.coverUrl)})` } : undefined">
+        <Avatar :src="activeAuthor.avatarUrl ?? undefined" :name="activeAuthor.displayName" size="xl" rounded />
+        <strong>{{ activeAuthor.displayName }}</strong><span>@{{ activeAuthor.username }}</span>
+        <p v-if="activeAuthor.signature">{{ activeAuthor.signature }}</p>
+      </RouterLink>
       <ArticleCard
         v-if="activeArticle"
         :article="activeArticle"
@@ -258,16 +312,26 @@ onBeforeUnmount(() => {
     </div>
 
     <p class="article-infinite-menu__hint" :class="moving && 'article-infinite-menu__hint--hidden'">
-      按住并拖拽球面浏览
+      滚动或拖拽
     </p>
 
     <p class="article-infinite-menu__sr-status" aria-live="polite">
-      当前文章：{{ activeArticle?.titleText || '' }}
+      {{ authorMode ? `当前作者：${activeAuthor?.displayName || ''}` : `当前文章：${activeArticle?.titleText || ''}` }}
     </p>
+    <nav v-if="authorMode" class="article-infinite-menu__sr-label" aria-label="作者个人页">
+      <RouterLink v-for="author in authors" :key="author.id" :to="author.profilePath">{{ author.displayName }} @{{ author.username }}</RouterLink>
+    </nav>
   </section>
 </template>
 
 <style scoped>
+.author-menu-fallback-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: .65rem; width: min(90vw, 34rem); min-height: 22rem; padding: 2rem; border: 1px solid var(--color-border); border-radius: var(--radius-xl); background-color: var(--color-surface-elevated); background-size: cover; background-position: center; color: var(--color-text); text-align: center; box-shadow: var(--shadow-lg); }
+.author-menu-fallback-card--cover { color: var(--color-action-on-primary); }
+.author-menu-fallback-card--cover::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, transparent, rgb(8 15 34 / .72)); }
+.author-menu-fallback-card > * { position: relative; }
+.author-menu-fallback-card strong { font-size: 1.6rem; }
+.author-menu-fallback-card p { max-width: 90%; }
+
 .article-infinite-menu {
   --infinite-menu-copy-edge: 28vw;
   --infinite-menu-copy-gap: clamp(1rem, 1.6vw, 2rem);

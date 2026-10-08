@@ -7,12 +7,12 @@ import { CATEGORY_TAB } from '@/entities/category'
 import { mapCategoryValueToVm } from '@/entities/category'
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteCategoryArticlesQuery } from '@/entities/queries'
-import { EmptyState } from '@/shared/components/base'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import {
   ArticleResultStream,
+  ResultEmptyState,
   ResultListHeading,
   ResultViewToggle,
   RESULT_VIEW_MODE,
@@ -164,13 +164,7 @@ useIntersectionObserver(
           </ArticleResultStream>
         </div>
 
-        <div v-else key="category-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
-          <EmptyState
-            title="这里还没有文章"
-            :description="errorMessage || ''"
-            emoji="🥲"
-          />
-        </div>
+        <ResultEmptyState v-else key="category-empty" title="这里还没有文章" :description="errorMessage || ''" emoji="🥲" />
       </Transition>
     </main>
   </div>

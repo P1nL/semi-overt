@@ -5,12 +5,14 @@ import { useIntersectionObserver } from '@vueuse/core'
 
 import { mapArticleCardDtoToVm } from '@/entities/article/model/article.mapper'
 import { useInfiniteSearchArticlesQuery, useInfiniteSearchUsersQuery } from '@/entities/queries'
-import { Avatar, EmptyState } from '@/shared/components/base'
+import { mapUserSearchItemDtoToVm } from '@/entities/user'
+import { AuthorInfiniteMenu } from '@/widgets/article-infinite-menu'
 import { ROUTE_NAME } from '@/shared/constants/routes'
 import { setDocumentTitle } from '@/shared/utils/documentTitle'
 import { getErrorMessage } from '@/shared/utils/error'
 import {
   ArticleResultStream,
+  ResultEmptyState,
   RESULT_VIEW_MODE,
   ResultViewToggle,
   ResultListHeading,
@@ -44,8 +46,8 @@ const routeType = computed(() => String(currentRoute.value.query.type || '').tri
 const isUserSearch = computed(() => routeType.value === 'users')
 const routeKeyword = computed(() => normalizeSearchKeyword(currentRoute.value.query.keyword || currentRoute.value.query.q))
 const resultView = computed(() => {
-  const queryView = currentRoute.value.query.view
-  return normalizeResultViewMode(queryView)
+  if (isUserSearch.value) return RESULT_VIEW_MODE.INFINITE
+  return normalizeResultViewMode(currentRoute.value.query.view)
 })
 const articleSearchQuery = useInfiniteSearchArticlesQuery(routeKeyword, pageSize, computed(() => !isUserSearch.value))
 const userSearchQuery = useInfiniteSearchUsersQuery(routeKeyword, userSearchLimit, isUserSearch)
@@ -89,6 +91,7 @@ const userList = computed(() => {
 
   return userPages.value
     .flatMap((pageData) => pageData.list)
+    .map(mapUserSearchItemDtoToVm)
     .filter((item) => {
       const key = String(item.id)
       if (seen.has(key)) return false
@@ -172,6 +175,11 @@ async function onViewChange(nextView: string) {
   }
 }
 
+function loadMoreAuthors() {
+  if (!isUserSearch.value || !userSearchQuery.hasNextPage.value || userSearchQuery.isFetchingNextPage.value) return
+  void userSearchQuery.fetchNextPage()
+}
+
 useIntersectionObserver(
   loadMoreRef,
   ([entry]) => {
@@ -195,8 +203,7 @@ useIntersectionObserver(
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main
-      class="page-container search-page-main"
-      :class="isUserSearch ? 'space-y-8 py-8 md:space-y-10 md:py-10' : 'pb-0 pt-0'"
+      class="page-container search-page-main pb-0 pt-0"
     >
       <div
         v-if="!isUserSearch && contentState === 'content'"
@@ -204,8 +211,6 @@ useIntersectionObserver(
       >
         <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
       </div>
-
-      <ResultListHeading v-if="isUserSearch" :title="searchTitle" :description="resultSummary" />
 
       <section class="space-y-5">
         <Transition name="content-fade" mode="out-in">
@@ -220,42 +225,13 @@ useIntersectionObserver(
             key="search-content"
             class="space-y-5"
           >
-            <template v-if="isUserSearch">
-              <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <router-link
-                  v-for="user in userList"
-                  :key="user.id"
-                  :to="user.profilePath"
-                  class="surface-1 rounded-[var(--radius-xl)] p-4 transition-transform duration-200 hover:-translate-y-0.5"
-                >
-                  <div class="flex items-center gap-3">
-                    <Avatar
-                      :src="user.avatarUrl || undefined"
-                      :name="user.nickname || user.username"
-                      size="lg"
-                    />
-
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-semibold text-[var(--color-text)]">
-                        {{ user.nickname || user.username }}
-                      </p>
-                      <p class="truncate text-sm text-[var(--color-text-muted)]">@{{ user.username }}</p>
-                    </div>
-                  </div>
-                </router-link>
-              </section>
-
-              <section class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5">
-                <div ref="loadMoreRef" class="search-page-load-sentinel" aria-hidden="true" />
-
-                <p v-if="userSearchQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
-                  正在续接更多作者…
-                </p>
-                <p v-else-if="userSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
-                  继续滚动，自动载入
-                </p>
-              </section>
-            </template>
+            <AuthorInfiniteMenu
+              v-if="isUserSearch"
+              :items="userList"
+              :center-label="activeKeyword"
+              :result-count="total"
+              @load-more="loadMoreAuthors"
+            />
 
             <template v-else>
               <ArticleResultStream
@@ -290,12 +266,7 @@ useIntersectionObserver(
             </template>
           </div>
 
-          <div v-else key="search-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">
-            <EmptyState
-              :title="emptyStateTitle"
-              emoji="🤔"
-            />
-          </div>
+          <ResultEmptyState v-else key="search-empty" :title="emptyStateTitle" :description="errorMessage" emoji="🤔" />
         </Transition>
       </section>
     </main>

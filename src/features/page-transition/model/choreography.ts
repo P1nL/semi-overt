@@ -1,13 +1,16 @@
 import type { PageMotionKind } from '@/shared/composables/usePageMotion'
 export const PAGE_MOTION_FPS = 60
-export const SCENE_DURATION = { home: 2000, results: 2000, profile: 2000, other: 150 } as const
-export const LEAVE_DURATION = { ...SCENE_DURATION, home: 2500, results: 1500 } as const
+export const SCENE_DURATION = { home: 1800, results: 2000, profile: 2000, other: 150 } as const
+export const LEAVE_DURATION = { ...SCENE_DURATION, home: 2100, results: 1500 } as const
 export const RESULT_SCALE_DURATION = { enter: 1100, leave: 850 } as const
+export const RESULT_EMPTY_DURATION = { enter: 350, leave: 250 } as const
+export const RESULT_LIST_LEAVE_DURATION = 650
 export const SIBLING_DURATION = 2000
 export const progress = (time: number, start: number, duration: number) => Math.max(0, Math.min(1, (time - start) / duration))
 export const out = (p: number) => 1 - Math.pow(1 - p, 3)
 export const mix = (a: number, b: number, p: number) => a + (b - a) * p
-export const ROPE_CONNECT_START = 550
+export const HOME_ORBIT_STOP_DURATION = 700
+export const ROPE_CONNECT_START = HOME_ORBIT_STOP_DURATION + 50
 export const ROPE_CONNECT_DURATION = 600
 const ROPE_CONNECT_HOLD = 50
 export const homeExitProgress = (time: number, pullStart = ROPE_CONNECT_START + ROPE_CONNECT_DURATION + ROPE_CONNECT_HOLD) => progress(time, pullStart, Math.max(1, LEAVE_DURATION.home - pullStart)) ** 2

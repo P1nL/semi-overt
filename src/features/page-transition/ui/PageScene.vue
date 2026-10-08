@@ -19,15 +19,16 @@ provide(animationSceneKey, {
 provide(pageMotionKey, { phase: toRef(props, 'phase') })
 let cancel: (() => void) | undefined
 function stop() { cancel?.(); cancel = undefined }
-function play(options: SceneOptions, done: () => void) {
+function play(options: SceneOptions, done: () => void, onPrepared?: () => void) {
   stop()
-  if (!root.value) { done(); return }
+  if (!root.value) { onPrepared?.(); done(); return }
   managed.value = true
   const start = () => {
     if (!root.value) return
     cancel = playScene(root.value, options, done)
     // Reveal only after every currently mounted effect has painted its first frame.
     prepared.value = true
+    onPrepared?.()
   }
   if ((options.kind === 'profile' || options.kind === 'results') && options.phase === 'enter' && !options.reduced) {
     // Wait for real content / renderer readiness, not a static loading frame.
@@ -42,7 +43,9 @@ function whenReady(ready: () => void) {
     const el = root.value
     if (!el) return false
     if (props.kind === 'profile') return !!el.querySelector('.profile-card,.profile-page[data-profile-state="error"]')
-    return !el.querySelector('.content-loading-shell') && !!el.querySelector('main') && !el.querySelector('.article-infinite-menu[aria-busy="true"]')
+    return !el.querySelector('.content-loading-shell') && !!el.querySelector('main')
+      && !!el.querySelector('[data-page-motion="result-empty"],[data-page-motion="result-list"],.article-infinite-menu')
+      && !el.querySelector('.article-infinite-menu[aria-busy="true"]')
   }
   if (check()) { ready(); return () => {} }
   const observer = new MutationObserver(() => { if (check()) { observer.disconnect(); ready() } })

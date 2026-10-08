@@ -1,5 +1,6 @@
 // src/entities/user/model/user.mapper.ts
 import { mapArticleCardListDtoToVm } from '@/entities/article/model/article.mapper'
+import type { UserSearchItemDto } from '@/shared/types/api'
 import type { UserProfileEntityDto, UserProfilePageEntityDto, UserProfileVm, UserRoleVm, UserStatItemVm } from './user.types'
 import {
     USER_DEFAULT_SIGNATURE,
@@ -61,4 +62,9 @@ export function mapUserProfilePageDtoToVm(dto: UserProfilePageEntityDto): UserPr
             wordCount: Number(day.wordCount ?? 0),
         })),
     }
+}
+
+/** Search only carries identity; do not invent a signature while profile data loads. */
+export function mapUserSearchItemDtoToVm(dto: UserSearchItemDto): UserProfileVm {
+    return { ...mapUserProfileDtoToVm({ ...dto, coverUrl: null, signature: null }), signature: '', profilePath: dto.profilePath || `/u/${encodeURIComponent(dto.username)}` }
 }

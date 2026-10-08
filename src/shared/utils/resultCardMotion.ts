@@ -1,9 +1,10 @@
 export interface ResultCardMotion { mainScale: number; othersOpacity: number }
 const states = new WeakMap<HTMLCanvasElement, ResultCardMotion>()
-export function setResultCardMotion(canvas: HTMLCanvasElement, state: ResultCardMotion) {
-  // DOM readiness is not GPU readiness: the buffer may still contain a full-size
-  // static card until the renderer consumes this first transition state.
-  if (!states.has(canvas)) canvas.dataset.resultMotionPending = ''
+export function setResultCardMotion(canvas: HTMLCanvasElement, state: ResultCardMotion, waitForRender = state.mainScale < 1) {
+  // An entrance's first local clock can already be a fraction past zero.
+  // Gate that stale full-size buffer explicitly, not by exact scale equality.
+  // Leave keeps its valid last frame visible even if its first clock is nonzero.
+  if (!states.has(canvas) && waitForRender) canvas.dataset.resultMotionPending = ''
   states.set(canvas, state)
   if (import.meta.env.DEV) {
     canvas.dataset.mainCardScale = state.mainScale.toFixed(4)

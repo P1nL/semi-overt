@@ -1,8 +1,8 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/vue-query'
+import { keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@tanstack/vue-query'
 import { mapArticleDetailDtoToVm } from '@/entities/article/model/article.mapper'
 import { mapPendingReviewItemDtoToVm, mapReviewLogListDtoToVm } from '@/entities/review'
-import { mapUserProfilePageDtoToVm } from '@/entities/user'
+import { mapUserProfilePageDtoToVm, type UserProfileVm } from '@/entities/user'
 import { articleApi } from '@/shared/api/modules/article'
 import { categoryApi } from '@/shared/api/modules/category'
 import { homeApi } from '@/shared/api/modules/home'
@@ -310,5 +310,24 @@ export function useReviewLogsQuery(
         queryFn: async () => mapReviewLogListDtoToVm(await reviewApi.getReviewLogs(String(toValue(articleId)))),
         enabled: computed(() => queryEnabled.value && Boolean(toValue(articleId))),
         ...refreshOptions,
+    })
+}
+
+/** Cached public profiles supply the cover/signature missing from author search. */
+export function useAuthorResultProfilesQuery(items: MaybeRefOrGetter<UserProfileVm[]>) {
+    return useQueries({
+        queries: computed(() => toValue(items).map(user => ({
+            queryKey: queryKeys.userProfile(user.username, 'approved', 1, 1),
+            queryFn: async () => mapUserProfilePageDtoToVm(await userApi.getUserProfile(
+                user.username, { tab: 'approved', page: 1, pageSize: 1 }, { errorPolicy: 'auth' },
+            )),
+        }))),
+        combine: results => ({
+            pending: results.some(result => result.isPending),
+            // Hold the identity set until the whole batch settles to avoid repeated GPU rebuilds.
+            profiles: results.some(result => result.isPending)
+                ? toValue(items)
+                : toValue(items).map((user, index) => results[index]?.data ?? user),
+        }),
     })
 }

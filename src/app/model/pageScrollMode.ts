@@ -8,7 +8,7 @@ export function resolvePageScrollMode(route: {
   query: Record<string, unknown>
 }): PageScrollMode {
   if (route.name !== ROUTE_NAME.CATEGORY && route.name !== ROUTE_NAME.SEARCH) return 'page'
-  if (route.name === ROUTE_NAME.SEARCH && String(route.query.type ?? '').trim().toLowerCase() === 'users') return 'page'
+  if (route.name === ROUTE_NAME.SEARCH && String(route.query.type ?? '').trim().toLowerCase() === 'users') return 'infinite'
   const view = Array.isArray(route.query.view) ? route.query.view[0] : route.query.view
   return view === 'list' ? 'list' : 'infinite'
 }

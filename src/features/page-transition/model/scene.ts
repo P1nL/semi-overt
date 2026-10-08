@@ -2,19 +2,22 @@ import type { PageMotionKind } from '@/shared/composables/usePageMotion'
 import { motionTimer } from '@/shared/utils/motionClock'
 import { clearResultCardMotion, setResultCardMotion } from '@/shared/utils/resultCardMotion'
 import { avatarEffect, burstEffect, overlay, resultSwapEffect, slideCover, styles, svgNode, textEffect, type Effect } from './effects'
-import { createRopeDescentClock, fallingPose, fallingRotation, LEAVE_DURATION, out, progress, randomLandingRotation, RESULT_SCALE_DURATION, ROPE_CONNECT_START, SCENE_DURATION } from './choreography'
+import { createRopeDescentClock, fallingPose, fallingRotation, LEAVE_DURATION, out, progress, randomLandingRotation, RESULT_SCALE_DURATION, RESULT_EMPTY_DURATION, RESULT_LIST_LEAVE_DURATION, ROPE_CONNECT_START, SCENE_DURATION } from './choreography'
+import { getResultMenu, type ResultMenuSnapshot } from '@/shared/utils/resultMenuBridge'
+import { playResultLayoutChange } from './resultLayoutMotion'
+import type { ResultTransition } from './resultTransition'
 import { createGlyphAnchor, type GlyphAnchor } from './ropeAnchor'
 import { profileLayoutEffect, snapshotProfileLayout, type ProfileLayoutSnapshot } from './profileLayout'
 
 export const TEXTS = '.profile-card__name,.profile-card__username,.profile-card__signature,.article-card h3,.article-summary,.article-infinite-menu__title,.article-infinite-menu__left-meta,.article-infinite-menu__details'
 export const COVERS = '.profile-card__cover-image,.article-cover img'
 export const AVATARS = '.profile-card__avatar,[data-motion-avatar]'
-export interface SceneSnapshot { texts: string[]; covers: HTMLImageElement[]; avatars: HTMLImageElement[]; results?: HTMLCanvasElement; profileLayout?: ProfileLayoutSnapshot }
+export interface SceneSnapshot { texts: string[]; covers: HTMLImageElement[]; avatars: HTMLImageElement[]; results?: HTMLCanvasElement; resultMenu?: ResultMenuSnapshot; resultCopy?: Record<string, string>; profileLayout?: ProfileLayoutSnapshot }
 function targets(root: HTMLElement, selector: string) {
-  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(el => !el.closest('[data-motion-overlay]'))
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(el => !el.closest('[data-motion-overlay]') && !el.closest('.article-result-stream__panel[aria-hidden="true"]'))
 }
 export function snapshotScene(root?: HTMLElement): SceneSnapshot {
-  const canvas = root?.querySelector<HTMLCanvasElement>('.article-infinite-menu__canvas')
+  const canvas = root ? targets(root, '.article-infinite-menu__canvas')[0] as HTMLCanvasElement | undefined : undefined
   let results: HTMLCanvasElement | undefined
   if (canvas?.width && canvas.height) {
     results = document.createElement('canvas')
@@ -24,6 +27,8 @@ export function snapshotScene(root?: HTMLElement): SceneSnapshot {
   }
   return {
     results,
+    resultMenu: getResultMenu(canvas)?.snapshot(),
+    resultCopy: root ? Object.fromEntries(['.article-infinite-menu__title', '.article-infinite-menu__left-meta', '.article-infinite-menu__details'].map(selector => [selector, root.querySelector(selector)?.textContent?.trim() ?? ''])) : {},
     profileLayout: snapshotProfileLayout(root),
     texts: root ? targets(root, TEXTS).map(el => el.textContent ?? '') : [],
     covers: root ? targets(root, COVERS).filter((el): el is HTMLImageElement => el instanceof HTMLImageElement) : [],
@@ -37,14 +42,25 @@ export interface SceneOptions {
   previous?: SceneSnapshot
   reduced?: boolean
   local?: boolean
+  resultTransition?: ResultTransition
+  outgoingRoot?: HTMLElement
+  targetView?: 'list' | 'infinite'
 }
 
 /** Timelines write independent translate/scale/rotate channels, preserving widget transforms. */
 export function playScene(root: HTMLElement, options: SceneOptions, done: () => void) {
   const { kind, phase, previous } = options
+  if (options.resultTransition === 'view' && options.outgoingRoot && options.targetView && !options.reduced) {
+    return playResultLayoutChange(options.outgoingRoot, root, options.targetView, done)
+  }
   const reverse = phase === 'leave'
   const swap = phase === 'swap'
-  const duration = options.reduced ? 150 : swap ? 2000 : (reverse ? LEAVE_DURATION : SCENE_DURATION)[kind]
+  // The infinite view is fully gone once its central card reaches zero scale.
+  // Hand off then instead of idling through the generic results leave budget.
+  const empty = kind === 'results' && !!root.querySelector('[data-page-motion="result-empty"]')
+  const listExit = reverse && kind === 'results' && !!root.querySelector('[data-result-view="list"] [data-page-motion="result-list"]')
+  const infiniteExit = reverse && kind === 'results' && !!root.querySelector('.article-infinite-menu__canvas,.article-infinite-menu__fallback')
+  const duration = options.reduced ? 150 : empty ? RESULT_EMPTY_DURATION[reverse ? 'leave' : 'enter'] : swap ? options.resultTransition === 'rotate' ? 900 : 2000 : listExit ? RESULT_LIST_LEAVE_DURATION : infiniteExit ? RESULT_SCALE_DURATION.leave : (reverse ? LEAVE_DURATION : SCENE_DURATION)[kind]
   const started = performance.now()
   const effects = new Set<Effect>()
   const cancels = new Set<() => void>()
@@ -98,7 +114,7 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
       cancels.add(cancel)
     }
   }
-  function move(el: HTMLElement, start: number, length: number, x = 0, y = 0, fade = false, scale = false) {
+  function move(el: HTMLElement, start: number, length: number, x = 0, y = 0, fade = false, scale = false, holdCompletedExit = false) {
     const owned = styles(el)
     owned.set('will-change', scale ? 'scale, opacity' : 'translate, opacity')
     add({
@@ -109,12 +125,19 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
         if (fade) owned.set('opacity', String(1 - remain))
         if (scale) owned.set('scale', String(1 - remain))
       },
-      dispose() { owned.restore() },
+      dispose() {
+        // Vue may retain a transitioning child briefly during layer removal.
+        // Keep a finished empty group's zero scale instead of flashing it back.
+        owned.restore(reverse && completed && holdCompletedExit ? ['scale'] : [])
+      },
     })
   }
   function flow(el: HTMLElement, start: number, length: number) {
     const index = targets(root, TEXTS).indexOf(el)
-    add(textEffect(el, start, length, reverse, swap && kind === 'profile' ? previous?.texts[index] ?? '' : undefined))
+    const selector = ['.article-infinite-menu__title', '.article-infinite-menu__left-meta', '.article-infinite-menu__details'].find(selector => el.matches(selector))
+    const oldText = swap && kind === 'profile' ? previous?.texts[index] ?? ''
+      : options.resultTransition === 'rotate' && selector ? previous?.resultCopy?.[selector] ?? '' : undefined
+    add(textEffect(el, start, length, reverse, oldText))
   }
   function homeGlyph(el: HTMLElement) {
     const index = glyphIndex++
@@ -147,7 +170,7 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
     add({
       paint(time) {
         if (reverse) {
-          // Wait for the orbit's half-second deceleration, then measure actual
+          // Wait for the orbit's complete deceleration, then measure actual
           // ink/circle/cube vertices. Never attach to an empty layout-box corner.
           if (time >= ROPE_CONNECT_START && !attachment) {
             attachment = createGlyphAnchor(el)
@@ -207,26 +230,42 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
       return
     }
     if (kind === 'results') {
+      if (role === 'result-empty') { move(el, 0, duration, 0, 0, false, true, true); return }
+      if (role === 'result-list' && !listExit) return
+      if (listExit && !options.reduced) {
+        if (role === 'result-list') move(el, 0, RESULT_LIST_LEAVE_DURATION, -el.getBoundingClientRect().right - 32)
+        else if (!el.closest('[data-page-motion="result-list"]')) move(el, 0, 250, 0, 0, true)
+        return
+      }
       if (el.matches('.article-infinite-menu__canvas,.article-infinite-menu__fallback')) {
         if (!swap && el instanceof HTMLCanvasElement) {
           add({ paint(time) {
             const main = out(progress(time, 0, reverse ? RESULT_SCALE_DURATION.leave : RESULT_SCALE_DURATION.enter))
             const others = out(progress(time, reverse ? 0 : 250, reverse ? 650 : 850))
-            setResultCardMotion(el, { mainScale: reverse ? 1 - main : main, othersOpacity: reverse ? 1 - others : others })
+            setResultCardMotion(el, { mainScale: reverse ? 1 - main : main, othersOpacity: reverse ? 1 - others : others }, !reverse)
           }, dispose() { clearResultCardMotion(el) } })
         }
         else if (!swap) move(el, 0, reverse ? RESULT_SCALE_DURATION.leave : RESULT_SCALE_DURATION.enter, 0, 0, reverse, true)
-        else if (el instanceof HTMLCanvasElement) add(resultSwapEffect(el, previous?.results, options.direction ?? 1))
-      } else if (el.matches('.article-infinite-menu__title,.article-infinite-menu__left-meta')) flow(el, reverse ? 50 : swap ? 750 : 200, swap ? 1000 : 650)
-      else if (el.matches('.article-infinite-menu__details')) flow(el, reverse ? 0 : swap ? 850 : 250, swap ? 1000 : 650)
+        else if (el instanceof HTMLCanvasElement) {
+          const menu = getResultMenu(el)
+          if (options.resultTransition === 'rotate' && menu && previous?.resultMenu) {
+            const release = menu.rotateFrom(previous.resultMenu, options.direction ?? 1)
+            add({ paint() {}, dispose: release })
+            if (import.meta.env.DEV) el.dataset.resultGroupRotation = 'native'
+            cleanups.push(() => { delete el.dataset.resultGroupRotation })
+          } else add(resultSwapEffect(el, previous?.results, options.direction ?? 1))
+        }
+      } else if (el.matches('.article-infinite-menu__title,.article-infinite-menu__left-meta')) flow(el, options.resultTransition === 'rotate' ? 0 : reverse ? 50 : swap ? 750 : 200, options.resultTransition === 'rotate' ? 900 : swap ? 1000 : 650)
+      else if (el.matches('.article-infinite-menu__details')) flow(el, options.resultTransition === 'rotate' ? 0 : reverse ? 0 : swap ? 850 : 250, options.resultTransition === 'rotate' ? 900 : swap ? 1000 : 650)
       else if (el.matches('.article-infinite-menu__action')) {
+        if (options.resultTransition === 'rotate') return
         if (swap) move(el, 550, 650, 0, 0, true)
         else {
           move(el, reverse ? 100 : 1150, reverse ? 200 : 250, 0, 0, true)
           add(burstEffect(el, reverse ? 100 : 950, 650))
         }
       } else if (el.matches('.article-card')) move(el, swap ? 450 : 200, swap ? 1050 : 900, swap ? (options.direction ?? 1) * 20 : 0, 0, true)
-      else move(el, reverse ? 0 : 350, reverse ? 650 : 850, 0, 0, true)
+      else if (options.resultTransition !== 'rotate') move(el, reverse ? 0 : 350, reverse ? 650 : 850, 0, 0, true)
       return
     }
     if (kind === 'profile') {
@@ -271,7 +310,7 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
     }
   }
   const selectors = kind === 'home' ? '[data-page-motion="glyph"],[data-page-motion="home-bottom"]'
-    : kind === 'results' ? '.article-infinite-menu__canvas,.article-infinite-menu__fallback,.article-infinite-menu__title,.article-infinite-menu__left-meta,.article-infinite-menu__details,.article-infinite-menu__action,.article-infinite-menu__hint,.article-infinite-menu__result-index,.search-page-view-toggle,.category-page-view-toggle,.article-card,.content-loading-shell,.result-list-heading'
+    : kind === 'results' ? '[data-page-motion="result-empty"],[data-page-motion="result-list"],.article-infinite-menu__canvas,.article-infinite-menu__fallback,.article-infinite-menu__title,.article-infinite-menu__left-meta,.article-infinite-menu__details,.article-infinite-menu__action,.article-infinite-menu__hint,.article-infinite-menu__result-index,.search-page-view-toggle,.category-page-view-toggle,.article-card,.content-loading-shell,.result-list-heading'
     : `${TEXTS},${AVATARS},${COVERS},.profile-header-tilt,.profile-content-layout,.profile-content-layout__tabs,.ptm__card,[data-page-motion="divider"],[data-page-motion="review"],[data-page-motion="review-item"],[data-page-motion="writing-stats"]`
   const scan = () => { if (!stopped) targets(root, selectors).forEach(register) }
   const observer = new MutationObserver(scan)
@@ -281,10 +320,15 @@ export function playScene(root: HTMLElement, options: SceneOptions, done: () => 
     if (kind === 'home' && reverse && !pendingHomeAnchors.size) homeExitClock.start(ROPE_CONNECT_START)
     if (!reverse) observer.observe(root, { childList: true, subtree: true })
   }
+  // Consume the first card pose on the GPU while this layer is still staged.
+  // DOM preparation alone cannot prevent a full-size constructor frame flashing.
+  if (kind === 'results' && !swap) {
+    targets(root, '.article-infinite-menu__canvas').forEach(el => getResultMenu(el as HTMLCanvasElement)?.renderFrame?.())
+  }
   let paintedFrames = 0
   const end = motionTimer(duration, () => { paintedFrames++ }, () => {
     completed = true
-    if (import.meta.env.DEV) root.dataset.motionReport = JSON.stringify({ kind, phase, budgetMs: duration, elapsedMs: Math.round(performance.now() - started), frames: paintedFrames, fps: Math.round((paintedFrames - 1) * 1000 / (performance.now() - started)) })
+    if (import.meta.env.DEV) root.dataset.motionReport = JSON.stringify({ kind, phase, resultTransition: options.resultTransition, budgetMs: duration, elapsedMs: Math.round(performance.now() - started), frames: paintedFrames, fps: Math.round((paintedFrames - 1) * 1000 / (performance.now() - started)) })
     done()
   })
   return () => {

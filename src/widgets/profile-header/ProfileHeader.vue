@@ -199,7 +199,7 @@ const isOwner = computed(() => {
   letter-spacing: -0.045em;
   line-height: 1.08;
   text-wrap: nowrap;
-  text-shadow: 0 5px 24px rgb(8 15 34 / 0.48);
+  text-shadow: none;
 }
 
 .profile-card__username {
@@ -209,7 +209,7 @@ const isOwner = computed(() => {
   font-size: 0.86rem;
   font-weight: 500;
   letter-spacing: 0.01em;
-  text-shadow: 0 3px 16px rgb(8 15 34 / 0.38);
+  text-shadow: none;
 }
 
 .profile-card--plain .profile-card__name {
@@ -239,7 +239,7 @@ const isOwner = computed(() => {
   font-size: 0.875rem;
   line-height: 1.65;
   text-wrap: nowrap;
-  text-shadow: 0 3px 18px rgb(8 15 34 / 0.5);
+  text-shadow: none;
   transform: translateZ(34px);
 }
 

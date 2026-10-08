@@ -3,6 +3,7 @@ import http from 'node:http'
 
 const port = Number(process.env.MOTION_FIXTURE_PORT || 5198)
 const upstream = Number(process.env.MOTION_VITE_PORT || 5173)
+const emptyFixture = process.env.MOTION_EMPTY_FIXTURE === '1'
 const people = ['motion-a', 'motion-b', 'motion-slow', 'motion-spaces'].map((username, index) => ({
   id: 9101 + index, userId: 9101 + index, username, profilePath: `/u/${username}`,
   nickname: ['转场测试 · 青岚', '转场测试 · 秋野', '转场测试 · 慢速头像', 'Test User'][index],
@@ -43,8 +44,8 @@ const server = http.createServer((req, res) => {
     if (path === '/users/me') return send(res, people[0])
     if (path === '/home') return send(res, { hero: { primary: article(0), secondary: [article(1), article(2)] }, sections: [{ category: 'SHORT', list: [article(0), article(1), article(2)] }] })
     if (path === '/search/users') return send(res, { ...page(people.filter(p => `${p.username} ${p.nickname}`.includes(url.searchParams.get('keyword') || ''))), keyword: url.searchParams.get('keyword') })
-    if (path === '/search') return send(res, { ...page([article(0), article(1), article(2)]), keyword: url.searchParams.get('keyword') })
-    if (/^\/categories\//.test(path)) return send(res, { ...page([article(0), article(1), article(2)]), category: path.split('/')[2] })
+    if (path === '/search') return send(res, { ...page(emptyFixture && String(url.searchParams.get('keyword')).startsWith('motion-empty') ? [] : [article(0), article(1), article(2)]), keyword: url.searchParams.get('keyword') })
+    if (/^\/categories\//.test(path)) return send(res, { ...page(emptyFixture && path.split('/')[2] !== 'QUICK' ? [] : [article(0), article(1), article(2)]), category: path.split('/')[2] })
     const profile = path.match(/^\/users\/([^/]+)\/profile$/)
     if (profile) {
       const owner = Math.max(0, people.findIndex(p => p.username === decodeURIComponent(profile[1]) || String(p.id) === profile[1]))
