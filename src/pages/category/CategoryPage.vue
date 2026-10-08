@@ -118,11 +118,10 @@ useIntersectionObserver(
 
 <template>
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
-    <main class="page-container category-page-main" :class="layoutView === RESULT_VIEW_MODE.INFINITE ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'">
+    <main class="page-container category-page-main pb-0 pt-0">
       <div v-if="contentState === 'content'" class="category-page-view-toggle">
         <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
       </div>
-      <ResultListHeading v-if="layoutView !== RESULT_VIEW_MODE.INFINITE" :title="sectionMeta.label" :description="`共 ${Math.max(total, list.length)} 篇文章`" />
       <Transition name="content-fade" mode="out-in">
         <div
           v-if="contentState === 'loading'"
@@ -144,14 +143,13 @@ useIntersectionObserver(
             fullscreen
             @layout:view="layoutView = $event"
             @update:view="onViewChange"
-          />
-
-          <div ref="loadMoreRef" class="category-page-load-sentinel" aria-hidden="true" />
-
-          <section
-            v-if="layoutView !== RESULT_VIEW_MODE.INFINITE"
-            class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
           >
+            <template #list-header>
+              <ResultListHeading :title="sectionMeta.label" :description="`共 ${Math.max(total, list.length)} 篇文章`" />
+            </template>
+            <template #list-footer>
+              <div ref="loadMoreRef" class="category-page-load-sentinel" aria-hidden="true" />
+              <section class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5">
             <p v-if="categoryQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
               正在续接更多栏目文章…
             </p>
@@ -161,7 +159,9 @@ useIntersectionObserver(
             <p v-else class="text-sm text-[var(--color-text-muted)]">
               END
             </p>
-          </section>
+              </section>
+            </template>
+          </ArticleResultStream>
         </div>
 
         <div v-else key="category-empty" class="surface-1 rounded-[var(--radius-xl)] p-8">

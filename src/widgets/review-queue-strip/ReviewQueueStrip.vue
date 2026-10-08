@@ -30,6 +30,7 @@ withDefaults(
     <div v-else-if="items.length" class="overflow-x-auto pb-2">
       <div class="grid min-w-full grid-flow-col auto-cols-[15.5rem] gap-3 sm:auto-cols-[19rem] xl:auto-cols-[calc((100%-1.5rem)/3)]">
         <ReviewQueueItem
+            data-page-motion="review-item"
             v-for="item in items"
             :key="item.id"
             :item="item"

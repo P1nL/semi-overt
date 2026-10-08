@@ -109,7 +109,6 @@ const searchTitle = computed(() => {
 const documentTitle = computed(() => activeKeyword.value || searchTitle.value)
 const layoutView = ref(resultView.value)
 watch(layoutView, view => emit('result-layout', view), { immediate: true })
-const isInfiniteLayout = computed(() => !isUserSearch.value && layoutView.value === RESULT_VIEW_MODE.INFINITE)
 watch(() => [resultView.value, contentState.value, isUserSearch.value] as const, ([view, state, users]) => {
   if (state !== 'content' || users) layoutView.value = view
 })
@@ -121,12 +120,6 @@ const resultSummary = computed(() => {
 
   return `共找到 ${Math.max(total.value, articleList.value.length)} 篇与“${activeKeyword.value}”相关的文章`
 })
-const showArticleFooter = computed(
-  () =>
-    layoutView.value !== RESULT_VIEW_MODE.INFINITE ||
-    articleSearchQuery.isFetchingNextPage.value ||
-    articleSearchQuery.hasNextPage.value,
-)
 const emptyStateTitle = computed(() => {
   if (errorMessage.value) return '搜索失败'
   if (activeKeyword.value) return isUserSearch.value ? '暂无作者结果' : '暂无搜索结果'
@@ -203,7 +196,7 @@ useIntersectionObserver(
   <div class="min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
     <main
       class="page-container search-page-main"
-      :class="isInfiniteLayout ? 'pb-0 pt-0' : 'space-y-8 py-8 md:space-y-10 md:py-10'"
+      :class="isUserSearch ? 'space-y-8 py-8 md:space-y-10 md:py-10' : 'pb-0 pt-0'"
     >
       <div
         v-if="!isUserSearch && contentState === 'content'"
@@ -212,7 +205,7 @@ useIntersectionObserver(
         <ResultViewToggle :model-value="resultView" @update:model-value="onViewChange" />
       </div>
 
-      <ResultListHeading v-if="!isInfiniteLayout" :title="searchTitle" :description="resultSummary" />
+      <ResultListHeading v-if="isUserSearch" :title="searchTitle" :description="resultSummary" />
 
       <section class="space-y-5">
         <Transition name="content-fade" mode="out-in">
@@ -269,18 +262,17 @@ useIntersectionObserver(
                 :items="articleList"
                 :view="resultView"
                 fullscreen
-                :center-label="isInfiniteLayout ? activeKeyword : ''"
+                :center-label="activeKeyword"
                 :result-count="total"
                 :show-view-toggle="false"
                 @update:view="onViewChange"
                 @layout:view="layoutView = $event"
-              />
-
-              <section
-                v-if="showArticleFooter"
-                class="surface-1 content-rise-in rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5"
-                :style="{ '--content-rise-delay': `${articleList.length * 35 + 110}ms` }"
               >
+                <template #list-header>
+                  <ResultListHeading :title="searchTitle" :description="resultSummary" />
+                </template>
+                <template #list-footer>
+                  <section class="surface-1 rounded-[var(--radius-xl)] px-4 py-4 text-center md:px-5">
                 <div ref="loadMoreRef" class="search-page-load-sentinel" aria-hidden="true" />
 
                 <p v-if="articleSearchQuery.isFetchingNextPage.value" class="text-sm text-[var(--color-text-muted)]">
@@ -289,10 +281,12 @@ useIntersectionObserver(
                 <p v-else-if="articleSearchQuery.hasNextPage.value" class="text-sm text-[var(--color-text-muted)]">
                   继续滚动，自动载入
                 </p>
-                <p v-else-if="layoutView !== RESULT_VIEW_MODE.INFINITE" class="text-sm text-[var(--color-text-muted)]">
+                <p v-else class="text-sm text-[var(--color-text-muted)]">
                   END
                 </p>
-              </section>
+                  </section>
+                </template>
+              </ArticleResultStream>
             </template>
           </div>
 

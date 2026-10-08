@@ -2,6 +2,7 @@
 import { computed, useId } from 'vue'
 import { useHomeIntro, HOME_INTRO, INTRO_MOTION, progress, out, categoryEntryPose, categoryVisualBounds, seedSeparationProgress } from '@/features/home-intro'
 import { getHeaderSeedFrame } from './model/headerSeed'
+import { BUTTON_BURST_RAYS, buttonBurstRay } from '@/shared/utils/buttonBurst'
 const intro = useHomeIntro()!
 const emissionId = 'intro-seed-emission-' + useId().replace(/:/g, '-')
 const gradientId = emissionId + '-color'
@@ -10,7 +11,7 @@ const home = computed(() => intro.rects.value.home)
 const tools = computed(() => intro.rects.value.tools)
 const category = computed(() => intro.rects.value.category)
 const spark = computed(() => progress(t.value, HOME_INTRO.home, INTRO_MOTION.spark))
-const rays = Array.from({ length: 12 }, (_, i) => ({ a: i * Math.PI / 6, length: i % 2 ? 6 : 12 }))
+const rays = BUTTON_BURST_RAYS
 const seed = computed(() => {
   const c = category.value, n = tools.value
   if (!c || !n) return null
@@ -37,7 +38,7 @@ const seed = computed(() => {
         </filter>
       </defs>
       <g v-if="t >= HOME_INTRO.home && spark < 1" :transform="`translate(${home.left + home.width / 2} ${home.top + home.height / 2})`" :opacity="1 - spark">
-        <line v-for="(ray, i) in rays" :key="i" :x1="Math.cos(ray.a) * (20 + out(spark) * 20)" :y1="Math.sin(ray.a) * (20 + out(spark) * 20)" :x2="Math.cos(ray.a) * (20 + out(spark) * 20 + ray.length * (1 - spark))" :y2="Math.sin(ray.a) * (20 + out(spark) * 20 + ray.length * (1 - spark))" stroke="var(--color-brand-logo-bg)" stroke-width="2" stroke-linecap="round" />
+        <line v-for="(_, i) in rays" :key="i" v-bind="buttonBurstRay(i, spark)" stroke="var(--color-brand-logo-bg)" stroke-width="2" stroke-linecap="round" />
       </g>
       <g v-if="seed && t > HOME_INTRO.seed && t < HOME_INTRO.capsuleReady" :data-seed-phase="t < HOME_INTRO.seedDetached ? 'separating' : t < HOME_INTRO.capsule ? 'flying' : 'growing'">
         <path v-if="seed.neck" class="header-intro-neck" :d="seed.neck" :opacity="seed.neckOpacity" fill="var(--color-brand-logo-bg)" />

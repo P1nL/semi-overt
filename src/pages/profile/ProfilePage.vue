@@ -183,23 +183,23 @@ function loadMoreArticles() {
 </script>
 
 <template>
-  <div class="profile-page min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]">
+  <div class="profile-page min-h-[calc(100vh-var(--header-height))] md:min-h-[calc(100vh-var(--header-height-md))]" :data-profile-state="profileQuery.isError.value ? 'error' : profile ? 'ready' : 'loading'">
     <main class="page-container py-8 md:py-10">
       <Transition name="content-fade" mode="out-in">
         <div
           v-if="contentState === 'loading'"
           key="profile-page-loading"
-          class="grid min-h-[calc(100vh-var(--header-height)-4rem)] place-items-center md:min-h-[calc(100vh-var(--header-height-md)-5rem)]"
+          class="profile-motion-placeholder space-y-8"
           role="status"
           aria-live="polite"
           aria-label="正在加载个人页"
         >
-          <div class="surface-1 flex size-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--color-border)_80%,transparent)] text-[var(--color-text-muted)] shadow-[var(--shadow-md)]">
-            <span
-              class="inline-block size-5 animate-[spin_0.8s_linear_infinite] rounded-full border-2 border-current border-r-transparent"
-              aria-hidden="true"
-            />
+          <div class="surface-1 flex min-h-[22rem] flex-col items-center justify-end gap-3 rounded-[var(--radius-xl)] p-9" aria-hidden="true">
+            <span class="surface-2 size-20 rounded-full" />
+            <span class="surface-2 h-6 w-40 rounded" />
+            <span class="surface-2 h-4 w-64 rounded" />
           </div>
+          <div class="grid grid-cols-[11rem_1fr] gap-6" aria-hidden="true"><div class="surface-1 h-60 rounded-[var(--radius-xl)]" /><div class="surface-1 h-80 rounded-[var(--radius-xl)]" /></div>
         </div>
 
         <div
@@ -209,10 +209,11 @@ function loadMoreArticles() {
         >
           <ProfileHeader :profile="profile" />
 
-          <ProfileWritingCalendar :days="profile.writingCalendar" />
+          <ProfileWritingCalendar :days="profile.writingCalendar" data-page-motion="writing-stats" />
 
           <section
             v-if="showAdminReviewQueue"
+            data-page-motion="review"
             class="surface-1 rounded-[var(--radius-xl)] p-4 md:p-5"
           >
             <SectionHeader title="审核" description="" compact />
@@ -244,6 +245,7 @@ function loadMoreArticles() {
             </aside>
 
             <div class="profile-content-layout__main">
+              <span class="profile-content-divider" data-page-motion="divider" aria-hidden="true" />
               <div class="profile-content-layout__tabs-mobile surface-1 rounded-[var(--radius-xl)] p-3 sm:p-4">
                 <ProfileTabs
                   :model-value="activeTab"
@@ -271,6 +273,7 @@ function loadMoreArticles() {
 .profile-content-layout {
   display: block;
 }
+.profile-content-divider { display: none; }
 
 .profile-content-layout__tabs {
   display: none;
@@ -335,8 +338,8 @@ function loadMoreArticles() {
     position: relative;
   }
 
-  .profile-content-layout__main::before {
-    content: '';
+.profile-content-divider {
+    display: block;
     position: absolute;
     left: -0.75rem;
     top: 0.75rem;

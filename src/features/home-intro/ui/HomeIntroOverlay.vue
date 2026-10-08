@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import SnoopyEye from '@/shared/components/SnoopyEye.vue'
+import IntroEyeLoading from './IntroEyeLoading.vue'
 import { eyeOpeningEase, eyeOpeningPath } from '@/shared/utils/snoopyEye'
 import { coveringRadius, radialRevealEase } from '@/shared/utils/radialReveal'
 import { useHomeIntro } from '../model/context'
@@ -12,6 +13,9 @@ const playbackTime = computed(() => toPlaybackTime(t.value))
 const eye = computed(() => intro.rects.value.eye)
 const opened = computed(() => eyeOpeningEase(progress(t.value, HOME_INTRO.open, INTRO_MOTION.eyeOpen)))
 const opening = computed(() => eyeOpeningPath(opened.value))
+const loadingProgress = computed(() => progress(t.value, HOME_INTRO.loading, HOME_INTRO.filled - HOME_INTRO.loading))
+const tileSeamFade = computed(() => out(progress(t.value, HOME_INTRO.filled, 240)))
+const lidEntry = computed(() => out(progress(t.value, HOME_INTRO.filled, HOME_INTRO.open - HOME_INTRO.filled)))
 const blend = computed(() => progress(t.value, HOME_INTRO.open, INTRO_MOTION.eyeBlend))
 const eyeStyle = computed(() => eye.value ? {
   left: `${eye.value.left}px`, top: `${eye.value.top}px`, width: `${eye.value.width}px`, height: `${eye.value.height}px`,
@@ -33,12 +37,15 @@ const coverPath = computed(() => {
         <path :d="coverPath" fill-rule="evenodd" />
       </svg>
       <div v-if="eye && t < HOME_INTRO.revealed" class="home-intro-eye" :style="eyeStyle" aria-hidden="true">
-        <SnoopyEye :autonomous="false" :openness="opened" :disc-opacity="blend" :outline-opacity="0" />
+        <IntroEyeLoading v-if="t < HOME_INTRO.filled + 240" :progress="loadingProgress" />
+        <!-- Cover the completed tiles gradually, so only their seams dissolve. -->
+        <svg v-if="t >= HOME_INTRO.filled" class="home-intro-eye-disc" :style="{ opacity: tileSeamFade }" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" /></svg>
+        <SnoopyEye :autonomous="false" :openness="opened" :disc-opacity="0" :outline-opacity="0" />
         <svg class="home-intro-eye-lines" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="48.8" fill="none" stroke-width="1.5" pathLength="1" stroke-dasharray="1" :opacity="1 - blend" :stroke-dashoffset="1 - progress(t, 0, INTRO_MOTION.outline)" transform="rotate(-90 50 50)" />
           <!-- One persistent contour: the traced slit becomes both lids.
                Iris/pupil clipping uses the exact same opening geometry. -->
-          <path class="home-intro-eyelids" :d="opening" fill="none" :stroke-width="2.6 + 1.9 * blend" :style="{ stroke: `color-mix(in srgb, var(--color-snoopy-eye-ink) ${blend * 100}%, var(--color-text))`, transform: `scaleX(${out(progress(t, INTRO_MOTION.lidDelay, INTRO_MOTION.lidDraw))})`, transformOrigin: '50px 50px' }" />
+          <path class="home-intro-eyelids" :d="opening" fill="none" :stroke-width="2.6 + 1.9 * blend" :style="{ stroke: `color-mix(in srgb, var(--color-snoopy-eye-ink) ${blend * 100}%, var(--color-text))`, transform: `scaleX(${lidEntry})`, transformOrigin: '50px 50px' }" />
         </svg>
       </div>
       <button class="home-intro-skip" type="button" @click="intro.skip">跳过动画 <span aria-hidden="true">↗</span></button>
@@ -55,6 +62,8 @@ const coverPath = computed(() => {
 .home-intro-overlay { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
 .home-intro-cover { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--color-splash-cover); }
 .home-intro-eye { position: absolute; }
+.home-intro-eye-disc { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--color-snoopy-eye-disc); }
+.home-intro-eye > :deep(.snoopy-eye) { position: relative; }
 .home-intro-eye-lines { position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--color-text); stroke-linecap: round; }
 .home-intro-skip { position: absolute; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); pointer-events: auto; min-height: 44px; padding: 0 12px; color: var(--color-text-muted); font-size: 12px; letter-spacing: .08em; cursor: pointer; }
 .home-intro-skip:focus-visible, .home-intro-debug button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }

@@ -76,7 +76,7 @@ const isOwner = computed(() => {
         />
 
         <div class="profile-card__identity-layer">
-          <h1 class="profile-card__name">
+          <h1 class="profile-card__name" :title="profile.displayName">
             {{ profile.displayName }}
           </h1>
           <p class="profile-card__username">
@@ -94,6 +94,7 @@ const isOwner = computed(() => {
         <p
           v-if="profile.signature"
           class="profile-card__signature"
+          :title="profile.signature"
         >
           {{ profile.signature }}
         </p>
@@ -165,9 +166,9 @@ const isOwner = computed(() => {
 .profile-card__avatar {
   width: 5rem;
   height: 5rem;
-  border: 0;
-  background: transparent;
-  color: white;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
   font-size: 1.5rem;
   box-shadow: none;
   transform: translateZ(76px);
@@ -178,6 +179,7 @@ const isOwner = computed(() => {
 }
 
 .profile-card__identity-layer {
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -186,17 +188,22 @@ const isOwner = computed(() => {
 }
 
 .profile-card__name {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0;
   color: white;
   font-size: clamp(1.75rem, 4vw, 2.55rem);
   font-weight: 650;
   letter-spacing: -0.045em;
   line-height: 1.08;
-  text-wrap: balance;
+  text-wrap: nowrap;
   text-shadow: 0 5px 24px rgb(8 15 34 / 0.48);
 }
 
 .profile-card__username {
+  white-space: nowrap;
   margin: 0;
   color: rgb(255 255 255 / 0.74);
   font-size: 0.86rem;
@@ -223,12 +230,15 @@ const isOwner = computed(() => {
 }
 
 .profile-card__signature {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: min(42rem, 92%);
   margin: 0.15rem 0 0;
   color: rgb(255 255 255 / 0.84);
   font-size: 0.875rem;
   line-height: 1.65;
-  text-wrap: balance;
+  text-wrap: nowrap;
   text-shadow: 0 3px 18px rgb(8 15 34 / 0.5);
   transform: translateZ(34px);
 }

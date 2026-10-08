@@ -71,10 +71,14 @@ function ensureMotionSetters() {
     duration: 0.34,
     ease: 'power3.out',
   })
-  scaleTo = gsap.quickTo(surface, 'scale', {
-    duration: 0.3,
-    ease: 'power3.out',
-  })
+  // Profile covers deliberately keep scale=1; a no-op quickTo has no resettable
+  // property in GSAP and emits warnings when route changes move under the cursor.
+  if (props.scaleOnHover !== 1) {
+    scaleTo = gsap.quickTo(surface, 'scale', {
+      duration: 0.3,
+      ease: 'power3.out',
+    })
+  }
 }
 
 function clearMotionSetters() {

@@ -1,4 +1,6 @@
 import { mat4, quat, vec2, vec3 } from 'gl-matrix';
+import { getResultCardMotion, markResultCardMotionRendered } from '@/shared/utils/resultCardMotion';
+import { stepPressCamera } from './press-camera';
 
 const discVertShaderSource = `#version 300 es
 
@@ -7,6 +9,9 @@ uniform mat4 uViewMatrix;
 uniform mat4 uProjectionMatrix;
 uniform vec3 uCameraPosition;
 uniform vec4 uRotationAxisVelocity;
+uniform int uTransitionMain;
+uniform float uMainScale;
+uniform float uOthersOpacity;
 
 in vec3 aModelPosition;
 in vec3 aModelNormal;
@@ -39,8 +44,15 @@ void main() {
     worldPosition.xyz = radius * normalize(worldPosition.xyz);
 
     gl_Position = uProjectionMatrix * uViewMatrix * worldPosition;
+    // Scale one instance around its own projected center, never the entire canvas.
+    if (gl_InstanceID == uTransitionMain) {
+        vec4 projectedCenter = uProjectionMatrix * uViewMatrix * vec4(centerPos, 1.);
+        vec2 centerNdc = projectedCenter.xy / projectedCenter.w;
+        gl_Position.xy = mix(centerNdc, gl_Position.xy / gl_Position.w, uMainScale) * gl_Position.w;
+    }
 
     vAlpha = smoothstep(0.5, 1., normalize(worldPosition.xyz).z) * .9 + .1;
+    vAlpha *= gl_InstanceID == uTransitionMain ? step(0.00001, uMainScale) : uOthersOpacity;
     vUvs = aModelUvs;
     vInstanceId = gl_InstanceID;
 }
@@ -582,12 +594,13 @@ class ArcballControl {
     canvas.style.touchAction = 'none';
   }
 
-  update(deltaTime, targetFrameDuration = 16) {
+  update(deltaTime, targetFrameDuration = 16, heldOverride = null) {
     const timeScale = deltaTime / targetFrameDuration + 0.00001;
     let angleFactor = timeScale;
     let snapRotation = quat.create();
 
-    if (this.isPointerDown) {
+    const held = heldOverride === null ? this.isPointerDown : heldOverride;
+    if (held) {
       const INTENSITY = 0.3 * timeScale;
       const ANGLE_AMPLIFICATION = 5 / timeScale;
 
@@ -688,6 +701,7 @@ class InfiniteGridMenu {
   #deltaTime = 0;
   #deltaFrames = 0;
   #frames = 0;
+  #nextFrame = 0;
 
   camera = {
     matrix: mat4.create(),
@@ -708,6 +722,22 @@ class InfiniteGridMenu {
   smoothRotationVelocity = 0;
   scaleFactor = 1.0;
   movementActive = false;
+  transitionMainIndex = null;
+  presentationPress = null;
+
+  setPresentationPress(value, initializeHidden = false) {
+    if (value !== null && this.presentationPress === null && value >= .99) this.canvas.dataset.viewPressPending = '';
+    this.presentationPress = value === null ? null : Math.max(0, Math.min(1, value));
+    if (initializeHidden && this.presentationPress !== null) {
+      // Only prime an invisible returning panel. Visible entry always uses
+      // the exact same damped update as a real pointerdown.
+      this.camera.position[2] = 3 * this.scaleFactor + 2.5 * this.presentationPress;
+      this.#updateCameraMatrix();
+    }
+  }
+
+  pause() { cancelAnimationFrame(this.animationFrame); this.animationFrame = 0; }
+  resume() { if (!this.animationFrame && !this.destroyed) this.run(performance.now()); }
 
   constructor(canvas, items, onActiveItemChange, onMovementChange, onInit = null, scale = 1.0, options = {}) {
     this.canvas = canvas;
@@ -734,6 +764,9 @@ class InfiniteGridMenu {
 
   run(time = 0) {
     if (this.destroyed) return;
+    this.animationFrame = requestAnimationFrame(t => this.run(t));
+    if (time + 0.01 < this.#nextFrame) return;
+    this.#nextFrame += (Math.max(0, Math.floor((time - this.#nextFrame + 0.01) / this.TARGET_FRAME_DURATION)) + 1) * this.TARGET_FRAME_DURATION;
 
     this.#deltaTime = Math.min(32, time - this.#time);
     this.#time = time;
@@ -743,7 +776,6 @@ class InfiniteGridMenu {
     this.#animate(this.#deltaTime);
     this.#render();
 
-    this.animationFrame = requestAnimationFrame(t => this.run(t));
   }
 
   dispose() {
@@ -789,6 +821,9 @@ class InfiniteGridMenu {
       uCameraPosition: gl.getUniformLocation(this.discProgram, 'uCameraPosition'),
       uScaleFactor: gl.getUniformLocation(this.discProgram, 'uScaleFactor'),
       uRotationAxisVelocity: gl.getUniformLocation(this.discProgram, 'uRotationAxisVelocity'),
+      uTransitionMain: gl.getUniformLocation(this.discProgram, 'uTransitionMain'),
+      uMainScale: gl.getUniformLocation(this.discProgram, 'uMainScale'),
+      uOthersOpacity: gl.getUniformLocation(this.discProgram, 'uOthersOpacity'),
       uTex: gl.getUniformLocation(this.discProgram, 'uTex'),
       uFrames: gl.getUniformLocation(this.discProgram, 'uFrames'),
       uItemCount: gl.getUniformLocation(this.discProgram, 'uItemCount'),
@@ -938,7 +973,25 @@ class InfiniteGridMenu {
 
   #animate(deltaTime) {
     const gl = this.gl;
-    this.control.update(deltaTime, this.TARGET_FRAME_DURATION);
+    const motion = getResultCardMotion(this.canvas);
+    if (motion) {
+      if (this.transitionMainIndex === null) {
+        this.transitionMainIndex = this.#findNearestVertexIndex();
+        // A cold renderer enters at its normal snapped pose before any card is visible.
+        if (motion.mainScale < 0.001) {
+          const from = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(this.transitionMainIndex));
+          const correction = quat.rotationTo(quat.create(), from, this.control.snapDirection);
+          quat.multiply(this.control.orientation, correction, this.control.orientation);
+        }
+        this.onActiveItemChange(this.transitionMainIndex % Math.max(1, this.items.length));
+        this.onMovementChange(false);
+        this.movementActive = false;
+      }
+    } else {
+      this.transitionMainIndex = null;
+      this.control.update(deltaTime, this.TARGET_FRAME_DURATION,
+        this.presentationPress === null ? null : this.presentationPress > 0);
+    }
 
     let positions = this.instancePositions.map(p => vec3.transformQuat(vec3.create(), p, this.control.orientation));
     const scale = 0.25;
@@ -980,7 +1033,7 @@ class InfiniteGridMenu {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.discInstances.matricesArray);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-    this.smoothRotationVelocity = this.control.rotationVelocity;
+    this.smoothRotationVelocity = motion || this.presentationPress !== null ? 0 : this.control.rotationVelocity;
   }
 
   #render() {
@@ -1012,6 +1065,10 @@ class InfiniteGridMenu {
 
     gl.uniform1i(this.discLocations.uItemCount, this.items.length);
     gl.uniform1i(this.discLocations.uAtlasSize, this.atlasSize);
+    const motion = getResultCardMotion(this.canvas);
+    gl.uniform1i(this.discLocations.uTransitionMain, this.transitionMainIndex ?? -1);
+    gl.uniform1f(this.discLocations.uMainScale, motion?.mainScale ?? 1);
+    gl.uniform1f(this.discLocations.uOthersOpacity, motion?.othersOpacity ?? 1);
 
     gl.uniform1f(this.discLocations.uFrames, this.#frames);
     gl.uniform1f(this.discLocations.uScaleFactor, this.scaleFactor);
@@ -1029,13 +1086,22 @@ class InfiniteGridMenu {
     );
 
     this.#renderCenterLabel();
+    markResultCardMotionRendered(this.canvas, motion);
+    if (import.meta.env.DEV) {
+      this.canvas.dataset.cameraZ = this.camera.position[2].toFixed(6);
+      this.canvas.dataset.pointerHeld = String(this.control.isPointerDown);
+    }
+    if (this.presentationPress !== null) {
+      delete this.canvas.dataset.viewPressPending;
+      if (import.meta.env.DEV) this.canvas.dataset.renderedViewPress = String(this.presentationPress);
+    }
   }
 
   #renderCenterLabel() {
     if (!this.centerLabelProgram || !this.centerLabelTexture || !this.centerLabelVAO) return;
 
     const gl = this.gl;
-    const opacity = this.movementActive ? 0.48 : 0.66;
+    const opacity = (this.movementActive ? 0.48 : 0.66) * (getResultCardMotion(this.canvas)?.othersOpacity ?? 1);
 
     gl.useProgram(this.centerLabelProgram);
     gl.enable(gl.DEPTH_TEST);
@@ -1067,7 +1133,7 @@ class InfiniteGridMenu {
   #updateProjectionMatrix(gl) {
     this.camera.aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const height = this.SPHERE_RADIUS * 0.35;
-    const distance = this.camera.position[2];
+    const distance = 3 * this.scaleFactor;
     if (this.camera.aspect > 1) {
       this.camera.fov = 2 * Math.atan(height / distance);
     } else {
@@ -1084,29 +1150,24 @@ class InfiniteGridMenu {
   }
 
   #onControlUpdate(deltaTime) {
-    const timeScale = deltaTime / this.TARGET_FRAME_DURATION + 0.0001;
-    let damping = 5 / timeScale;
-    let cameraTargetZ = 3 * this.scaleFactor;
-
-    const isMoving = this.control.isPointerDown || Math.abs(this.smoothRotationVelocity) > 0.01;
+    const controlled = this.presentationPress !== null;
+    const pressed = controlled ? this.presentationPress > 0 : this.control.isPointerDown;
+    const isMoving = pressed || (!controlled && Math.abs(this.smoothRotationVelocity) > 0.01);
 
     if (isMoving !== this.movementActive) {
       this.movementActive = isMoving;
       this.onMovementChange(isMoving);
     }
 
-    if (!this.control.isPointerDown) {
+    if (!pressed) {
       const nearestVertexIndex = this.#findNearestVertexIndex();
       const itemIndex = nearestVertexIndex % Math.max(1, this.items.length);
       this.onActiveItemChange(itemIndex);
       const snapDirection = vec3.normalize(vec3.create(), this.#getVertexWorldPosition(nearestVertexIndex));
       this.control.snapTargetDirection = snapDirection;
-    } else {
-      cameraTargetZ += this.control.rotationVelocity * 80 + 2.5;
-      damping = 7 / timeScale;
     }
-
-    this.camera.position[2] += (cameraTargetZ - this.camera.position[2]) / damping;
+    this.camera.position[2] = stepPressCamera(this.camera.position[2], 3 * this.scaleFactor, pressed,
+      this.control.rotationVelocity, deltaTime, this.TARGET_FRAME_DURATION);
     this.#updateCameraMatrix();
   }
 

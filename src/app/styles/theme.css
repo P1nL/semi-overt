@@ -5,6 +5,22 @@
     --color-intro-seed-edge: #123e32;
     color-scheme: light;
 
+    --color-hero-cube-front: var(--color-text);
+    --color-hero-cube-side: var(--color-text);
+    --color-hero-cube-top: var(--color-text);
+    --color-hero-cube-bottom: var(--color-text);
+    --color-hero-cube-edge: var(--color-text);
+    --color-hero-cube-stratum-core: #dc713f;
+    --color-hero-cube-stratum-sand: #d8b77a;
+    --color-hero-cube-stratum-clay: #b87964;
+    --color-hero-cube-stratum-chalk: #e5d9bb;
+    --color-hero-cube-stratum-slate: #789b94;
+    --color-hero-cube-door: #203e32;
+    --color-hero-cube-door-shadow: #0d2018;
+    --color-hero-cube-soft-light: rgb(255 255 255 / 10%);
+    --color-hero-cube-soft-shade: rgb(27 45 33 / 15%);
+    --color-hero-cube-rim-light: rgb(255 255 245 / 46%);
+    --color-hero-cube-rim-shade: rgb(31 48 36 / 25%);
     --color-brand-logo-bg: #123e32;
     --color-brand-logo-fg: #f2f7f3;
     --color-draft-star-fill: #006400;
@@ -23,7 +39,7 @@
     --shadow-draft-panel: 0 12px 32px rgb(18 62 50 / 0.10), 0 2px 6px rgb(18 62 50 / 0.06);
 
     /* Original Snoopy eye demo palette; intentionally unchanged. */
-    --color-snoopy-eye-disc: #a29bfe;
+    --color-snoopy-eye-disc: #C4BAED;
     --color-snoopy-eye-iris: #6c5ce7;
     --color-snoopy-eye-ink: #333;
     --color-snoopy-eye-white: #dfe6e9;

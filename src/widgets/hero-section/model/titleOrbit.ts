@@ -29,6 +29,9 @@ export function getTitleOrbitPose(angle: number, phase: number) {
   const blend = front * front * (3 - 2 * front)
   const scale = 0.66 + 0.34 * blend
   return {
+    // Outward radial normal: (cos(theta), 0, -sin(theta)).
+    // The door (+Z face) points away from the center as it follows the orbit.
+    cubeYaw: theta + Math.PI / 2,
     x: 0.46 * Math.cos(theta),
     y: 0.38 + TITLE_ORBIT_HEIGHT * depth,
     front: blend,

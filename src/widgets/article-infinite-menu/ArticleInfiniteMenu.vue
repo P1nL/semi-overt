@@ -12,11 +12,13 @@ const props = withDefaults(
     fullscreen?: boolean
     centerLabel?: string
     resultCount?: number
+    active?: boolean
   }>(),
   {
     fullscreen: false,
     centerLabel: '',
     resultCount: 0,
+    active: true,
   },
 )
 
@@ -34,6 +36,25 @@ let themeObserver: MutationObserver | null = null
 let buildVersion = 0
 let mounted = false
 let darkMode = false
+let viewPress: number | null = null
+let initializeHeldView = false
+function setViewPress(value: number | null, initializeHidden = false) {
+  viewPress = value
+  if (initializeHidden) initializeHeldView = true
+  if (value === null) initializeHeldView = false
+  if (renderer) { renderer.setPresentationPress(value, initializeHeldView); initializeHeldView = false }
+}
+function whenReady(ready: () => void) {
+  if (!loading.value) { ready(); return () => {} }
+  const stop = watch(loading, value => { if (!value) { stop(); ready() } })
+  return stop
+}
+defineExpose({ setViewPress, whenReady })
+watch(() => props.active, async active => {
+  if (!active) { renderer?.pause(); return }
+  await nextTick()
+  renderer?.resize(); renderer?.resume()
+})
 
 const rendererSignature = computed(() =>
   [
@@ -83,7 +104,7 @@ async function rebuildRenderer() {
       (isMoving) => {
         moving.value = isMoving
       },
-      (instance) => instance.run(),
+      (instance) => { instance.setPresentationPress(viewPress, initializeHeldView); initializeHeldView = false; if (props.active) instance.resume() },
       1,
       { centerLabel: props.centerLabel },
     )
@@ -109,7 +130,7 @@ onMounted(() => {
   darkMode = document.documentElement.classList.contains('dark')
 
   if (rootRef.value) {
-    resizeObserver = new ResizeObserver(() => renderer?.resize())
+    resizeObserver = new ResizeObserver(() => { if (props.active) renderer?.resize() })
     resizeObserver.observe(rootRef.value)
   }
 
@@ -168,12 +189,12 @@ onBeforeUnmount(() => {
       <div v-else class="article-infinite-menu__left-meta" aria-label="文章信息">
         <div class="article-infinite-menu__meta article-infinite-menu__meta--left">
           <span>{{ activeArticle.meta.readMinutesText }}</span>
-          <span v-if="activeArticle.meta.wordCountText">{{ activeArticle.meta.wordCountText }}</span>
+          <span v-if="activeArticle.meta.wordCountText"><span class="article-infinite-menu__separator" aria-hidden="true">·</span>{{ activeArticle.meta.wordCountText }}</span>
           <time
             v-if="activeArticle.meta.displayTime"
             :datetime="activeArticle.meta.publishedAt || activeArticle.meta.updatedAt || undefined"
           >
-            {{ activeArticle.meta.displayTime }}
+            <span class="article-infinite-menu__separator" aria-hidden="true">·</span>{{ activeArticle.meta.displayTime }}
           </time>
         </div>
         <p v-if="activeArticle.author?.displayName" class="article-infinite-menu__author">
@@ -189,12 +210,12 @@ onBeforeUnmount(() => {
         <template v-if="activeHasCover">
           <div class="article-infinite-menu__meta" aria-label="文章信息">
             <span>{{ activeArticle.meta.readMinutesText }}</span>
-            <span v-if="activeArticle.meta.wordCountText">{{ activeArticle.meta.wordCountText }}</span>
+            <span v-if="activeArticle.meta.wordCountText"><span class="article-infinite-menu__separator" aria-hidden="true">·</span>{{ activeArticle.meta.wordCountText }}</span>
             <time
               v-if="activeArticle.meta.displayTime"
               :datetime="activeArticle.meta.publishedAt || activeArticle.meta.updatedAt || undefined"
             >
-              {{ activeArticle.meta.displayTime }}
+              <span class="article-infinite-menu__separator" aria-hidden="true">·</span>{{ activeArticle.meta.displayTime }}
             </time>
           </div>
 
@@ -286,6 +307,11 @@ onBeforeUnmount(() => {
 
 .article-infinite-menu__canvas:active {
   cursor: grabbing;
+}
+
+.article-infinite-menu__canvas[data-result-motion-pending],
+.article-infinite-menu__canvas[data-view-press-pending] {
+  visibility: hidden;
 }
 
 .article-infinite-menu__overlay {
@@ -407,8 +433,7 @@ onBeforeUnmount(() => {
   font-size: 0.92rem;
 }
 
-.article-infinite-menu__meta > * + *::before {
-  content: '·';
+.article-infinite-menu__separator {
   position: absolute;
   left: -0.72rem;
   color: var(--color-text-faint);
@@ -502,7 +527,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-faint);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  opacity: 1;
+  opacity: 0;
   transform: translateX(-50%);
   transition: opacity 160ms ease;
   user-select: none;
@@ -511,6 +536,10 @@ onBeforeUnmount(() => {
 
 .article-infinite-menu__hint--hidden {
   opacity: 0;
+}
+
+.article-infinite-menu--ready .article-infinite-menu__hint:not(.article-infinite-menu__hint--hidden) {
+  opacity: 1;
 }
 
 .article-infinite-menu__sr-label,

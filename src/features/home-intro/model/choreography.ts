@@ -1,9 +1,9 @@
 // Real milliseconds. Each beat has its own tempo; never globally slow the pop.
 export const HOME_INTRO = {
-  outline: 0, open: 800, revealed: 2240, lookUp: 2550,
-  home: 2880, category: 3260, seed: 3350, seedDetached: 4200,
-  capsule: 5380, capsuleReady: 6080, upper: 6220, lower: 7480,
-  rise: 10160, cubeReady: 11510, cards: 10760, end: 12760,
+  outline: 0, loading: 680, filled: 1680, open: 1980, revealed: 3420, lookUp: 3730,
+  home: 4060, category: 4440, seed: 4530, seedDetached: 5380,
+  capsule: 6560, capsuleReady: 7260, upper: 7400, lower: 8660,
+  rise: 11340, cubeReady: 12690, cards: 11940, end: 13940,
 } as const
 export const INTRO_MOTION = {
   outline: 680, lidDelay: 300, lidDraw: 490, eyeOpen: 790, eyeBlend: 300,
@@ -76,7 +76,9 @@ export function categoryVisualBounds(rect: CategoryRect, pose: ReturnType<typeof
 }
 export function introPhase(time: number) {
   if (time < 0) return 'prepare'
-  if (time < HOME_INTRO.open) return 'outline'
+  if (time < HOME_INTRO.loading) return 'outline'
+  if (time < HOME_INTRO.filled) return 'purple-fill'
+  if (time < HOME_INTRO.open) return 'closed-lid'
   if (time < HOME_INTRO.revealed) return 'open'
   if (time < HOME_INTRO.home) return 'look-up'
   if (time < HOME_INTRO.upper) return 'header'

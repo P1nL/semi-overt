@@ -25,6 +25,7 @@ import { UI_TIMING } from '@/shared/constants/ui'
 import { ApiBusinessError } from '@/shared/types/api'
 import { getErrorMessage } from '@/shared/utils/error'
 import { beginPageScrollTransition, finishPageScrollTransition, getPageScrollPosition, setPageScrollContainer } from '@/shared/utils/pageScroll'
+import { isResultViewOnlyChange } from '@/shared/utils/resultViewNavigation'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
@@ -33,6 +34,7 @@ import { AuthDialog } from '@/widgets/auth-dialog'
 import { PageSheet } from '@/widgets/page-sheet'
 import { ToastStack } from '@/widgets/toast-stack'
 import { provideHomeIntro, HomeIntroOverlay, HOME_INTRO } from '@/features/home-intro'
+import { PageTransition } from '@/features/page-transition'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,12 +89,18 @@ const baseRenderRoute = computed<RouteLocationNormalizedLoaded>(() =>
 const shouldRenderBaseRoute = computed(
   () => !displayedSheetRoute.value || !!backgroundRoute.value,
 )
+const motionDisplayRoute = shallowRef(baseRenderRoute.value)
+function onBaseRouteDisplay(target: RouteLocationNormalizedLoaded) {
+  const viewOnly = isResultViewOnlyChange(motionDisplayRoute.value, target)
+  motionDisplayRoute.value = target
+  if (!viewOnly) basePageScrollMode.value = resolvePageScrollMode(target)
+  // Restore/reset the new page before measuring its entrance, not seven seconds later.
+  void nextTick(finishPageScrollTransition)
+}
 
 const basePageScrollMode = ref(resolvePageScrollMode(baseRenderRoute.value))
-watch(() => [baseRenderRoute.value.path, baseRenderRoute.value.query.type] as const, () => {
-  basePageScrollMode.value = resolvePageScrollMode(baseRenderRoute.value)
-})
-function onResultLayout(view: 'infinite' | 'list') {
+function onResultLayout(view: 'infinite' | 'list', target: RouteLocationNormalizedLoaded) {
+  if (target.fullPath !== motionDisplayRoute.value.fullPath) return
   if (resolvePageScrollMode(baseRenderRoute.value) !== 'page') basePageScrollMode.value = view
 }
 
@@ -599,7 +607,7 @@ onBeforeUnmount(() => {
     ref="pageScrollRef"
     class="app-shell app-scrollbar relative text-[var(--color-text)]"
     :class="{
-      'app-shell--home': baseRenderRoute.name === ROUTE_NAME.HOME,
+      'app-shell--home': motionDisplayRoute.name === ROUTE_NAME.HOME,
       'app-shell--infinite': basePageScrollMode === 'infinite',
       'app-shell--results-list': basePageScrollMode === 'list',
       'app-shell--locked': !!displayedSheetRoute || sheetOpening || authDialogOpen,
@@ -624,24 +632,26 @@ onBeforeUnmount(() => {
         @click.capture="homeIntro.active.value && homeIntro.finish()"
       />
 
-      <RouterView v-if="shouldRenderBaseRoute" v-slot="{ Component, route: currentRoute }" :route="baseRenderRoute">
-        <Transition
-          name="page-fade"
-          mode="out-in"
-          :css="shouldAnimateBaseRoute"
-          @before-leave="beginPageScrollTransition"
-          @after-enter="finishPageScrollTransition"
-          @leave-cancelled="finishPageScrollTransition"
-        >
+      <PageTransition
+        v-if="shouldRenderBaseRoute"
+        :route="baseRenderRoute"
+        :enabled="shouldAnimateBaseRoute"
+        @before="beginPageScrollTransition"
+        @after-enter="finishPageScrollTransition"
+        @display="onBaseRouteDisplay"
+      >
+        <template #default="{ route: motionRoute }">
+          <RouterView v-slot="{ Component, route: currentRoute }" :route="motionRoute">
           <div :key="getRouteViewKey(currentRoute)" class="app-route-view relative z-0 min-h-0">
             <component
               :is="resolveRouteViewComponent(Component)"
               v-bind="getRouteViewProps(currentRoute)"
-              @result-layout="onResultLayout"
+              @result-layout="onResultLayout($event, currentRoute)"
             />
           </div>
-        </Transition>
-      </RouterView>
+          </RouterView>
+        </template>
+      </PageTransition>
       <PageScrollbar
         :container="pageScrollRef"
         :active="baseRenderRoute.name !== ROUTE_NAME.HOME && basePageScrollMode !== 'infinite' && !displayedSheetRoute && !sheetOpening && !authDialogOpen"

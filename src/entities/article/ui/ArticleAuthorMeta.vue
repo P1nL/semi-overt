@@ -32,6 +32,7 @@ const wrapperClass = computed(() =>
       :class="wrapperClass"
   >
     <Avatar
+        data-motion-avatar
         :src="author.avatarUrl ?? undefined"
         :alt="author.displayName"
         :name="author.displayName"

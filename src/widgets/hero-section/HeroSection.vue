@@ -100,6 +100,7 @@ const displayedItems = computed(() => homeIntro?.active.value && introItems.valu
     <div
       v-if="revealed && displayedItems.length"
       class="hero-section__rail"
+      data-page-motion="home-bottom"
     >
       <HomeShowcaseRail
         :items="displayedItems"

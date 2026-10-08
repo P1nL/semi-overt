@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { MotionPlugin } from '@vueuse/motion'
+import gsap from 'gsap'
 
 import App from './App.vue'
 import { pinia } from '@/app/providers/pinia'
@@ -45,6 +46,8 @@ function registerAnimatedIconElement() {
 }
 
 const app = createApp(App)
+// Includes the existing opening sequence and card queues on high-refresh screens.
+gsap.ticker.fps(60)
 const router = createAppRouter()
 
 app.use(pinia)
@@ -55,5 +58,8 @@ app.use(router)
 
 useUiStore(pinia).initializeUiPreferences()
 
-app.mount('#app')
-registerAnimatedIconElement()
+// Do not mount a START_LOCATION view and then animate it out on a hard refresh.
+void router.isReady().then(() => {
+  app.mount('#app')
+  registerAnimatedIconElement()
+})

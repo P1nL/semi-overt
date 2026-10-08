@@ -16,6 +16,9 @@ export class InfiniteGridMenu {
   )
 
   resize(): void
+  setPresentationPress(value: number | null, initializeHidden?: boolean): void
+  pause(): void
+  resume(): void
   run(time?: number): void
   dispose(): void
 }
