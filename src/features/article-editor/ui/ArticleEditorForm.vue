@@ -1177,7 +1177,7 @@ defineExpose({
     />
 
     <div class="editor-main-shell" :class="{ 'editor-main-shell--side-collapsed': !sidePanelOpen }">
-      <aside class="editor-left-rail">
+      <aside data-sheet-motion="editor-tools" class="editor-left-rail">
         <div class="editor-insert-bar editor-insert-bar--rail">
           <button type="button" class="editor-insert-item" :disabled="disabledState" @click="toggleHeadingBlock">
             <span class="editor-insert-icon">
@@ -1234,7 +1234,7 @@ defineExpose({
 
       <div class="editor-content-region">
         <div class="editor-canvas-region">
-          <aside class="editor-insert-bar editor-insert-bar--canvas">
+          <aside data-sheet-motion="editor-tools-mobile" class="editor-insert-bar editor-insert-bar--canvas">
             <button type="button" class="editor-insert-item" :disabled="disabledState" @click="toggleHeadingBlock">
               <span class="editor-insert-icon">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -1287,7 +1287,7 @@ defineExpose({
             </button>
           </aside>
 
-          <section class="editor-canvas-shell">
+          <section data-sheet-motion="editor-canvas" class="editor-canvas-shell">
             <InlineMessage v-if="saveError" tone="error" :message="saveError" class="mb-5" />
 
             <div v-if="returnedReason" class="editor-returned-banner">
@@ -1877,7 +1877,7 @@ defineExpose({
 
       <div class="editor-side-region" :class="{ 'editor-side-region--collapsed': !sidePanelOpen }">
         <Transition name="editor-side-panel">
-          <aside v-if="sidePanelOpen" class="editor-side-panel">
+          <aside v-if="sidePanelOpen" data-sheet-motion="editor-settings" class="editor-side-panel">
           <section class="editor-side-section">
             <div class="editor-side-label">摘要</div>
             <textarea
@@ -2912,6 +2912,7 @@ defineExpose({
   z-index: 5;
   min-width: 0;
   width: var(--editor-side-width);
+  overflow: hidden;
   transform: translateX(0);
   transition:
     width var(--editor-side-motion-duration) var(--editor-side-motion-ease),
@@ -2980,6 +2981,8 @@ defineExpose({
 .editor-side-panel {
   position: relative;
   display: flex;
+  width: var(--editor-side-width);
+  min-width: var(--editor-side-width);
   min-height: 100%;
   height: 100%;
   flex-direction: column;

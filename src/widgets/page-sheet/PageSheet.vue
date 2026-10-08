@@ -3,11 +3,15 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 
 import Icon from '@/shared/components/base/Icon.vue'
 import IconButton from '@/shared/components/base/IconButton.vue'
+import { createSheetSequence } from './model/sequence'
+import { UI_TIMING } from '@/shared/constants/ui'
 import { getPageScrollPosition, scrollPageTo } from '@/shared/utils/pageScroll'
 
 const props = withDefaults(
   defineProps<{
     open?: boolean
+    animated?: boolean
+    contentAnimated?: boolean
     inset?: 'default' | 'article' | 'editor'
     variant?: 'default' | 'full'
     scrollMode?: 'sheet' | 'content'
@@ -16,14 +20,22 @@ const props = withDefaults(
   }>(),
   {
     open: false,
+    animated: true,
+    contentAnimated: true,
     inset: 'default',
     variant: 'default',
     scrollMode: 'sheet',
   },
 )
 
+const motionStyle = {
+  '--page-sheet-enter-duration': `${UI_TIMING.PAGE_SHEET_ENTER}ms`,
+  '--page-sheet-leave-duration': `${UI_TIMING.PAGE_SHEET_LEAVE}ms`,
+}
+
 const emit = defineEmits<{
   close: []
+  'after-close': []
 }>()
 
 let previousBodyOverflow = ''
@@ -33,6 +45,18 @@ let lockedScrollY = 0
 let bodyLockActive = false
 let visualOpenFrame: number | null = null
 const visualOpen = ref(false)
+const contentReady = ref(false)
+const contentArmed = ref(false)
+const panelRef = ref<HTMLElement | null>(null)
+const backdropRef = ref<HTMLElement | null>(null)
+const closeRef = ref<HTMLElement | null>(null)
+let sequence: ReturnType<typeof createSheetSequence> | undefined
+function ensureSequence() {
+  if (!sequence && panelRef.value) sequence = createSheetSequence(panelRef.value, backdropRef.value, closeRef.value,
+    phase => { contentReady.value = phase === 'open' },
+    phase => { if (phase === 'leave') { visualOpen.value = false; syncBodyLock(false); emit('after-close') } }, props.contentAnimated)
+  return sequence
+}
 
 function restoreBodyLock() {
   if (typeof document === 'undefined' || !bodyLockActive) return
@@ -91,17 +115,36 @@ function queueVisualOpen() {
   clearVisualOpenFrame()
   visualOpen.value = false
   visualOpenFrame = window.requestAnimationFrame(() => {
-    visualOpen.value = true
     visualOpenFrame = null
+    const motion = ensureSequence()
+    motion?.play('enter', window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false)
+    contentArmed.value = true
+    visualOpen.value = true
   })
 }
 
 watch(
   () => props.open,
-  (value) => {
-    syncBodyLock(value)
+  (value, previous) => {
+    if (value) syncBodyLock(true)
 
     if (typeof window === 'undefined') return
+
+    if (!props.animated) {
+      clearVisualOpenFrame()
+      sequence?.dispose()
+      sequence = undefined
+      visualOpen.value = value
+      contentArmed.value = true
+      contentReady.value = value
+      if (value) window.addEventListener('keydown', onWindowKeydown)
+      else {
+        window.removeEventListener('keydown', onWindowKeydown)
+        syncBodyLock(false)
+        if (previous !== undefined) emit('after-close')
+      }
+      return
+    }
 
     if (value) {
       queueVisualOpen()
@@ -110,14 +153,18 @@ watch(
     }
 
     clearVisualOpenFrame()
-    visualOpen.value = false
+    contentReady.value = false
     window.removeEventListener('keydown', onWindowKeydown)
+    if (previous === undefined) return
+    if (sequence) sequence.play('leave', window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false)
+    else { visualOpen.value = false; syncBodyLock(false); emit('after-close') }
   },
-  { immediate: true },
+  { immediate: true, flush: 'post' },
 )
 
 onBeforeUnmount(() => {
   clearVisualOpenFrame()
+  sequence?.dispose()
 
   if (typeof window !== 'undefined') {
     window.removeEventListener('keydown', onWindowKeydown)
@@ -129,8 +176,9 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div class="pointer-events-none fixed inset-0 z-[70]">
+    <div class="pointer-events-none fixed inset-0 z-[70]" :style="motionStyle">
       <button
+        ref="backdropRef"
         type="button"
         class="page-sheet-backdrop absolute inset-0 border-0 bg-[var(--color-sheet-overlay)] backdrop-blur-[8px]"
         :class="visualOpen ? 'page-sheet-backdrop--open' : ''"
@@ -141,6 +189,7 @@ onBeforeUnmount(() => {
       />
 
       <div
+        ref="closeRef"
         class="page-sheet-close pointer-events-none absolute inset-x-0 top-0 flex items-center justify-end px-4 md:px-6"
         :class="[visualOpen ? 'page-sheet-close--open' : '', 'page-sheet-close--drawer']"
         :aria-hidden="!open"
@@ -161,7 +210,10 @@ onBeforeUnmount(() => {
       </div>
 
       <section
-        class="page-sheet-panel app-scrollbar absolute inset-x-0 bottom-0 flex min-h-0 flex-col overflow-x-hidden bg-[color-mix(in_srgb,var(--color-surface)_92%,var(--color-surface-glass-strong)_8%)] backdrop-blur-[16px]"
+        ref="panelRef"
+        :data-content-armed="contentArmed"
+        :data-content-animated="props.contentAnimated"
+        class="page-sheet-panel page-sheet-panel--managed app-scrollbar absolute inset-x-0 bottom-0 flex min-h-0 flex-col overflow-x-hidden bg-[color-mix(in_srgb,var(--color-surface)_92%,var(--color-surface-glass-strong)_8%)] backdrop-blur-[16px]"
         :class="[
           visualOpen ? 'page-sheet-panel--open' : '',
           props.variant === 'full'
@@ -176,6 +228,7 @@ onBeforeUnmount(() => {
             ],
         ]"
         :aria-hidden="!open"
+        :inert="!open || !contentReady"
       >
         <div
           class="relative min-h-0 flex-1 overscroll-contain"
@@ -195,7 +248,7 @@ onBeforeUnmount(() => {
 .page-sheet-backdrop {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 220ms ease;
+  transition: none;
 }
 
 .page-sheet-backdrop--open {
@@ -206,9 +259,7 @@ onBeforeUnmount(() => {
 .page-sheet-close {
   opacity: 0;
   transform: translateY(-8px);
-  transition:
-    opacity 220ms ease,
-    transform 220ms ease;
+  transition: none;
 }
 
 .page-sheet-close--open {
@@ -219,14 +270,14 @@ onBeforeUnmount(() => {
 .page-sheet-panel {
   pointer-events: none;
   transform: translate3d(0, 100%, 0);
-  transition: transform 360ms cubic-bezier(0.4, 0, 1, 1);
+  transition: transform var(--page-sheet-leave-duration) cubic-bezier(0.4, 0, 1, 1);
   will-change: transform;
 }
 
 .page-sheet-panel.page-sheet-panel--open {
   pointer-events: auto;
   transform: translate3d(0, 0, 0);
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--page-sheet-enter-duration) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -236,4 +287,12 @@ onBeforeUnmount(() => {
   }
 }
 
+</style>
+
+<style scoped>
+/* The route content keeps its original flex/scroll structure; only owned motion
+   channels change. Disable CSS transitions that would fight the shared clock. */
+.page-sheet-panel--managed { transition: none !important; }
+.page-sheet-panel--managed[data-content-armed="false"] > :deep(*) { visibility: hidden; }
+.page-sheet-panel--managed[data-content-animated="true"] :deep([data-sheet-motion]) { animation: none !important; transition: none !important; }
 </style>

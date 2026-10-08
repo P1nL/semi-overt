@@ -22,7 +22,11 @@ import { ArticleToc } from '@/widgets/article-toc'
 
 const route = useRoute()
 
-const articleId = computed(() => String(route.params.id || ''))
+// Preserve reader and review data until the sheet's reverse sequence completes.
+const articleId = ref(String(route.params.id || ''))
+watch(() => [route.name, route.params.id] as const, ([name, id]) => {
+  if (name === ROUTE_NAME.ARTICLE_REVIEW) articleId.value = String(id || '')
+})
 const article = ref<ArticleDetailVm | null>(null)
 const tocSyncVersion = ref(0)
 const tocSyncKey = computed(() => `${articleId.value}-${tocSyncVersion.value}`)
@@ -138,7 +142,7 @@ function onLoaded(value: ArticleDetailVm) {
     <main class="flex-1 overflow-y-auto px-3 pb-56 pt-4 sm:px-4 md:px-6 md:pb-44 md:pt-6 xl:px-8">
       <div class="mx-auto w-full max-w-[1200px] space-y-6">
 
-        <section class="surface-1 rounded-[var(--radius-xl)] p-4 lg:hidden">
+        <section data-sheet-motion="review-toc" class="surface-1 rounded-[var(--radius-xl)] p-4 lg:hidden">
           <SectionHeader title="目录" compact />
           <ArticleToc :sync-key="tocSyncKey" />
         </section>
@@ -155,7 +159,7 @@ function onLoaded(value: ArticleDetailVm) {
             </section>
           </section>
 
-          <aside class="min-w-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+          <aside data-sheet-motion="review-info" class="min-w-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1">
             <section class="surface-1 overflow-hidden rounded-[var(--radius-xl)]">
               <section class="p-4 sm:p-5">
                 <div class="mb-3 flex items-center justify-between gap-3">
@@ -223,7 +227,7 @@ function onLoaded(value: ArticleDetailVm) {
             </section>
           </aside>
 
-          <section class="surface-1 min-w-0 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8 xl:col-start-1 xl:row-start-2">
+          <section data-sheet-motion="review-logs" class="surface-1 min-w-0 rounded-[var(--radius-xl)] p-4 sm:p-5 md:p-8 xl:col-start-1 xl:row-start-2">
             <SectionHeader title="审核记录" compact />
             <ReviewLogList :logs="reviewLogs" />
             <EmptyState
@@ -238,7 +242,7 @@ function onLoaded(value: ArticleDetailVm) {
       </div>
     </main>
 
-    <div class="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_94%,transparent)] backdrop-blur-xl">
+    <div data-sheet-motion="review-actions" class="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface-glass-strong)_94%,transparent)] backdrop-blur-xl">
       <div class="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-3 py-3.5 sm:px-4 md:flex-row md:items-center md:justify-between md:px-6 xl:px-8">
         <div class="min-w-0">
           <p class="text-sm font-semibold tracking-[-0.02em] text-[var(--color-text)]">

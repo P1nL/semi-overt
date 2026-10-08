@@ -31,7 +31,7 @@ import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { AppHeader } from '@/widgets/app-header'
 import { AuthDialog } from '@/widgets/auth-dialog'
-import { PageSheet } from '@/widgets/page-sheet'
+import { PageSheet, PAGE_SHEET_CLOSE_BUDGET } from '@/widgets/page-sheet'
 import { ToastStack } from '@/widgets/toast-stack'
 import { provideHomeIntro, HomeIntroOverlay, HOME_INTRO } from '@/features/home-intro'
 import { PageTransition } from '@/features/page-transition'
@@ -52,7 +52,7 @@ watch(pageScrollRef, setPageScrollContainer, { flush: 'post' })
 onBeforeUnmount(() => setPageScrollContainer(null))
 const WavesBackground = defineAsyncComponent(() => import('@/shared/components/backgrounds/Waves.vue'))
 
-const PAGE_SHEET_LEAVE = 360
+const PAGE_SHEET_LEAVE = PAGE_SHEET_CLOSE_BUDGET + UI_TIMING.MICRO
 const SHEET_OPENING_MIN_VISIBLE_MS = 260
 const DEFAULT_CATEGORY = 'SHORT'
 const CATEGORY_VALUES = new Set(['QUICK', 'SHORT', 'DEEP'])
@@ -187,6 +187,13 @@ function resolveRouteViewComponent(component: Component | undefined): Component 
   const asyncComponent = defineAsyncComponent(component)
   asyncRouteComponentCache.set(component, asyncComponent)
   return asyncComponent
+}
+
+function finishSheetClose() {
+  if (sheetLeaveTimer !== null) { window.clearTimeout(sheetLeaveTimer); sheetLeaveTimer = null }
+  if (isSheetRoute(liveRoute.value)) { ensureActiveSheetRouteVisible(); return }
+  displayedSheetRoute.value = null
+  backgroundRoute.value = null
 }
 
 function isSheetRoute(
@@ -432,17 +439,7 @@ async function syncSheetRouteState(
 
   if (previousIsSheet && displayedSheetRoute.value) {
     sheetVisible.value = false
-    sheetLeaveTimer = window.setTimeout(() => {
-      sheetLeaveTimer = null
-
-      if (isSheetRoute(liveRoute.value)) {
-        ensureActiveSheetRouteVisible()
-        return
-      }
-
-      displayedSheetRoute.value = null
-      backgroundRoute.value = null
-    }, PAGE_SHEET_LEAVE)
+    sheetLeaveTimer = window.setTimeout(finishSheetClose, PAGE_SHEET_LEAVE)
 
     return
   }
@@ -685,12 +682,14 @@ onBeforeUnmount(() => {
     <PageSheet
       v-if="displayedSheetRoute"
       :open="sheetVisible"
+      :content-animated="displayedSheetRoute.name !== ROUTE_NAME.ARTICLE_EDITOR && displayedSheetRoute.name !== ROUTE_NAME.ARTICLE_EDITOR_NEW"
       :inset="activeSheetInset"
       :variant="activeSheetVariant"
       :scroll-mode="activeSheetScroll"
       :background-scroll-x="sheetBackgroundScrollX"
       :background-scroll-y="sheetBackgroundScrollY"
       @close="closeSheet"
+      @after-close="finishSheetClose"
     >
       <RouterView
         v-slot="{ Component, route: currentRoute }"

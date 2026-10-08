@@ -20,7 +20,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 const queryClient = useQueryClient()
 
-const articleId = computed(() => String(route.params.id || ''))
+// Keep the rendered article alive while the sheet exits over a different live route.
+const articleId = ref(String(route.params.id || ''))
+watch(() => [route.name, route.params.id] as const, ([name, id]) => {
+  if (name === ROUTE_NAME.ARTICLE_READ) articleId.value = String(id || '')
+})
 const tocSyncKey = ref(`${articleId.value}-0`)
 const mainRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
@@ -103,7 +107,7 @@ watch(
           </ArticleReader>
         </section>
 
-        <div class="hidden lg:flex lg:col-start-3 lg:sticky lg:top-24 lg:h-fit lg:justify-end lg:self-start lg:pr-3 xl:top-28 xl:pr-5">
+        <div data-sheet-motion="reader-toc" class="hidden lg:flex lg:col-start-3 lg:sticky lg:top-24 lg:h-fit lg:justify-end lg:self-start lg:pr-3 xl:top-28 xl:pr-5">
           <ArticleToc
             :sync-key="tocSyncKey"
             :scroll-container="mainRef"

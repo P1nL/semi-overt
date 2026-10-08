@@ -70,7 +70,7 @@ watch(
     </div>
 
     <div v-else-if="article" class="space-y-6 md:space-y-8">
-      <div class="surface-1 rounded-[var(--radius-xl)] px-6 py-6 shadow-[var(--shadow-sm)] md:px-8 md:py-8">
+      <div data-sheet-motion="reader-header" class="surface-1 rounded-[var(--radius-xl)] px-6 py-6 shadow-[var(--shadow-sm)] md:px-8 md:py-8">
         <ArticleReaderHeader :article="article" :show-status="showStatus ?? true">
           <template #actions>
             <slot name="header-actions" :article="article" />
@@ -78,7 +78,7 @@ watch(
         </ArticleReaderHeader>
       </div>
 
-      <div class="surface-1 rounded-[var(--radius-xl)] px-6 py-6 shadow-[var(--shadow-sm)] md:px-8 md:py-8">
+      <div data-sheet-motion="reader-body" class="surface-1 rounded-[var(--radius-xl)] px-6 py-6 shadow-[var(--shadow-sm)] md:px-8 md:py-8">
         <ArticleReaderBody :content="article.content" />
       </div>
     </div>

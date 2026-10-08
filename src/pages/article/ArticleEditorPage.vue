@@ -294,6 +294,10 @@ function formatSavedTime(value: string): string {
   const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return ''
 
+  if (Date.now() - date.getTime() > 24 * 60 * 60 * 1000) {
+    return `${date.getMonth() + 1}月${date.getDate()}日`
+  }
+
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${hours}:${minutes}`
@@ -961,7 +965,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="editor-page">
-    <header class="editor-topbar">
+    <header data-sheet-motion="editor-header" class="editor-topbar">
       <div class="editor-topbar__left">
         <div class="editor-topbar__logo">
           <Icon name="menu" :size="14" />

@@ -41,6 +41,10 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
+# Local preview demos and generated output
+/demos/
+/output/
+
 # Local AI/browser automation artifacts
 .codex-runtime/
 .playwright-mcp/

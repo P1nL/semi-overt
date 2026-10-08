@@ -124,6 +124,8 @@ test('sheet body locking does not translate the background by internal scroll di
   const props = { open: true, backgroundScrollX: 0, backgroundScrollY: 520 }
   const setup = parse(read('src/widgets/page-sheet/PageSheet.vue')).descriptor.scriptSetup.content
   const controls = load(setup, {
+    './model/sequence': {},
+    '@/shared/constants/ui': load(read('src/shared/constants/ui.ts')),
     vue: { ref: value => ({ value }), watch: (source, callback, options) => { if (options?.immediate) callback(source()) }, onBeforeUnmount() {} },
     '@/shared/utils/pageScroll': h.api,
   }, { document: h.document, window: h.window, defineProps: () => props, withDefaults: (value, defaults) => ({ ...defaults, ...value }), defineEmits: () => () => {} }, '\nmodule.exports.controls = { restoreBodyLock };').controls

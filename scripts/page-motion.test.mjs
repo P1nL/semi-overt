@@ -815,3 +815,45 @@ test('nonzero first entrance clocks gate and paint the GPU buffer before the lay
   assert.match(enter, /}, revealPrepared\)/)
   assert.match(read('src/features/page-transition/ui/PageScene.vue'), /prepared.value = true\s+onPrepared\?\.\(\)/)
 })
+
+
+test('page drawer has longer enter/leave timings and its unmount timer shares the CSS source', () => {
+  const { UI_TIMING } = load('src/shared/constants/ui.ts')
+  assert.equal(UI_TIMING.PAGE_SHEET_ENTER, 700)
+  assert.equal(UI_TIMING.PAGE_SHEET_LEAVE, 600)
+  const sheet = read('src/widgets/page-sheet/PageSheet.vue')
+  assert.match(sheet, /UI_TIMING\.PAGE_SHEET_ENTER/)
+  assert.match(sheet, /UI_TIMING\.PAGE_SHEET_LEAVE/)
+  assert.match(sheet, /transition: transform var\(--page-sheet-enter-duration\)/)
+  assert.match(sheet, /transition: transform var\(--page-sheet-leave-duration\)/)
+  assert.match(sheet, /@media \(prefers-reduced-motion: reduce\)/)
+  assert.match(read('src/app/App.vue'), /const PAGE_SHEET_LEAVE = PAGE_SHEET_CLOSE_BUDGET \+ UI_TIMING\.MICRO/)
+})
+
+
+test('drawer opens its container first, then staggered groups; closure is the exact reverse order', () => {
+  const { UI_TIMING } = load('src/shared/constants/ui.ts')
+  const sequence = load('src/widgets/page-sheet/model/sequence.ts', {
+    '@/shared/constants/ui': { UI_TIMING }, '@/shared/utils/motionClock': {},
+  })
+  const count = 3
+  assert.equal(sequence.sheetSequenceDuration('enter', count), 1200)
+  assert.equal(sequence.sheetSequenceDuration('leave', count), 1000)
+  const panelArrived = sequence.sheetSequencePose('enter', 700, 0, count)
+  assert.equal(panelArrived.panel, 1)
+  for (let index = 0; index < count; index++) assert.equal(sequence.sheetSequencePose('enter', 700, index, count).content, 0)
+  assert.ok(sequence.sheetSequencePose('enter', 760, 0, count).content > 0)
+  assert.equal(sequence.sheetSequencePose('enter', 760, 1, count).content, 0)
+  assert.equal(sequence.sheetSequencePose('enter', 760, 2, count).content, 0)
+  assert.ok(sequence.sheetSequencePose('leave', 60, 2, count).content > 0)
+  assert.equal(sequence.sheetSequencePose('leave', 60, 1, count).content, 0)
+  assert.equal(sequence.sheetSequencePose('leave', 60, 0, count).content, 0)
+  assert.equal(sequence.sheetSequencePose('leave', 400, 0, count).content, 1)
+  assert.equal(sequence.sheetSequencePose('leave', 400, 0, count).panel, 0)
+  assert.equal(sequence.sheetSequencePose('leave', 1000, 0, count).panel, 1)
+  assert.equal(sequence.sheetSequenceDuration('leave', 100), sequence.PAGE_SHEET_CLOSE_BUDGET)
+  assert.equal(sequence.sheetSequenceDuration('enter', count, true), 1)
+  const sheet = read('src/widgets/page-sheet/PageSheet.vue')
+  assert.match(sheet, /emit\('after-close'\)/)
+  assert.match(read('src/app/App.vue'), /@after-close="finishSheetClose"/)
+})
