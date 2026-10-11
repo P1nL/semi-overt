@@ -1,85 +1,77 @@
-# 接口联调场景清单
+# 接口联调清单
 
-基于 `content-platform-api.postman_collection.json` 生成，覆盖当前前端实现涉及的主流程接口。
+> 源码核对：2026-10-11。依据 shared/api/modules、authRuntime、response 与路由定义，不再依赖仓库中不存在的 Postman 集合。下表是前端调用契约，不代表本轮已对真实后端验收。
 
-## 0. 联调前准备
-- `baseUrl` 已配置（例如 `/api/v1` 或后端实际地址）
-- 准备两个账号：
-  - 普通用户（`USER`）
-  - 管理员（`ADMIN`）
-- Postman 环境变量：
-  - `token`（用户 Token）
-  - `adminToken`（管理员 Token）
-  - `articleId`（测试文章 ID）
-  - `targetUsername`（公开主页用户名）
+## 准备
 
-## 1. 认证模块（9.x）
-- `POST /auth/register`：注册成功并返回 token + user
-- `POST /auth/login`：用户名/邮箱登录成功
-- `POST /auth/logout`：登出后 token 失效
-- `POST /auth/password/forgot`：发起找回密码成功
-- `POST /auth/password/reset`：使用 token 重置成功
+- 默认请求前缀为 /api/v1；下表路径均省略该前缀。
+- 准备 USER 与 ADMIN 测试账号、可修改的测试文章和图片；删除与审核仅使用测试数据。
+- 默认 Vite 将 /api 和 /static 代理到 localhost:8080。
+- 会话测试使用浏览器 Cookie 或支持 Cookie jar 的客户端，不能只复制 bearer token。
 
-关键校验：
-- 错误凭据返回非 200 业务码
-- 前端收到 401 时应清理登录态并跳转登录页
+## 认证与用户
 
-## 2. 用户与个人主页（10.x）
-- `GET /users/me`：返回当前用户资料
-- `PUT /users/me/profile`：更新用户名/签名/头像/封面
-- `GET /users/{username}/profile`：公开主页列表与统计
+| 方法 | 路径 | 检查点 |
+| --- | --- | --- |
+| POST | /auth/register-code | 邮箱验证码；按后端配置携带 cfTurnstileToken |
+| POST | /auth/register | 注册响应被归一化并接纳为当前会话 |
+| POST | /auth/login | 登录、rememberMe 与后端 Cookie 行为一致 |
+| POST | /auth/refresh | Cookie 恢复会话；返回新的内存 access token |
+| POST | /auth/logout | Cookie 授权的设备退出，不要求 bearer |
+| POST | /auth/forgot-password | 发起密码找回；错误留在表单 |
+| POST | /auth/reset-password | 完成密码重置；错误留在表单 |
+| GET | /users/me | 当前用户资料 |
+| PUT | /users/me | 更新资料，不是 /users/me/profile |
+| GET | /users/{username}/profile | 公开主页；用户名编码、分页和统计 |
 
-关键校验：
-- 更新资料后，前端 Header/Profile 数据同步
-- 无权限访问返回 403 时前端跳转 Forbidden
+会话重点：刷新页面恢复、并发 401 共享刷新、跨标签页退出、刷新接口暂时失败、退出失败后的重试。access token 不应写入 localStorage/sessionStorage；旧 token 键应清除。协调标记可以存在，不能把它们误判为保存了凭据。
 
-## 3. 文章与草稿（11.x）
-- `POST /articles`：新建文章，获取 `articleId`
-- `PUT /articles/{articleId}/draft`：自动保存草稿
-- `GET /articles/drafts`：草稿箱列表
-- `GET /articles/{articleId}`：详情（读/编/审复用）
-- `POST /articles/{articleId}/submit`：提交审核
-- `POST /articles/{articleId}/cancel-review`：取消审核
-- `DELETE /articles/{articleId}`：删除文章
+## 内容、搜索与上传
 
-关键校验：
-- 状态流转：`DRAFT/RETURNED -> PENDING -> DRAFT`（取消）或审核结果
-- 删除后草稿箱与编辑态同步清理
-- 重复提交/状态冲突时返回 409 业务冲突提示
+| 方法 | 路径 | 检查点 |
+| --- | --- | --- |
+| GET | /home | 首页内容，空列表与加载失败 |
+| GET | /categories/{QUICK或SHORT或DEEP}/articles | 分类与分页 |
+| GET | /search | 文章搜索，keyword 与分页；不是 /search/articles |
+| GET | /search/users | 作者搜索与分页 |
+| POST | /articles | 创建文章 |
+| PUT | /articles/{id}/draft | 保存草稿、状态与 draftVisible |
+| GET | /articles/drafts | 写作箱；前端只保留 DRAFT / PENDING / RETURNED |
+| GET | /articles/{id} | 阅读、编辑、审核共用详情入口，错误策略依上下文不同 |
+| POST | /articles/{id}/submit | 提交审核 |
+| POST | /articles/{id}/cancel-review | 取消审核 |
+| DELETE | /articles/{id} | 作者删除；以服务端权限和状态检查为准 |
+| DELETE | /admin/articles/{id} | 管理员删除 |
+| POST | /upload | multipart：file、bizType，可选 articleId、oldUrl |
 
-## 4. 首页/分类/搜索（12.x）
-- `GET /home`：首页 Hero + sections
-- `GET /categories/{QUICK|SHORT|DEEP}/articles`：分类列表
-- `GET /search/articles`：搜索（P2 占位）
-- `GET /search/users`：作者搜索（分页 / 无限加载）
+上传返回 url、size，可带 width、height、dominantColor；前端补齐缺省值。验收头像、封面和正文图片回填、类型/大小错误和替换旧资源行为。
 
-关键校验：
-- 分类切换请求参数正确
-- 搜索关键词同步到 URL 与 UI store
-- 搜索文章 / 作者都返回 `list/total/page/pageSize/pages`
+## 审核
 
-## 5. 审核模块（13.x）
-- `GET /reviews/pending`：管理员待审队列
-- `POST /reviews/{articleId}/action`：`APPROVE/RETURN/REJECT`
-- `GET /reviews/{articleId}/logs`：审核日志
+| 方法 | 路径 | 检查点 |
+| --- | --- | --- |
+| GET | /review/pending | 管理员待审队列与分页 |
+| POST | /review/{id}/decision | APPROVE / RETURN / REJECT，原因校验 |
+| GET | /review/{id}/logs | 审核记录与刷新 |
 
-关键校验：
-- `RETURN/REJECT` 必填 reason
-- 操作后待审列表更新，日志可刷新看到新记录
-- 非管理员访问审核接口返回 403
+三个动作使用不同的 PENDING 测试文章，不能在同一篇已审核文章上连续验证三种决定。审核成功后核对列表、文章状态与日志；非管理员不得获得审核能力。
 
-## 6. 上传模块（14.x）
-- `POST /uploads/images`：`AVATAR/COVER/ARTICLE_IMAGE`
+状态常量为 DRAFT、PENDING、APPROVED、RETURNED、REJECTED；提交/取消/重审资格以 feature、页面校验和服务端返回共同判断，不能只依赖按钮是否出现。
 
-关键校验：
-- 上传成功返回 `url/width/height/size/dominantColor`
-- 非法格式或超限大小返回业务错误
-- 前端上传成功后回填对应字段
+## 错误策略不是“一律跳转”
 
-## 7. 统一错误码回归
-- 401：清理 auth，记录 session code，跳登录
-- 403：记录 forbidden message，跳 403 页面
-- 404：前端进入 404 页面
-- 409：前端显示冲突提示（例如审核状态变化）
-- 429：前端显示“操作过于频繁”
+| errorPolicy | 行为 |
+| --- | --- |
+| local | 不触发全局错误导航，由当前表单/页面展示 |
+| auth（默认） | 401 进入会话处理；403/404 保留给调用方 |
+| route | 401 会话处理，并允许 403/404 全局路由副作用 |
 
+- HTTP 层在符合条件的 401 上先尝试刷新并重试，不对登录、注册、刷新等排除请求循环刷新。
+- 全局 401 清理失效状态；只有受保护路由需要引导登录，当前实现使用首页 auth=login 入口并保留返回目标。
+- 全局权限页为 /403，不是 /forbidden。
+- 公开文章详情显式 withAuth=false、errorPolicy=local；错误不应强制把读者踢到登录页。
+- 409、429、网络错误和上传错误应有局部反馈；记录实际返回，不能把业务错误冒充成功。
+
+## 留证格式
+
+每条场景记录：日期、前后端版本、账号角色、请求路径、脱敏响应、界面结果、是否通过。不要记录 token、Cookie、邮箱验证码或密钥。

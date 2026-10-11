@@ -1,19 +1,41 @@
-# Desktop page transitions — V4.4 implementation
+# Desktop page transitions — current implementation
 
-Approved motion contract, updated 2026-10-08. Scope: desktop (>=1024px), normal
+Source-aligned documentation, updated 2026-10-11; not a new visual acceptance report. Scope: desktop (>=1024px), normal
 pages only. Existing article/editor/review sheets remain owned by `App.vue` and
 `PageSheet`; closing a sheet must not replay its background entrance.
 
 ## Timing / clock
 
-| Route | Leave | Enter | Total |
-|---|---:|---:|---:|
-| Home -> category/search | 2.5s | 2s | 4.5s |
-| Category/search -> home | 1.5s | 2s | 3.5s |
-| Category <-> search | concurrent content replacement | | 2s |
-| Home -> profile / profile -> home | 2.5s / 2s | 2s / 2s | 4.5s / 4s |
-| Results -> profile / profile -> results | 1.5s / 2s | 2s / 2s | 3.5s / 4s |
-| Profile A -> B | concurrent content replacement | | 2s |
+Current constants are in `src/features/page-transition/model/choreography.ts`.
+These are animation budgets, not network-inclusive navigation guarantees.
+
+| Scene / rendered state | Leave | Enter |
+|---|---:|---:|
+| Home | 2.1s | 1.8s |
+| Results: infinite canvas/fallback | .85s | 2s |
+| Results: list | .65s | 2s |
+| Results: empty | .25s | .35s |
+| Results: generic fallback constant | 1.5s | 2s |
+| Profile | 2s | 2s |
+| Other / reduced motion | .15s | .15s |
+
+`scene.ts` chooses duration from rendered state, so the generic `routeDuration`
+sum is not the actual handoff time for every result view. For example, a normal
+infinite result → home is .85s + 1.8s of animation, excluding readiness waits.
+Home → normal results/profile is 2.1s + 2s.
+
+Same-kind result transitions are classified in `resultTransition.ts`:
+
+- list → list: direct content update;
+- same infinite presentation: native group rotation (.9s) where live renderers exist;
+- list/infinite switch: 1.5s toward list, 1.1s toward infinite;
+- article/author presentation change: replacement (ordinary swap budget 2s);
+- identical empty states: direct; entering/leaving an empty state: replacement,
+  with empty-scene timing taking precedence in the painter.
+
+Profile-to-profile replacement has a 2s budget. See `scene.ts`,
+`resultLayoutMotion.ts` and `src/shared/utils/resultViewMotion.ts` before changing
+result timing; do not restore a universal two-second sibling transition.
 
 `motionClock.ts` provides one shared, wall-time-driven RAF painter capped at 60
 updates/second. No frame-count-based duration, even on 120/144/165/240 Hz displays.
@@ -24,10 +46,11 @@ run (budget, elapsed time, paint count and observed FPS).
 
 ## Home
 
-Exit: 0-.5s stop autonomous motion, then measure all precise attachment points.
+Exit: the orbit stop budget is .7s; nominal rope connection starts at .75s,
+after measuring all precise attachment points.
 Start a shared rope clock after that batch completes: grow lines from viewport
 top (zero length) to the anchors over .6s, hold the connection for .05s, then
-accelerate the glyphs upward and the tesseract/cards downward together to 2.5s.
+accelerate the glyphs upward and the tesseract/cards downward together within the nominal 2.1s leave budget.
 Anchor measurement time must not consume rope descent time. Use linear growth,
 not a short cubic ease-out that reveals most of the rope in its first few frames.
 Both directions use the same quadratic displacement curve, with no end slowdown.
@@ -57,8 +80,8 @@ the visual plane is perpendicular to the direction toward the ring center,
 not locked to the screen.
 Keep natural side-view perspective; do not add independent X/Y tumbling.
 The cube also retains its orbit yaw and modeled shape with local-plane roll.
-Glyphs finish falling within 2s; the tesseract and cards rise from below
-in 1.7s, within the same two-second entrance budget.
+Glyphs finish falling within the 1.8s home entrance budget; the tesseract and cards rise from below
+in 1.7s, within the same 1.8s home entrance budget.
 
 ## Results
 
@@ -69,14 +92,14 @@ Metadata separators are real text nodes and participate in the same character
 stream, not CSS-generated dots. The drag hint defaults to hidden until renderer
 readiness; its CSS opacity transition is disabled while a scene timeline owns it.
 Main-card scale lasts 1.1s on entrance and .85s on exit. Companion text, fades and
-sparks are retimed to fit the 2s entrance / 1.5s exit; sibling replacement stays 2s.
+sparks are retimed to fit the entrance/exit budget selected by the rendered state; ordinary sibling replacement has a nominal 2s budget; view/direct/empty paths differ as listed above.
 On entry, hide the canvas until the renderer has drawn the current motion state.
 DOM readiness alone cannot reveal a buffer still containing a static full-size card.
 The button uses the very same 12-ray geometry as the existing opening sequence,
 via `buttonBurst.ts`; exit is another outward burst, not reversed absorption.
-Sibling results keep the shell stable, replace content with short directional
-movement, and never replay a full scale entrance or burst. Query updates retain
-their component/input focus and use local replacement.
+Sibling results keep the shell stable and choose rotation, direct update, view switch
+or replacement from the old/new rendered presentations. Do not replay an unrelated
+full-page scale entrance or burst. Query updates preserve input focus.
 
 ## Profile
 
@@ -152,3 +175,7 @@ included in the production build. Useful routes: `/`, `/category/SHORT`,
 Acceptance: complete home/results/profile navigation; mid-flight renavigation;
 profile-to-profile updates; delayed avatars/review data; sheet open/close without
 background replay; no residual overlays/inert state; desktop light/dark modes.
+
+Fixture options: `MOTION_FIXTURE_PORT` (default 5198), `MOTION_VITE_PORT`
+(default 5173), `MOTION_EMPTY_FIXTURE=1` (empty content). This is synthetic UI
+evidence only, not proof of real authentication, writes or backend compatibility.

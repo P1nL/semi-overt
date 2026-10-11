@@ -1,198 +1,107 @@
 # AGENTS.md
 
+> Repository facts checked against source on 2026-10-11. Product: Semi-Overt; npm package name: now. Recheck runtime/deployment claims instead of treating this file as live acceptance evidence.
+
 ## Commands
 
 ```sh
-npm run dev           # Vite dev server (proxies /api and /static → localhost:8080)
-npm run build         # Type-check via vue-tsc, then Vite production build
-npm run preview       # Serve the dist/ output locally
-npm run generate:api  # Generate TS types from OpenAPI specs (see API codegen below)
+npm ci
+npm run dev                  # Vite; /api and /static → localhost:8080
+npm run build                # vue-tsc --noEmit, then vite build
+npm run preview              # Preview dist locally, not a deployment service
+npm run test:auth-session     # Node session policy/runtime tests
+npm run test:page-scroll      # Node scroll-mode tests
+npm run test:page-motion      # Node motion contract tests
+npm run dev:motion-fixture    # Loopback fixture on 5198; needs Vite on 5173
+npm run generate:api          # Requires explicit OPENAPI_* sources
+npm run font:subset          # Optional Python font asset generation
 ```
 
-No test runner is configured. No lint script exists in `package.json`.  
-Type-check is embedded in `build`; run `npx vue-tsc --noEmit` to type-check without building.
+Node engines: `^20.19.0 || >=22.12.0`; prefer Node 22.18+ for tests importing TypeScript. More focused Node tests live in scripts/. No aggregate npm test or lint script exists. Type-check alone: `npx vue-tsc --noEmit`.
 
----
+The auth-session projection test reads Java files from ../semi-overt-backend; missing sibling sources cause ENOENT. This is not a self-contained frontend suite. See the known test dependency in docs/source-code-guide.md. Do not mask that failure.
 
-## Architecture — Feature-Sliced Design (FSD)
+## Architecture — FSD-style layering
 
-`src/` uses a strict FSD layering. Dependency direction is **top → bottom only**:
+Target dependency direction: pages → widgets → features → entities → shared. app owns bootstrap, router, global providers/styles and the application shell; stores is cross-cutting.
 
-```
-pages → widgets → features → entities → shared
-                                    ↘ stores (cross-cutting)
-app  (bootstrap only, never imported by other layers)
-```
+- pages compose UI, query/load/error states and workflows; new business rules belong in feature/entity model code.
+- widgets are reusable large UI regions; features implement actions and independent interactions.
+- entities own domain models, mappers and minimal displays; shared owns infrastructure and base components.
+- Current stores are auth, session, ui, editor and draft. There are no profile/review stores.
+- Known legacy exception: shared/constants/article.ts re-exports entities/article. Do not extend reverse dependencies or claim all current imports strictly satisfy FSD.
+- Use feature/entity/widget index.ts barrels for cross-module imports, not internal UI paths.
+- Use @ for cross-directory imports. model/ holds logic/types/mappers; ui/ holds Vue components.
+- Do not render raw DTOs directly: shared/api/adapters.ts normalizes backend shapes, entity mappers create VMs.
+- Empty/reserved directories are not feature specifications; do not implement them without matching requirements.
 
-| Layer | Purpose |
-|---|---|
-| `app/` | Bootstrap: `main.ts`, `App.vue`, router, providers, global styles |
-| `pages/` | Route-level components — compose widgets/features/entities, handle load/error/empty states |
-| `widgets/` | Large self-contained UI regions reused across pages (header, reader, profile sections) |
-| `features/` | One user action per feature (login, edit, submit-review, cancel-review, etc.) |
-| `entities/` | Domain models + minimal display units: `article`, `category`, `review`, `user` |
-| `shared/` | Infrastructure only — API, base components, utils, composables, constants, config |
-| `stores/` | Pinia stores for cross-page state: `auth`, `session`, `ui`, `editor`, `draft`, `profile`, `review` |
+## Routing, Sheet and scroll
 
-**Do not** put business logic in `pages/`. Pages only orchestrate; logic lives in feature `model/` or entity `model/`.
+Source of truth: shared/constants/routes.ts and app/router/routes/*.ts.
 
----
+- Public: /, /category/:tab?, /search, /articles/:id, /u/:username.
+- Auth routes: /login, /register, /forgot-password, /reset-password; global auth-dialog entry also exists.
+- Creator: /article-editor-new, /editor/:id (USER/ADMIN).
+- Admin: /review, /review/articles/:id.
+- Forbidden: /403; not-found: catch-all. Do not document /forbidden as the current route.
 
-## Key Conventions
+RouteMeta: title; access=public|creator|admin; requiresAuth; publicOnly; roles; drawerAware; presentation=sheet; sheetVariant=default|full; sheetInset=default|article|editor; sheetScroll=sheet|content.
 
-### Barrel exports
-Every feature/entity/widget exposes an `index.ts` barrel. Always import from the barrel, not from internal paths:
-```ts
-// correct
-import { ArticleCard } from '@/entities/article'
-// wrong
-import ArticleCard from '@/entities/article/ui/ArticleCard.vue'
-```
+Article, editor and review detail use PageSheet. App.vue owns background route preservation. Article/editor use content scrolling and their own inset. Preserve background scroll and do not replay its entrance on closing a sheet.
 
-### `model/` vs `ui/` inside features and entities
-- `model/` — pure logic, types, mappers, validation, DTO↔VM conversion
-- `ui/` — Vue components only
+Respect drawer-close deferral, unsaved-editor guards and auth destination restoration. Read guards.ts before changing navigation. Login prompting may use /?auth=login with a stored destination, not always /login?redirect=... . Scroll ownership includes app/model/pageScrollMode.ts and shared/utils/pageScroll.ts, not just window.
 
-### DTO → VM mapping
-Never use raw API DTOs in templates. Always run through the entity mapper:
-- `entities/article/model/article.mapper.ts`
-- `entities/review/model/review.mapper.ts`
-- `entities/user/model/user.mapper.ts`
-- `entities/category/model/category.mapper.ts`
+## API and auth
 
-`shared/api/adapters.ts` normalises raw backend responses *before* mappers run.
+Default base: /api/v1. Modules → request.ts → http.ts (Axios); response.ts unwraps business envelopes; adapters and entity mappers normalize display data.
 
-### Path alias
-`@` resolves to `src/`. Use it for all cross-directory imports.
+- Access tokens are memory-only in shared/api/authRuntime.ts. Refresh and logout use Cookie-backed device sessions.
+- http.ts adds the memory bearer and retries eligible HTTP 401 requests after refresh. Do not restore response-header token persistence.
+- authStorage.ts removes legacy token/user state from localStorage/sessionStorage; it is not the active storage mechanism.
+- Preserve concurrent refresh coordination, cross-tab logout and pending-logout retry behavior.
+- API errorPolicy defaults to auth: local has no global side effects; auth handles 401; route additionally handles 403/404 navigation.
+- Public article reads explicitly use withAuth=false and local errors. Do not redirect all public failures to login.
+- Cookie properties and deployment behavior require backend/runtime verification; frontend code alone does not prove them.
 
----
+Use shared/api/queries.ts and centralized queryKeys for query caching/invalidation; mutations can call API modules directly. Defaults: staleTime 30s, gcTime 5min, no refetch on focus, at most one retry. ApiBusinessError retries only for code >=500; other thrown errors may retry.
 
-## Routing
+Current endpoints and acceptance boundaries are in docs/integration-checklist.md. In particular: PUT /users/me, GET /search, POST /upload, /review/pending and /review/:id/decision.
 
-Route meta fields (all optional):
+## API codegen
 
-| Field | Type | Effect |
-|---|---|---|
-| `requiresAuth` | boolean | Redirect to `/login?redirect=...` if unauthenticated |
-| `publicOnly` | boolean | Redirect authenticated users away (login/register pages) |
-| `roles` | `('USER'\|'ADMIN')[]` | Redirect to `/forbidden` if role doesn't match |
-| `presentation` | `'sheet'` | Render inside `PageSheet` overlay, not full-page navigation |
-| `sheetVariant` | `'default'\|'full'` | Sheet size |
-| `sheetInset` | `'default'\|'article'` | Sheet inset style |
-| `drawerAware` | boolean | If `false`, skips drawer-close guard on navigation |
+npm run generate:api reads at least one of OPENAPI_AUTH_URL, OPENAPI_CONTENT_URL, OPENAPI_REVIEW_URL, OPENAPI_SEARCH_URL, OPENAPI_FILE_URL from the process environment. It writes src/shared/api/generated/openapi.ts. Existing contracts.ts is manually maintained, not a renamed generated output; reconcile contracts/adapters/mappers explicitly after backend changes.
 
-**Sheet routing**: `/articles/:id` and review sheet routes render as `PageSheet` (overlay on top of the previous page). `App.vue` manages which route is the "background" page and which is the sheet.
+## Styling and motion
 
-**Drawer close guard**: If `uiStore.drawerOpen` is true, any navigation is deferred until the drawer finishes closing. Don't bypass this by calling `router.push` directly from within a drawer without closing it first.
+- Tailwind CSS 4 uses @tailwindcss/vite; no tailwind.config.js.
+- Core design tokens are in app/styles/theme.css: use color/surface/text/border/status, shadow and radius variables rather than introducing arbitrary colors.
+- Font declarations and --font-pressure / --font-display are in fonts.css; base/component styles also contain local variables. Do not claim every token lives only in theme.css.
+- html.dark switches theme; rich-text styles are in prose.css.
+- Follow .impeccable.md: content-led Chinese editorial identity, legible workflows and a restrained shell, with existing expressive home/results/profile scenes.
+- Home intro and desktop navigation choreography are separate: docs/home-intro.md and docs/page-transitions.md.
+- Desktop page choreography is >=1024px; mobile does not inherit full desktop timing. Preserve reduced-motion behavior, cancellation, first-paint readiness and cleanup.
+- main.ts caps GSAP ticker at 60; motionClock and WebGL renderers have their own update budgets. This is not a guaranteed delivered FPS.
+- No PWA/Capacitor/native app is configured. Do not present proposals as shipped functionality.
 
----
+## Environment
 
-## API Layer
+| Variable | Default / role |
+| --- | --- |
+| VITE_APP_NAME | Semi-Overt |
+| VITE_API_BASE_URL | /api/v1 |
+| VITE_ASSET_BASE_URL | Empty; asset prefix |
+| VITE_TOKEN_STORAGE_KEY | now.token; legacy cleanup key only |
+| VITE_TURNSTILE_SITE_KEY | Public registration challenge site key |
+| VITE_NAV_LIQUID_MOTION | String false disables the liquid panel transition |
+| BASE_URL | Vite-provided router base; configure through Vite base |
 
-### Base URL
-Default: `/api/v1` (proxied to `http://localhost:8080` in dev via `vite.config.ts`).  
-Override with `VITE_API_BASE_URL` env var.
+Never put backend secrets in VITE_* variables or public source. Font subset generation needs Python, fonttools[woff], and assets-source/fonts/ZhaohuaMinB-Black.woff2; it is not required for a normal build.
 
-### Request flow
-```
-shared/api/modules/*.ts  →  shared/api/request.ts  →  shared/api/http.ts (Axios)
-                                       ↓
-                          shared/api/response.ts (business error normalisation)
-                                       ↓
-                          app/providers/setupApiSideEffects.ts (401/403/404 → navigation)
-```
+## Git, CI and documentation
 
-- `request.ts` wraps `get/post/put/patch/delete/upload` and unwraps the business response envelope.
-- `http.ts` auto-attaches `Authorization: Bearer <token>` and persists refreshed tokens from response headers (`new-token`, `x-new-token`, `x-access-token`, `authorization`).
-- Global error handling: 401 → clear auth + redirect to login; 403 → redirect to `/forbidden`; 404 → redirect to not-found. **Pages do not need to handle these themselves.**
-
-### Vue Query
-All data fetching uses `@tanstack/vue-query` hooks defined in `shared/api/queries.ts`.  
-Cache keys are centralised in `shared/api/queryKeys.ts` — always use `queryKeys.*` for invalidation.  
-Default: `staleTime=30s`, `gcTime=5min`, retry only on 5xx errors, no refetch on window focus.
-
-### API codegen
-`npm run generate:api` reads OpenAPI specs from environment variables and writes to `src/shared/api/generated/openapi.ts`.  
-Required env vars (set at least one):
-```
-OPENAPI_AUTH_URL
-OPENAPI_CONTENT_URL
-OPENAPI_REVIEW_URL
-OPENAPI_SEARCH_URL
-OPENAPI_FILE_URL
-```
-The generated file is committed as `src/shared/api/generated/contracts.ts` (manually curated subset). Re-run codegen after backend contract changes.
-
----
-
-## Stores
-
-| Store | Holds |
-|---|---|
-| `auth` | Current user, token, `isAuthenticated`, `role` |
-| `session` | Redirect target, forbidden message (session-scoped) |
-| `ui` | Dark mode, search keyword, `drawerOpen`, `isDrawerClosing`, `pendingRoute` |
-| `editor` | Current article being edited, dirty flag, save/submit state, last-saved timestamp |
-| `draft` | Draft list |
-| `profile` | Current profile page data |
-| `review` | Pending review queue and review logs |
-
-Token is persisted via `shared/utils/authStorage.ts`. Storage key defaults to `now.token` (override with `VITE_TOKEN_STORAGE_KEY`).
-
----
-
-## Styling
-
-- **Tailwind CSS v4** via `@tailwindcss/vite` plugin. No `tailwind.config.js` — configuration is in CSS.
-- **Design tokens** live exclusively in `src/app/styles/theme.css` as CSS custom properties. Use these variables, not hardcoded colours:
-  - `--color-primary`, `--color-bg`, `--color-surface`, `--color-surface-glass`, `--color-text`, `--color-text-muted`, `--color-border`, `--color-danger`, `--color-success`, `--color-warning`
-  - `--shadow-xs/sm/md/lg`, `--shadow-glass-card`, `--shadow-button`
-  - `--radius-sm/md/lg/xl/pill`, `--backdrop-blur`
-- Dark mode: toggled by adding `html.dark` class. All token overrides are in `theme.css` under `html.dark`.
-- Font stack prioritises Chinese fonts: HarmonyOS Sans SC → MiSans → PingFang SC → Noto Sans SC → Microsoft YaHei.
-- Rich-text/article prose styles: `src/app/styles/prose.css`.
-
----
-
-## Design Principles (from `.impeccable.md`)
-
-This is a Chinese-language editorial platform. Keep these in mind when building UI:
-
-1. **Content first** — public screens help users decide what to read within seconds.
-2. **One dominant action** per screen; no equal-weight competing CTAs.
-3. **Calm over clever** — motion and blur support orientation, not spectacle.
-4. **Plain language** — labels and status copy explain value and state directly.
-5. **Aesthetic**: light-first, frosted/glass surfaces, restrained blue (`#0071e3` / `#2997ff` dark), minimal typography. Avoid decorative gradients, dashboard-card excess, generic AI-SaaS tropes.
-
----
-
-## Environment Variables
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `VITE_APP_NAME` | `Now` | Browser title prefix |
-| `VITE_API_BASE_URL` | `/api/v1` | API base path |
-| `VITE_ASSET_BASE_URL` | `''` | CDN prefix for assets |
-| `VITE_TOKEN_STORAGE_KEY` | `now.token` | localStorage key for auth token |
-| `BASE_URL` | `/` | Router history base (set by Vite) |
-
----
-
-## Placeholder / Stub Directories
-
-These exist in the tree but have no implementation files yet:
-- `src/types/` — reserved for future global type consolidation
-- `src/features/article-delete/` — user-side article delete (separate from `admin-article-delete`)
-- `src/widgets/fullpage-drawer/`
-- `src/widgets/publish-dropdown/`
-
-Don't add logic inside them without a matching feature spec.
-
----
-
-## Git / Repo Notes
-
-- Push uses SSH (not HTTPS). Ensure SSH key is configured before `git push`.
-- `.github/workflows/frontend-ci.yml` runs `npm ci` and `npm run build` for relevant pull requests, pushes to `main`, and manual dispatches.
-- The public frontend repository must not contain production SSH secrets. Production frontend deployment is orchestrated from the private `P1nL/semi-overt-springboot` repository.
-- No pre-commit hook is configured; run `npm run build` locally before pushing when practical.
+- Check git status before editing; preserve unrelated work. Inspect git remote -v instead of assuming SSH or HTTPS.
+- Frontend CI installs and builds for configured PR/main path filters and workflow_dispatch. It does not currently run Node tests or deploy. Docs-only/scripts-only changes do not match its file filters.
+- Production credentials must not enter this public repository; production deployment orchestration belongs to the private backend repository.
+- Build before pushing when practical. Do not commit or push without authorization.
+- Keep README product-focused; keep implementation details in docs/source-code-guide.md. Update interface/regression/motion documents when their contracts change.
+- Preserve third-party license notices. Historical test counts and machine-local backups are not current acceptance evidence.
