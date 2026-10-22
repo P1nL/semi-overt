@@ -14,6 +14,13 @@ const markdown = new MarkdownIt({
 })
 
 configureMarkdownLinks(markdown)
+// Whitespace-preserving editor imports must not mistake renderer pretty-printing
+// around block tags or <br> for user-entered spaces/line breaks (tight lists
+// in particular omit <p>, leaving the renderer's newline inside the list item).
+const renderToken = markdown.renderer.renderToken.bind(markdown.renderer)
+markdown.renderer.renderToken = (tokens, index, options) => renderToken(tokens, index, options).trim()
+markdown.renderer.rules.hardbreak = () => '<br />'
+markdown.renderer.rules.softbreak = () => '<br />'
 
 export function renderMarkdownToEditorHtml(content: string): string {
   if (!content.trim()) {
@@ -27,9 +34,9 @@ export function renderMarkdownToEditorHtml(content: string): string {
 
 export function serializeEditorToMarkdown(editor: Pick<Editor, 'getJSON'>): string {
   const document = editor.getJSON()
-  const content = serializeBlockNodes(document.content ?? []).trim()
-
-  return content.replace(/\n{3,}/g, '\n\n')
+  const onlyBlock = document.content?.length === 1 ? document.content[0] : null
+  if (onlyBlock?.type === 'paragraph' && !onlyBlock.content?.length && !getTextAlign(onlyBlock)) return ''
+  return serializeBlockNodes(document.content ?? []).trim()
 }
 
 function serializeBlockNodes(nodes: JSONContent[]): string {
@@ -42,8 +49,9 @@ function serializeBlockNodes(nodes: JSONContent[]): string {
 function serializeBlockNode(node: JSONContent, depth = 0): string {
   switch (node.type) {
     case 'paragraph': {
-      const text = serializeInlineNodes(node.content ?? [])
-      return wrapAlignedBlock('p', text, getTextAlign(node))
+      if (getTextAlign(node)) return serializeBlockNodeAsHtml(node)
+      if (!node.content?.length) return '<p></p>'
+      return serializeInlineNodes(node.content)
     }
     case 'heading': {
       const level = clampHeadingLevel(node.attrs?.level)
@@ -51,7 +59,7 @@ function serializeBlockNode(node: JSONContent, depth = 0): string {
       const alignment = getTextAlign(node)
 
       if (alignment && alignment !== 'left') {
-        return `<h${level} style="text-align: ${alignment};">${text}</h${level}>`
+        return serializeBlockNodeAsHtml(node)
       }
 
       return `${'#'.repeat(level)} ${text}`.trim()
@@ -67,11 +75,10 @@ function serializeBlockNode(node: JSONContent, depth = 0): string {
         .map((line) => (line ? `> ${line}` : '>'))
         .join('\n')
     }
-    case 'codeBlock': {
-      const language = typeof node.attrs?.language === 'string' ? node.attrs.language : ''
-      const code = serializeCodeContent(node.content ?? [])
-      return `\`\`\`${language}\n${code}\n\`\`\``
-    }
+    // Fenced Markdown normalizes a final newline into the code content. Raw
+    // <pre><code> preserves exact text, including zero or many trailing newlines.
+    case 'codeBlock':
+      return serializeBlockNodeAsHtml(node)
     case 'horizontalRule':
       return '---'
     case 'image': {
@@ -87,59 +94,60 @@ function serializeBlockNode(node: JSONContent, depth = 0): string {
 function serializeList(node: JSONContent, ordered: boolean, depth: number): string {
   const items = node.content ?? []
 
-  if (items.some((item) => getListItemTextAlign(item))) {
-    return serializeAlignedListAsHtml(node, ordered)
+  if (items.some((item) => getListItemTextAlign(item) || (item.content ?? []).some((child, index) =>
+    index > 0 && child.type !== 'bulletList' && child.type !== 'orderedList',
+  ))) {
+    return serializeListAsHtml(node, ordered)
   }
 
+  const start = ordered ? toPositiveInteger(node.attrs?.start) ?? 1 : 1
   return items
-    .map((item, index) => serializeListItem(item, ordered, depth, index))
+    .map((item, index) => serializeListItem(item, ordered, depth, start + index))
     .filter(Boolean)
     .join('\n')
 }
 
-function serializeAlignedListAsHtml(node: JSONContent, ordered: boolean): string {
+function serializeListAsHtml(node: JSONContent, ordered: boolean): string {
   const tag = ordered ? 'ol' : 'ul'
+  const start = ordered ? toPositiveInteger(node.attrs?.start) ?? 1 : 1
+  const attributes = ordered && start !== 1 ? ` start="${start}"` : ''
   const items = node.content ?? []
   const body = items
     .map((item) => {
       const alignment = getListItemTextAlign(item)
       const style = alignment ? ` style="text-align: ${alignment};"` : ''
-      const content = serializeListItemContentAsHtml(item)
+      const content = serializeBlockNodesAsHtml(item.content ?? [])
 
       return `<li${style}>${content}</li>`
     })
     .join('\n')
 
-  return `<${tag}>\n${body}\n</${tag}>`
-}
-
-function serializeListItemContentAsHtml(node: JSONContent): string {
-  return (node.content ?? [])
-    .map((child) => {
-      if (child.type === 'paragraph') {
-        return serializeInlineNodesAsHtml(child.content ?? [])
-      }
-
-      if (child.type === 'bulletList' || child.type === 'orderedList') {
-        return serializeAlignedListAsHtml(child, child.type === 'orderedList')
-      }
-
-      return serializeBlockNodeAsHtml(child)
-    })
-    .filter(Boolean)
-    .join('\n')
+  return `<${tag}${attributes}>\n${body}\n</${tag}>`
 }
 
 function serializeBlockNodeAsHtml(node: JSONContent): string {
   switch (node.type) {
+    case 'paragraph': {
+      const alignment = getTextAlign(node)
+      const style = alignment ? ` style="text-align: ${alignment};"` : ''
+      return `<p${style}>${serializeInlineNodesAsHtml(node.content ?? [])}</p>`
+    }
     case 'heading': {
       const level = clampHeadingLevel(node.attrs?.level)
       const alignment = getTextAlign(node)
       const style = alignment ? ` style="text-align: ${alignment};"` : ''
       return `<h${level}${style}>${serializeInlineNodesAsHtml(node.content ?? [])}</h${level}>`
     }
-    case 'codeBlock':
-      return `<pre><code>${escapeHtmlText(serializeCodeContent(node.content ?? []))}</code></pre>`
+    case 'bulletList':
+    case 'orderedList':
+      return serializeListAsHtml(node, node.type === 'orderedList')
+    case 'blockquote':
+      return `<blockquote>${serializeBlockNodesAsHtml(node.content ?? [])}</blockquote>`
+    case 'codeBlock': {
+      const language = typeof node.attrs?.language === 'string' ? node.attrs.language : ''
+      const attributes = language ? ` class="language-${escapeHtmlAttribute(language)}"` : ''
+      return `<pre><code${attributes}>${escapeHtmlText(serializeCodeContent(node.content ?? []))}</code></pre>`
+    }
     case 'horizontalRule':
       return '<hr />'
     case 'image':
@@ -155,10 +163,10 @@ function serializeListItem(
   node: JSONContent,
   ordered: boolean,
   depth: number,
-  index: number,
+  number: number,
 ): string {
   const indent = '  '.repeat(depth)
-  const prefix = ordered ? `${index + 1}. ` : '- '
+  const prefix = ordered ? `${number}. ` : '- '
   const continuationIndent = `${indent}${' '.repeat(prefix.length)}`
   const blocks = node.content ?? []
   const lines: string[] = []
@@ -186,7 +194,8 @@ function serializeListItem(
     }
 
     if (child.type === 'bulletList' || child.type === 'orderedList') {
-      lines.push(serializeList(child, child.type === 'orderedList', depth + 1))
+      const nested = serializeList(child, child.type === 'orderedList', 0)
+      lines.push(...nested.split('\n').map((line) => `${continuationIndent}${line}`))
       return
     }
 
@@ -207,94 +216,50 @@ function serializeListItem(
 }
 
 function serializeInlineNodes(nodes: JSONContent[]): string {
-  const { leadingWhitespace, contentNodes } = splitLeadingInlineWhitespace(nodes)
-
-  return `${serializeLeadingWhitespace(leadingWhitespace)}${contentNodes
-    .map((node) => {
-      if (node.type === 'text') {
-        return applyTextMarks(node.text ?? '', node.marks ?? [])
-      }
-
-      if (node.type === 'hardBreak') {
-        return '  \n'
-      }
-
-      if (node.type === 'image') {
-        return serializeImageNode(node)
-      }
-
-      return serializeInlineNodes(node.content ?? [])
-    })
-    .join('')}`
+  return serializeInlineContent(nodes, false)
 }
 
 function serializeInlineNodesAsHtml(nodes: JSONContent[]): string {
-  const { leadingWhitespace, contentNodes } = splitLeadingInlineWhitespace(nodes)
+  return serializeInlineContent(nodes, true)
+}
 
-  return `${serializeLeadingWhitespace(leadingWhitespace)}${contentNodes
+function serializeInlineContent(nodes: JSONContent[], asHtml: boolean): string {
+  let atLineStart = true
+  return nodes
     .map((node) => {
       if (node.type === 'text') {
-        return applyTextMarksAsHtml(node.text ?? '', node.marks ?? [])
+        const text = node.text ?? ''
+        const isCode = node.marks?.some((mark) => mark.type === 'code')
+        const leading = atLineStart && !isCode ? text.match(/^[\t \u00a0\u3000]+/)?.[0] ?? '' : ''
+        const remaining = text.slice(leading.length)
+        if (remaining) atLineStart = false
+        const applyMarks = asHtml ? applyTextMarksAsHtml : applyTextMarks
+        return serializeLeadingWhitespace(leading) + (remaining ? applyMarks(remaining, node.marks) : '')
       }
 
       if (node.type === 'hardBreak') {
-        return '<br />'
+        // A soft line break starts a new indentation scope, not a new paragraph.
+        atLineStart = true
+        return asHtml ? '<br />' : '  \n'
       }
 
+      atLineStart = false
       if (node.type === 'image') {
-        return serializeImageNodeAsHtml(node)
+        return asHtml ? serializeImageNodeAsHtml(node) : serializeImageNode(node)
       }
 
-      return serializeInlineNodesAsHtml(node.content ?? [])
+      return serializeInlineContent(node.content ?? [], asHtml)
     })
-    .join('')}`
-}
-
-function splitLeadingInlineWhitespace(nodes: JSONContent[]): {
-  leadingWhitespace: string
-  contentNodes: JSONContent[]
-} {
-  let collectingLeadingWhitespace = true
-  let leadingWhitespace = ''
-  const contentNodes: JSONContent[] = []
-
-  for (const node of nodes) {
-    if (!collectingLeadingWhitespace || node.type !== 'text') {
-      collectingLeadingWhitespace = false
-      contentNodes.push(node)
-      continue
-    }
-
-    const text = node.text ?? ''
-    const match = text.match(/^[\t \u00a0]+/)
-
-    if (!match) {
-      collectingLeadingWhitespace = false
-      contentNodes.push(node)
-      continue
-    }
-
-    leadingWhitespace += match[0]
-    const remainingText = text.slice(match[0].length)
-
-    if (remainingText) {
-      collectingLeadingWhitespace = false
-      contentNodes.push({
-        ...node,
-        text: remainingText,
-      })
-    }
-  }
-
-  return {
-    leadingWhitespace,
-    contentNodes,
-  }
+    .join('')
 }
 
 function serializeLeadingWhitespace(value: string): string {
   return Array.from(value)
-    .map((character) => character === '\t' ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '&nbsp;')
+    .map((character) => {
+      if (character === '\t') return '&nbsp;&nbsp;&nbsp;&nbsp;'
+      if (character === '\u3000') return '&#12288;'
+      return '&nbsp;'
+    })
     .join('')
 }
 
@@ -315,40 +280,30 @@ function serializeCodeContent(nodes: JSONContent[]): string {
 }
 
 function applyTextMarks(text: string, marks: JSONContent['marks'] = []): string {
-  let output = escapeMarkdownText(text)
-  const marksList = marks ?? []
-  const markTypes = new Set(marksList.map((mark) => mark.type))
-  const linkMark = marksList.find((mark) => mark.type === 'link')
-
-  if (markTypes.has('italic')) {
-    output = `*${output}*`
-  }
-
-  if (markTypes.has('strike')) {
-    output = `~~${output}~~`
-  }
-
-  if (markTypes.has('bold')) {
-    output = `**${output}**`
-  }
-
-  if (markTypes.has('underline')) {
-    output = `<u>${output}</u>`
-  }
-
-  if (markTypes.has('highlight')) {
-    output = `<mark>${output}</mark>`
-  }
-
-  if (linkMark && typeof linkMark.attrs?.href === 'string' && linkMark.attrs.href) {
-    output = `[${output}](${linkMark.attrs.href})`
-  }
-
-  return output
+  const isCode = marks?.some((mark) => mark.type === 'code')
+  const output = isCode ? serializeInlineCode(text) : escapeMarkdownText(text)
+  // HTML marks are already part of the content format. Unlike per-node **/*/~~,
+  // explicit boundaries remain unambiguous with spaces and overlapping marks.
+  return wrapTextMarks(output, marks)
 }
 
 function applyTextMarksAsHtml(text: string, marks: JSONContent['marks'] = []): string {
   let output = escapeHtmlText(text)
+  if (marks?.some((mark) => mark.type === 'code')) output = `<code>${output}</code>`
+  return wrapTextMarks(output, marks)
+}
+
+function longestBacktickRun(value: string): number {
+  return Math.max(0, ...(value.match(/`+/g) ?? []).map((run) => run.length))
+}
+
+function serializeInlineCode(text: string): string {
+  const delimiter = '`'.repeat(longestBacktickRun(text) + 1)
+  const padding = /`/.test(text) || (/^ .* $/.test(text) && /[^ ]/.test(text)) ? ' ' : ''
+  return `${delimiter}${padding}${text}${padding}${delimiter}`
+}
+
+function wrapTextMarks(output: string, marks: JSONContent['marks'] = []): string {
   const marksList = marks ?? []
   const markTypes = new Set(marksList.map((mark) => mark.type))
   const linkMark = marksList.find((mark) => mark.type === 'link')
@@ -429,13 +384,7 @@ function serializeTableCellNodeAsHtml(node: JSONContent): string {
 
 function serializeBlockNodesAsHtml(nodes: JSONContent[]): string {
   return nodes
-    .map((node) => {
-      if (node.type === 'paragraph') {
-        return `<p>${serializeInlineNodesAsHtml(node.content ?? [])}</p>`
-      }
-
-      return serializeBlockNodeAsHtml(node)
-    })
+    .map((node) => serializeBlockNodeAsHtml(node))
     .filter(Boolean)
     .join('')
 }
@@ -500,13 +449,11 @@ function serializeImageNode(node: JSONContent): string {
   const title = typeof node.attrs?.title === 'string' && node.attrs.title.trim() ? node.attrs.title : ''
   const widthPercent = normalizeEditorImageWidthPercent(node.attrs?.widthPercent)
 
-  if (widthPercent === null) {
+  if (widthPercent === null && !title && !/[\s()<>]/.test(src)) {
     return `![${escapeMarkdownText(alt)}](${src})`
   }
 
-  const titleAttribute = title ? ` title="${escapeHtmlAttribute(title)}"` : ''
-
-  return `<img src="${escapeHtmlAttribute(src)}" alt="${escapeHtmlAttribute(alt)}"${titleAttribute} data-width="${widthPercent}" style="width: ${widthPercent}%; height: auto;" />`
+  return serializeImageNodeAsHtml(node)
 }
 
 function serializeImageNodeAsHtml(node: JSONContent): string {
@@ -524,14 +471,6 @@ function serializeImageNodeAsHtml(node: JSONContent): string {
   return `<img src="${escapeHtmlAttribute(src)}" alt="${escapeHtmlAttribute(alt)}"${titleAttribute}${widthAttributes} />`
 }
 
-function wrapAlignedBlock(tag: 'p', text: string, alignment: string | null): string {
-  if (!alignment) {
-    return text
-  }
-
-  return `<${tag} style="text-align: ${alignment};">${text}</${tag}>`
-}
-
 function clampHeadingLevel(level: unknown): number {
   if (typeof level !== 'number' || !Number.isFinite(level)) {
     return 2
@@ -541,7 +480,7 @@ function clampHeadingLevel(level: unknown): number {
 }
 
 function escapeMarkdownText(value: string): string {
-  return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
+  return escapeHtmlText(value).replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1')
 }
 
 function escapeHtmlAttribute(value: string): string {

@@ -232,6 +232,7 @@ const contentEditor = useEditor({
     }),
   ],
   content: renderMarkdownToEditorHtml(form.content),
+  parseOptions: { preserveWhitespace: true },
   editable: !disabledState.value,
   editorProps: {
     attributes: {
@@ -243,6 +244,10 @@ const contentEditor = useEditor({
 
       const editor = contentEditor.value
       if (!editor) return false
+
+      // Let ProseMirror paste literal text/newlines inside code blocks instead
+      // of inserting paragraph nodes or turning a pasted URL into a link.
+      if (editor.isActive('codeBlock')) return false
 
       const pastedLinkHref = resolvePastedLinkHref(text)
       if (pastedLinkHref) {
@@ -421,6 +426,7 @@ function syncEditorFromMarkdown(markdown: string, force = false) {
   syncingEditorContent.value = true
   editor.commands.setContent(renderMarkdownToEditorHtml(markdown), {
     emitUpdate: false,
+    parseOptions: { preserveWhitespace: true },
   })
 
   queueMicrotask(() => {
@@ -694,7 +700,7 @@ function createPlainTextPasteContent(text: string): JSONContent | JSONContent[] 
     }
   }
 
-  return normalized.split(/\n{2,}/).map((block) => {
+  return normalized.split('\n\n').map((block) => {
     const lines = block.split('\n')
     const content = lines.flatMap<JSONContent>((line, index) => {
       const nodes: JSONContent[] = []
