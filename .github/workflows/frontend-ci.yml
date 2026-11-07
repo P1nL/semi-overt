@@ -55,3 +55,13 @@ jobs:
 
       - name: Type-check and build
         run: npm run build
+
+      - name: Record automatic release eligibility
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          {
+            echo '## Frontend release'
+            printf '\nVerified main commit: %s\n' "$GITHUB_SHA"
+            echo 'The independent production workflow checks successful main builds every 30 minutes.'
+            echo 'Production SSH credentials remain in the private deployment repository.'
+          } >> "$GITHUB_STEP_SUMMARY"
