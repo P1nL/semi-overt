@@ -100,7 +100,7 @@ Never put backend secrets in VITE_* variables or public source. Font subset gene
 ## Git, CI and documentation
 
 - Check git status before editing; preserve unrelated work. Inspect git remote -v instead of assuming SSH or HTTPS.
-- Frontend CI installs and builds for configured PR/main path filters and workflow_dispatch. It does not currently run Node tests or deploy. Docs-only/scripts-only changes do not match its file filters.
+- Frontend CI installs and builds for configured PR/main path filters and workflow_dispatch. It does not run Node tests or deploy directly. The private backend repository's independent Deploy frontend production workflow checks every 30 minutes and releases only the latest main SHA with successful push CI. Docs-only/scripts-only changes do not match the frontend CI filters.
 - Production credentials must not enter this public repository; production deployment orchestration belongs to the private backend repository.
 - Build before pushing when practical. Do not commit or push without authorization.
 - Keep README product-focused; keep implementation details in docs/source-code-guide.md. Update interface/regression/motion documents when their contracts change.

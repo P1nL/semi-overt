@@ -171,6 +171,10 @@ npm run font:subset 调用 Python，依赖 `fonttools[woff]`，输入 assets-sou
 
 .github/workflows/frontend-ci.yml 对匹配路径的 PR、main push 和手动触发执行 npm ci + npm run build。专项测试没有接入该工作流；文档与 scripts 的独立变更也不在当前路径筛选中。
 
+生产发布使用私有后端仓库中的独立工作流 `Deploy frontend production`（`.github/workflows/deploy-frontend.yml`）。它在每小时第 7、37 分钟检查前端最新 main，要求同一 SHA 的 push CI 成功，且服务器尚未部署该版本；满足条件才构建生产包并发布。GitHub 定时任务可能延迟，需要立即发布时可手动运行同一工作流，无需填写 Java 后端参数。
+
+构建使用私有仓库维护的公开 VITE 配置；SSH 密钥只提供给版本检查和发布任务，不提供给 npm 构建任务。发布前再次核对 main 和 CI，沿用归档校验、静态资源验证、原子切换和失败回滚。已上线的版本不会重复构建。部署回执保留 7 天。
+
 Git remote URL 属于本地配置，不写死 SSH 或 HTTPS；操作前用 git remote -v 核验。生产 SSH 凭据不得进入公开前端仓库，部署协调保留在私有后端仓库。
 
 修改接口时同步联调清单；修改脚本/路由/会话时同步本指南和 AGENTS.md；修改动效时同步专门文档。许可证和历史证据不作为普通说明文档改写。未执行的验收明确标记“未验证”。
