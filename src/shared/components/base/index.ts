@@ -1,4 +1,5 @@
 export { default as AnimatedActionButtonIcon } from './AnimatedActionButtonIcon.vue'
+export { default as AnimatedBowlingIcon } from './AnimatedBowlingIcon.vue'
 export { default as AnimatedPersonCyclingIcon } from './AnimatedPersonCyclingIcon.vue'
 export { default as AnimatedPersonExitIcon } from './AnimatedPersonExitIcon.vue'
 export { default as AnimatedTrashIcon } from './AnimatedTrashIcon.vue'

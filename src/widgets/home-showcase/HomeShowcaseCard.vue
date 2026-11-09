@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { ArticleCardVm } from '@/entities/article'
+import { HomePinButton } from '@/features/home-pin'
 
 const props = withDefaults(
   defineProps<{
@@ -85,9 +86,7 @@ const cardStyle = computed(() => ({
 </script>
 
 <template>
-  <component
-    :is="article ? RouterLink : 'div'"
-    :to="article?.articlePath"
+  <div
     class="home-showcase-card"
     data-title-effect-occluder
     :class="{
@@ -97,9 +96,14 @@ const cardStyle = computed(() => ({
       'home-showcase-card--settled': revealed && !animateReveal,
     }"
     :style="cardStyle"
-    :aria-label="article ? `${categoryLabel}：${article.titleText}` : undefined"
     :aria-hidden="!article ? 'true' : undefined"
   >
+    <component
+      :is="article ? RouterLink : 'div'"
+      :to="article?.articlePath"
+      class="home-showcase-card__link"
+      :aria-label="article ? `${categoryLabel}：${article.titleText}` : undefined"
+    >
     <template v-if="article">
     <div class="home-showcase-card__header">
 
@@ -115,7 +119,9 @@ const cardStyle = computed(() => ({
       </div>
     </div>
     </template>
-  </component>
+    </component>
+    <HomePinButton v-if="article" :article-id="article.id" :pinned="article.homePinned" />
+  </div>
 </template>
 
 <style scoped>
@@ -156,6 +162,16 @@ const cardStyle = computed(() => ({
 }
 
 .home-showcase-card--decorative { cursor: default; }
+
+.home-showcase-card__link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: inherit;
+  min-height: 0;
+  color: inherit;
+  text-decoration: none;
+}
 
 .home-showcase-card__header {
   display: flex;
@@ -226,7 +242,7 @@ const cardStyle = computed(() => ({
   border-radius: clamp(1.2rem, 3vw, 1.8rem);
 }
 
-.home-showcase-card:focus-visible {
+.home-showcase-card__link:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-primary) 78%, white 22%);
   outline-offset: 5px;
 }

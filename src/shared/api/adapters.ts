@@ -53,6 +53,7 @@ interface BackendArticleResp {
     latestReviewReason?: string | null
     assignedAdminId?: number | null
     draftVisible?: boolean | null
+    homePinned?: boolean | null
     author?: {
         id?: number | null
         username?: string | null
@@ -245,6 +246,7 @@ function normalizeArticleCardDto(raw: BackendArticleResp): ArticleCardDto & { dr
         updatedAt: normalizeBackendDateTime(raw.updatedAt),
         rejectReason: raw.rejectReason ?? null,
         draftVisible: raw.draftVisible ?? false,
+        homePinned: raw.homePinned === true,
     }
 }
 

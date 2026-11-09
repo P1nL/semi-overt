@@ -42,9 +42,12 @@
 | POST | /articles/{id}/cancel-review | 取消审核 |
 | DELETE | /articles/{id} | 作者删除；以服务端权限和状态检查为准 |
 | DELETE | /admin/articles/{id} | 管理员删除 |
+| PUT | /admin/articles/{id}/home-pin | 管理员首页置顶；请求 `{ pinned: boolean }`，返回 `{ articleId, homePinned }` |
 | POST | /upload | multipart：file、bizType，可选 articleId、oldUrl |
 
 上传返回 url、size，可带 width、height、dominantColor；前端补齐缺省值。验收头像、封面和正文图片回填、类型/大小错误和替换旧资源行为。
+
+首页置顶：仅管理员在首页真实文章卡片右上角看到 bowling 按钮；实心底色表示已置顶，点击可取消。置顶对游客和登录用户都生效；桌面将置顶文章移到队列最右端，最近置顶文章占据最右侧完整卡位，手机列表将其排在前面。最多展示 11 张首页主卡片。未置顶文章继续按原曝光规则轮换。分类、搜索和个人主页排序保持原样。核对按钮点击不会打开文章，提交中不能重复操作，失败显示错误；服务端拒绝游客和普通用户写入，草稿、未发布及已删除文章不能新增置顶。
 
 ## 审核
 

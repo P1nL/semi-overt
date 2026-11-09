@@ -52,6 +52,36 @@ test('content follows either direction of the original slots without changing ar
   assert.equal(isShowcaseLayoutReversed([0,0]),false)
   assert.deepEqual(createShowcaseSlots(articles(11),11,true,true),createShowcaseSlots(articles(11),11,true,false))
 })
+test('desktop pins occupy the physical right end with the newest pin at the outermost slot',()=>{
+  for(const count of [1,4,11]) for(const reversed of [false,true]) {
+    const items=articles(count)
+    items[0].homePinned=true
+    if(count>1) items[1].homePinned=true
+    const original=[...items]
+    const slots=createShowcaseSlots(items,11,true,reversed,true)
+    const real=slots.filter(slot=>slot.kind==='article')
+    const fromRight=(reversed?[...real]:[...real].reverse()).map(slot=>slot.article.id)
+    assert.deepEqual(fromRight.slice(0,Math.min(count,2)),items.slice(0,2).map(article=>article.id))
+    const offsets=slots.map((_,index)=>reversed?-index*80:index*80)
+    const latestIndex=slots.findIndex(slot=>slot.kind==='article' && slot.article.id===items[0].id)
+    assert.equal(offsets[latestIndex],Math.max(...offsets))
+    assert.deepEqual(real.filter(slot=>!slot.article.homePinned).map(slot=>slot.article),items.slice(2))
+    real.forEach(slot=>assert.equal(slot.articleIndex,items.indexOf(slot.article)))
+    assert.deepEqual(items,original)
+    assert.equal(new Set(real.map(slot=>slot.article.id)).size,count)
+  }
+})
+test('unpinned decks retain their original order and narrow screens retain pinned-first API order',()=>{
+  const items=articles(4)
+  for(const reversed of [false,true]) {
+    assert.deepEqual(createShowcaseSlots(items,11,true,reversed,true),createShowcaseSlots(items,11,true,reversed))
+  }
+  items[0].homePinned=true
+  assert.deepEqual(createShowcaseSlots(items,11,false,false,false).map(slot=>slot.article),items)
+  assert.deepEqual(createShowcaseSlots(items,11,false,false,true).map(slot=>slot.article.id),[2,3,4,1])
+  items[0].homePinned=false
+  assert.deepEqual(createShowcaseSlots(items,11,false,false,true).map(slot=>slot.article),items)
+})
 test('decoration roots are non-link hidden surfaces; only real cards render a title',()=>{
   const card=readFileSync(new URL('../src/widgets/home-showcase/HomeShowcaseCard.vue',import.meta.url),'utf8')
   assert.match(card,/:is="article \? RouterLink : 'div'"/)
@@ -84,23 +114,30 @@ test('all card slots expose hover geometry while only real articles expose navig
 const railSetup=parse(readFileSync(new URL('../src/widgets/home-showcase/HomeShowcaseRail.vue',import.meta.url),'utf8')).descriptor.scriptSetup.content
 const railAst=ts.createSourceFile('HomeShowcaseRail.ts',railSetup,ts.ScriptTarget.Latest,true)
 const railMotionSource=railAst.statements.filter(node=>{
-  if(ts.isVariableStatement(node)) return node.declarationList.declarations.some(item=>item.name.getText(railAst)==='getMotionState')
+  if(ts.isVariableStatement(node)) return node.declarationList.declarations.some(item=>['getMotionState','getItemStyle'].includes(item.name.getText(railAst)))
   return ts.isFunctionDeclaration(node) && ['handleRailPointerMove','clearHoveredItem','onItemClick','shouldUseNativeNavigation'].includes(node.name?.text)
 }).map(node=>node.getText(railAst)).join('\n')
 const railMotionCode=ts.transpileModule(railMotionSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
 function motionHarness(slots) {
-  const hoveredIndex={value:null},desktop={value:true},active={value:false},pushes=[]
+  const hoveredIndex={value:null},desktop={value:true},active={value:false},reversed={value:false},pushes=[]
   class Target {
     constructor(index){this.index=index}
-    closest(){return this.index===null?null:{dataset:{showcaseItemIndex:String(this.index)}}}
+    closest(selector){
+      if(selector==='[data-home-pin-action]') return this.pinAction ? this : null
+      return this.index===null?null:{dataset:{showcaseItemIndex:String(this.index)}}
+    }
   }
   const exports={}
-  vm.runInNewContext(railMotionCode+'\nObject.assign(exports,{getMotionState,handleRailPointerMove,clearHoveredItem,onItemClick})',{
+  vm.runInNewContext(railMotionCode+'\nObject.assign(exports,{getMotionState,getItemStyle,handleRailPointerMove,clearHoveredItem,onItemClick})',{
     exports,hoveredIndex,visibleSlots:{value:slots},isDesktopRail:desktop,entrance:{active},Element:Target,
+    reversedLayout:reversed,
+    visibleItems:{value:slots.flatMap(slot=>slot.kind==='article'?[slot.article]:[])},props:{featured:true},
+    featuredLiftPattern:['0rem'],regularLiftPattern:['0rem'],
     clearNavigationSettleTimer(){},syncMotionState:async()=>{},navigationSettleTimer:null,HOVER_SETTLE_BEFORE_NAVIGATE_MS:280,
     window:{setTimeout(fn){fn();return 1}},router:{push:path=>pushes.push(path)},
   })
-  return {...exports,hoveredIndex,desktop,active,pushes,
+  return {...exports,hoveredIndex,desktop,active,reversed,pushes,
+    pinTarget(){const target=new Target(8);target.pinAction=true;return target},
     move(index,pointerType='mouse'){exports.handleRailPointerMove({pointerType,target:new Target(index)})},
     pose(index){return JSON.parse(JSON.stringify(exports.getMotionState(index)))},
   }
@@ -165,6 +202,28 @@ test('real article navigation still settles the deck before opening the article'
   assert.equal(prevented,true)
   assert.equal(h.hoveredIndex.value,null)
   assert.deepEqual(h.pushes,[items[0].articlePath])
+})
+test('pin controls bypass capture-phase navigation and keep the hovered card in place',async()=>{
+  const items=articles(3),h=motionHarness(createShowcaseSlots(items,11,true))
+  h.move(8)
+  let prevented=false
+  await h.onItemClick({button:0,target:h.pinTarget(),preventDefault(){prevented=true}},items[0])
+  assert.equal(prevented,false)
+  assert.equal(h.hoveredIndex.value,8)
+  assert.deepEqual(h.pushes,[])
+})
+test('right-end pins use the normal deck paint order; reversed geometry paints from left to right',()=>{
+  const items=articles(4)
+  items[0].homePinned=true
+  items[1].homePinned=true
+  const h=motionHarness(createShowcaseSlots(items,11,true,false,true))
+  for(let index=0;index<11;index++) assert.equal(h.getItemStyle(index).zIndex,undefined)
+  h.reversed.value=true
+  assert.ok(h.getItemStyle(0).zIndex>h.getItemStyle(10).zIndex)
+  h.move(10)
+  assert.ok(h.getItemStyle(10).zIndex>h.getItemStyle(0).zIndex)
+  h.desktop.value=false
+  assert.equal(h.getItemStyle(0).zIndex,undefined)
 })
 test('development and production share real data and the intro freezes it until completion',()=>{
   const hero=readFileSync(new URL('../src/widgets/hero-section/HeroSection.vue',import.meta.url),'utf8')

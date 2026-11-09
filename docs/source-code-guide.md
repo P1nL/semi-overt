@@ -178,3 +178,17 @@ npm run font:subset 调用 Python，依赖 `fonttools[woff]`，输入 assets-sou
 Git remote URL 属于本地配置，不写死 SSH 或 HTTPS；操作前用 git remote -v 核验。生产 SSH 凭据不得进入公开前端仓库，部署协调保留在私有后端仓库。
 
 修改接口时同步联调清单；修改脚本/路由/会话时同步本指南和 AGENTS.md；修改动效时同步专门文档。许可证和历史证据不作为普通说明文档改写。未执行的验收明确标记“未验证”。
+
+## 首页置顶
+
+`features/home-pin` 提供仅管理员可见的 `HomePinButton`，由
+`widgets/home-showcase/HomeShowcaseCard.vue` 放在卡片右上角，与文章链接并列。
+`HomeShowcaseRail` 的捕获阶段导航跳过该按钮，点击置顶不会触发文章跳转或收回悬停卡片。
+图标使用随项目打包的 `ball-bowling-hover-pinch.json`，尊重减少动态效果设置。
+
+`PUT /admin/articles/{id}/home-pin` 发送明确的 `{ pinned: boolean }`。
+成功后只刷新 `queryKeys.home`；首页 DTO 的 `homePinned` 经 adapter 和 article mapper
+传至卡片；桌面将置顶文章移至卡片队列最右端，最近置顶的文章占据最右侧完整卡位，
+并随实际队列方向调整卡位顺序。手机列表按接口顺序显示，置顶文章排在前面。
+其他页面的文章卡片不显示置顶入口。后端权限、持久化和置顶排序由 API 执行。
+回归测试：`node --test scripts/home-pin.test.mjs scripts/home-showcase.test.mjs`。

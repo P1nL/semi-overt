@@ -34,10 +34,13 @@ const props = withDefaults(
 const router = useRouter()
 const isDesktopRail = useMediaQuery('(min-width: 1024px)')
 const reversedLayout = ref(false)
+const pinRightOverflow = ref(0)
 const visibleItems = computed(() => props.items.slice(0, props.maxVisible))
-const visibleSlots = computed(() => createShowcaseSlots(visibleItems.value, props.maxVisible, props.featured && props.fillDecorative && isDesktopRail.value, reversedLayout.value))
+const visibleSlots = computed(() => createShowcaseSlots(visibleItems.value, props.maxVisible, props.featured && props.fillDecorative && isDesktopRail.value, reversedLayout.value, isDesktopRail.value))
 // Changing slot contents after a size measurement must not remount/move slots.
-const visibleItemSignature = computed(() => `${visibleItems.value.map(item => item.id).join('|')}:${visibleSlots.value.length}`)
+const visibleItemSignature = computed(() => visibleSlots.value.map(slot =>
+  slot.kind === 'article' ? `${slot.key}:${slot.article.homePinned}` : slot.key,
+).join('|'))
 const layoutVersion = ref(0)
 const motions = useMotions()
 const motionIdPrefix = `home-showcase-rail-${getCurrentInstance()?.uid ?? 'default'}`
@@ -45,6 +48,7 @@ const railRef = ref<HTMLElement | null>(null)
 let layoutObserver: ResizeObserver | undefined
 function syncSlotOrder() {
   const slots = Array.from(railRef.value?.querySelectorAll<HTMLElement>('.home-showcase-rail__item') ?? [])
+  const viewport = railRef.value?.querySelector<HTMLElement>('.home-showcase-rail__viewport')
   // offsetLeft ignores hover/entrance transforms. Read only on layout changes.
   const reversed = props.featured && props.fillDecorative && isDesktopRail.value
     && isShowcaseLayoutReversed(slots.map(slot => slot.offsetLeft))
@@ -52,6 +56,11 @@ function syncSlotOrder() {
     reversedLayout.value = reversed
     hoveredIndex.value = null
   }
+  // Keep the right-end pin inside the viewport without changing card sizes or spacing.
+  pinRightOverflow.value = isDesktopRail.value && visibleItems.value.some(article => article.homePinned) && viewport
+    ? Math.max(0, Number.parseFloat(getComputedStyle(viewport).paddingInlineStart)
+      + Math.max(0, ...slots.map(slot => slot.offsetLeft + slot.offsetWidth)) - viewport.clientWidth)
+    : 0
 }
 const entrance = useCardEntrance(railRef, motionIdPrefix, () => props.featured, () => visibleSlots.value.length)
 const HOVER_SETTLE_BEFORE_NAVIGATE_MS = 280
@@ -59,12 +68,18 @@ const regularLiftPattern = ['0rem', '1.5rem', '0.5rem', '2.35rem', '1rem', '3rem
 const featuredLiftPattern = ['0rem', '2rem', '0.85rem', '3rem', '1.5rem', '4rem'] as const
 let navigationSettleTimer: number | null = null
 
-const getItemStyle = (index: number) => ({
-  '--item-index': index,
-  '--showcase-item-lift': (props.featured ? featuredLiftPattern : regularLiftPattern)[
-    index % (props.featured ? featuredLiftPattern.length : regularLiftPattern.length)
-  ],
-})
+const getItemStyle = (index: number) => {
+  return {
+    '--item-index': index,
+    // Reverse the paint order with the geometry so the rightmost card stays exposed.
+    zIndex: isDesktopRail.value && reversedLayout.value
+      ? hoveredIndex.value === index ? visibleSlots.value.length + 1 : visibleSlots.value.length - index
+      : undefined,
+    '--showcase-item-lift': (props.featured ? featuredLiftPattern : regularLiftPattern)[
+      index % (props.featured ? featuredLiftPattern.length : regularLiftPattern.length)
+    ],
+  }
+}
 
 // --- 🌟 动画核心逻辑开始 ---
 const hoveredIndex = ref<number | null>(null)
@@ -208,6 +223,7 @@ function shouldUseNativeNavigation(event: MouseEvent) {
 
 async function onItemClick(event: MouseEvent, item: ArticleCardVm | undefined) {
   if (!item) return
+  if (event.target instanceof Element && event.target.closest('[data-home-pin-action]')) return
   if (shouldUseNativeNavigation(event)) return
   if (!isDesktopRail.value || hoveredIndex.value === null) return
 
@@ -256,6 +272,7 @@ onBeforeUnmount(() => {
       ref="railRef"
       :inert="entrance.active.value"
       class="home-showcase-rail"
+      :style="{ '--showcase-pin-overflow': `${pinRightOverflow}px` }"
       :class="{ 'home-showcase-rail--featured': featured }"
       @pointermove="handleRailPointerMove"
       @pointerleave="clearHoveredItem"
@@ -352,6 +369,7 @@ onBeforeUnmount(() => {
     gap: 0;
     padding-right: 0;
     perspective: 1200px; /* 为 rotate 提供空间深度感 */
+    translate: calc(-1 * var(--showcase-pin-overflow, 0px)) 0;
   }
 
   .home-showcase-rail__item {

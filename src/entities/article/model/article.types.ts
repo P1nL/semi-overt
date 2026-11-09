@@ -81,6 +81,7 @@ export interface ArticleCardVm {
     author: ArticleAuthorVm | null
     latestReason: string | null
     draftVisible: boolean
+    homePinned: boolean
     articlePath: string
     editPath: string
     reviewPath: string

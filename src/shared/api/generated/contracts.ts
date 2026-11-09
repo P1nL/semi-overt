@@ -53,6 +53,7 @@ export interface ArticleCardDto {
     status?: 'DRAFT' | 'PENDING' | 'APPROVED' | 'RETURNED' | 'REJECTED' | string
     author?: ArticleAuthorDto
     draftVisible?: boolean
+    homePinned?: boolean
     publishedAt?: string | null
     updatedAt?: string | null
     rejectReason?: string | null
